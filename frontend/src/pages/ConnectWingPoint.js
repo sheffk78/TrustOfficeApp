@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { showError, reportErrorToBackend } from '@/utils/errors';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, X, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { is2faChallenge, login2fa, get2faRateLimitMessage, get2faAttemptsRemaining } from '@/utils/twoFactor';
+import { use2faLockout, formatLockout } from '@/hooks/use2faLockout';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, X, ShieldCheck, Shield, ArrowLeft } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -47,7 +49,11 @@ const xhrPost = (url, data, headers = {}) => {
             } else if (xhr.status === 0) {
               retryOrFail(response.detail);
             } else {
-              reject(new Error(response.detail || `Request failed with status ${xhr.status}`));
+              const err = new Error(response.detail || `Request failed with status ${xhr.status}`);
+              // Carry the parsed body so callers can detect structured
+              // challenges (e.g. 2fa_required) on non-2xx responses.
+              err.payload = xhr.responseText;
+              reject(err);
             }
           } catch (e) {
             reject(new Error('Invalid server response'));
@@ -91,6 +97,15 @@ export default function ConnectWingPoint() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+
+  // 2FA (TOTP) challenge state — mirrors LoginPage's login flow so users with
+  // two-factor enabled can complete their sign-in on the connect page.
+  const [challengeToken, setChallengeToken] = useState('');
+  const [twoFAStage, setTwoFAStage] = useState(false);
+  const [twoFACode, setTwoFACode] = useState('');
+  const [twoFAError, setTwoFAError] = useState('');
+  const [twoFAAttemptsLeft, setTwoFAAttemptsLeft] = useState(null);
+  const lockout = use2faLockout();
 
   // Validate we have a redirect_url — without it the flow is meaningless
   const hasRedirectUrl = !!redirectUrl;
@@ -137,6 +152,16 @@ export default function ConnectWingPoint() {
         password: password,
       });
 
+      // Structured 2FA challenge: the API returns 403 + a challenge token
+      // instead of a session when the account has TOTP enabled. Stage into
+      // the code-entry view instead of showing a generic error.
+      if (is2faChallenge(data) && data.challenge_token) {
+        setChallengeToken(data.challenge_token);
+        setTwoFAStage(true);
+        setLoginError('');
+        return;
+      }
+
       if (data.token) {
         localStorage.setItem('auth_token', data.token);
       }
@@ -154,6 +179,25 @@ export default function ConnectWingPoint() {
       setStep('confirm');
     } catch (error) {
       const rawMsg = error.message || 'Login failed';
+
+      // 2FA challenge: the backend returns 401 with a JSON body
+      // {detail:'2fa_required', challenge_token}. xhrPost rejects with the
+      // detail string, so sniff the message; if this account has 2FA enabled
+      // the password was correct and we move to the code-entry step.
+      if (rawMsg.includes('2fa_required')) {
+        try {
+          const parsed = JSON.parse(error.payload || 'null');
+          if (is2faChallenge(parsed)) {
+            setChallengeToken(parsed.challenge_token);
+            setTwoFAStage(true);
+            setLoginError('');
+            return;
+          }
+        } catch (parseErr) {
+          // fall through to the generic error path
+        }
+      }
+
       let friendlyMsg = rawMsg;
       if (rawMsg.includes('Network error')) {
         friendlyMsg = 'Unable to connect to the server. Please check your internet connection and try again.';
@@ -169,6 +213,63 @@ export default function ConnectWingPoint() {
       if (!rawMsg.includes('401') && !rawMsg.toLowerCase().includes('invalid credentials')) {
         reportErrorToBackend(error, { operation: 'wingpoint_connect_login', page: 'ConnectWingPoint' });
       }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  // ── 2FA second step: exchange the challenge token + code (or recovery
+  // code) for a session, then proceed exactly as a normal login would.
+  // Mirrors LoginPage.handleTwoFactorSubmit.
+  const handleTwoFASubmit = async (e) => {
+    e.preventDefault();
+    if (loginLoading || lockout.active) return;
+    const trimmed = twoFACode.trim();
+    if (!trimmed) {
+      setTwoFAError('Enter the 6-digit code from your authenticator app.');
+      return;
+    }
+    setLoginLoading(true);
+    setTwoFAError('');
+    setTwoFAAttemptsLeft(null);
+
+    try {
+      const data = await login2fa(challengeToken, trimmed);
+      setTwoFACode('');
+      lockout.clear();
+      setTwoFAAttemptsLeft(null);
+
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      if (data.user) {
+        setUser(data.user);
+      }
+
+      await Promise.all([
+        loadTrusts(),
+        loadSubscriptionState(data.user?.email || data.user?.name),
+      ]);
+
+      toast.success('Welcome back');
+      setStep('confirm');
+    } catch (error) {
+      const rawMsg = error.message || 'Verification failed';
+      const rateMsg = get2faRateLimitMessage(error);
+      const attemptsLeft = get2faAttemptsRemaining(error);
+      let friendlyMsg = rawMsg;
+      if (rateMsg) {
+        // Backend rate-limit: show its message verbatim and start the countdown.
+        const retryAfter = Number(error?.body?.retry_after || error?.payload?.retry_after || 0);
+        lockout.trigger(retryAfter);
+        friendlyMsg = rateMsg;
+      } else if (rawMsg.includes('Network error')) {
+        friendlyMsg = 'Unable to connect to the server. Please check your internet connection and try again.';
+      } else if (rawMsg.includes('401') || rawMsg.toLowerCase().includes('invalid') || rawMsg.toLowerCase().includes('expired')) {
+        friendlyMsg = 'That code was not valid or has expired. Please check your authenticator app and try again.';
+      }
+      setTwoFAError(friendlyMsg);
+      setTwoFAAttemptsLeft(attemptsLeft);
     } finally {
       setLoginLoading(false);
     }
@@ -336,6 +437,76 @@ export default function ConnectWingPoint() {
             </div>
 
             <div className="card-trust corner-mark relative">
+              {twoFAStage ? (
+                <>
+                  <h1 className="font-serif text-3xl text-navy mb-2">Two-Factor Verification</h1>
+                  <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
+                    Protecting your TrustOffice account
+                  </p>
+
+                  <form onSubmit={handleTwoFASubmit} data-testid="connect-wp-2fa-step">
+                    <div className="space-y-4">
+                      {twoFAError && (
+                        <div className="p-3 bg-error/10 border border-error/20 flex items-start gap-2" data-testid="connect-wp-2fa-error">
+                          <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-error">Verification failed</p>
+                            <p className="text-xs text-error/80 mt-0.5">{twoFAError}</p>
+                          </div>
+                        </div>
+                      )}
+                      {lockout.active && (
+                        <div className="p-3 bg-navy/5 border border-navy/20 flex items-center gap-2" role="status">
+                          <AlertCircle className="w-4 h-4 text-navy flex-shrink-0" />
+                          <p className="text-sm text-navy">
+                            You can try again in {formatLockout(lockout.secondsLeft)}
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-3 p-3 bg-navy/5">
+                        <Shield className="w-4 h-4 text-navy mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-navy">
+                          Open your authenticator app and enter the 6-digit code it shows
+                          <span className="block text-xs text-muted-foreground mt-0.5">
+                            or use a recovery code if you lost your device.
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                          Authentication Code
+                        </Label>
+                        <Input
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          autoFocus
+                          placeholder="123456"
+                          maxLength={40}
+                          value={twoFACode}
+                          onChange={(e) => { setTwoFACode(e.target.value); if (twoFAError) setTwoFAError(''); }}
+                          className="input-trust mt-1 tracking-widest text-center text-lg"
+                          aria-label="6-digit authentication code or recovery code"
+                          data-testid="connect-wp-2fa-code-input"
+                          disabled={lockout.active}
+                        />
+                      </div>
+                      {twoFAAttemptsLeft != null && (
+                        <p className="text-xs text-muted-foreground">
+                          {twoFAAttemptsLeft} attempts left before a short cooldown
+                        </p>
+                      )}
+                      <Button
+                        type="submit"
+                        disabled={loginLoading || lockout.active}
+                        className="w-full h-12 uppercase tracking-wider text-xs"
+                      >
+                        {loginLoading ? 'Verifying…' : 'Verify Code'}
+                      </Button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <>
               <h1 className="font-serif text-3xl text-navy mb-2">Sign In</h1>
               <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
                 Log in to connect your WingPoint account
@@ -450,6 +621,8 @@ export default function ConnectWingPoint() {
                   Sign up
                 </Link>
               </p>
+                </>
+              )}
             </div>
           </div>
         </div>
