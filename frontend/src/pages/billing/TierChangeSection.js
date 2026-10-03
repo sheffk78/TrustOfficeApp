@@ -56,10 +56,11 @@ export default function TierChangeSection({
         {TIERS.map((tier) => {
           const isCurrentTier = tier.id === normalizedPlanType;
           const isUpgrade = TIERS.findIndex((t) => t.id === tier.id) > currentTierIndex;
+          // Same >= semantics as backend checkout/change-plan guards (2026-10-03 fix).
           const isIneligible =
             userTrustCount != null &&
             tier.maxTrusts !== Infinity &&
-            userTrustCount > tier.maxTrusts;
+            userTrustCount >= tier.maxTrusts;
           return (
             <div
               key={tier.id}
