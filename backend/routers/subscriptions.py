@@ -371,9 +371,14 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     # Trust count validation — prevent checkout for plans that can't support
     # the user's existing number of trusts. This check happens BEFORE any
     # Stripe API call so users never reach checkout for an ineligible plan.
+    # 2026-10-03: comparison is `>` (not `>=`) — the limit is "supports up
+    # to N trusts", so a user whose count EQUALS the limit fits the plan.
+    # The old `>=` blocked exactly-fitting prospects at checkout (prod
+    # 2026-10-03: WingPoint-provisioned prospect, 1 trust, Trustee checkout
+    # 400 ×6 in 6 min — paywall bug, not noise).
     trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
     trust_limit = get_trust_limit(checkout.plan_type, None)
-    if trust_limit != float('inf') and trust_count >= trust_limit:
+    if trust_limit != float('inf') and trust_count > trust_limit:
         _plan_display_names = {"trustee": "Trustee", "estate": "Estate", "advisor": "Advisor", "wingpoint": "WingPoint", "monthly": "Trustee", "annual": "Trustee"}
         plan_display_name = _plan_display_names.get(checkout.plan_type, checkout.plan_type.title())
         raise HTTPException(
@@ -920,9 +925,11 @@ async def change_plan(request: ChangePlanRequest, user: dict = Depends(get_curre
     # Trust count validation — prevent downgrade to a plan that can't support
     # the user's existing number of trusts. This check happens BEFORE the
     # Stripe Subscription.modify call so the plan change never goes through.
+    # Same `>` semantics as create-checkout (2026-10-03 off-by-one fix):
+    # a count EQUAL to the limit fits the plan; only exceeding it blocks.
     trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
     trust_limit = get_trust_limit(request.plan_type, None)
-    if trust_limit != float('inf') and trust_count >= trust_limit:
+    if trust_limit != float('inf') and trust_count > trust_limit:
         _plan_display_names = {"trustee": "Trustee", "estate": "Estate", "advisor": "Advisor", "wingpoint": "WingPoint"}
         plan_display_name = _plan_display_names.get(request.plan_type, request.plan_type.title())
         raise HTTPException(
