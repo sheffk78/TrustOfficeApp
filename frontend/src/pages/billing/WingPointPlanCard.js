@@ -32,10 +32,11 @@ function TrusteeOptionCard({ onSubscribe, processing, isTargetPlan, cardRef, use
   const [period, setPeriod] = useState('annual');
   const monthlyEquivalent = period === 'annual' ? (TRUSTEE_TIER.annual / 12).toFixed(2).replace(/\.00$/, '') : TRUSTEE_TIER.monthly;
 
-  const isIneligible =
-    userTrustCount != null &&
-    TRUSTEE_TIER.maxTrusts !== Infinity &&
-    userTrustCount > TRUSTEE_TIER.maxTrusts;
+// 2026-10-03 trust-count gate fix: backend rejects checkout when
+// trust_count >= plan limit (Trustee=1). Frontend must match with >= so a
+// WingPoint customer holding 1 trust sees this card locked instead of
+// hitting a server 400 after clicking (Kevin Jemison incident).
+const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infinity && userTrustCount >= TRUSTEE_TIER.maxTrusts;
 
   return (
     <div

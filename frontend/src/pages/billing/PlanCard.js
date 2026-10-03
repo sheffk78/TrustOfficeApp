@@ -24,12 +24,14 @@ export default function PlanCard({
   cardRef,
   userTrustCount,
 }) {
-  // A tier is ineligible when the user has more trusts than the tier supports.
-  // Infinity (unlimited) tiers are never ineligible.
+  // A tier is ineligible when the user's trusts already fill the tier:
+  // backend checkout rejects when trust_count >= plan limit (Trustee=1, Estate=8).
+  // Frontend must match with >= so the card locks before clicking (2026-10-03 fix;
+  // Infinity tiers are never ineligible).
   const isIneligible =
     userTrustCount != null &&
     tier.maxTrusts !== Infinity &&
-    userTrustCount > tier.maxTrusts;
+    userTrustCount >= tier.maxTrusts;
 
   return (
     <div
