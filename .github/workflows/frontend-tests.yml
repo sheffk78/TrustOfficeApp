@@ -1,0 +1,39 @@
+name: Frontend Tests
+
+# Gap fix (2026-10-03, Kevin outage): the WingPoint connect page shipped a
+# stale Aug-29 bundle for 3+ weeks because only the BACKEND had a CI gate.
+# The backend 2FA-login contract changed Sep-12; the frontend (and every
+# other page contract) was never re-verified. Every push to main now runs
+# the full frontend suite (24 suites / 207 tests, ~90s) so a page can never
+# drift from its API contract unnoticed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend-tests:
+    name: Frontend test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps
+        working-directory: frontend
+        run: npm install --legacy-peer-deps
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Test
+        working-directory: frontend
+        run: npx craco test --watchAll=false --ci --silent
