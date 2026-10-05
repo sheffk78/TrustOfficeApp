@@ -1080,7 +1080,7 @@ class BackgroundTaskRunner:
                         list_id=MAILERCLOUD_LEADS_LIST_ID,
                         list_name="TrustOffice Leads",
                     )
-                    if r.get("success"):
+                    if r.get("success") or r.get("status") == "sent":  # 2026-10-05 fix: send_email returns status, not success (hourly re-send bug)
                         await self.db.leads.update_one(
                             {"lead_id": lost["lead_id"]},
                             {"$set": {
@@ -1163,7 +1163,7 @@ class BackgroundTaskRunner:
                         "call_time": local_dt.strftime("%-I:%M %p"),
                         "timezone": BOOKING_TZ.replace("_", " "),
                         "meeting_url": lead.get("meeting_url")
-                        or (email_service.app_url + "/meeting"),
+                        or "https://trustoffice.app/book-a-call/",  # 2026-10-05: /meeting 404 on app domain; scheduler page is the safe fallback
                     }
 
                     if (
@@ -1173,7 +1173,7 @@ class BackgroundTaskRunner:
                         r = await email_service.send_booking_reminder_day_before(
                             to_email=email, **data
                         )
-                        if r.get("success"):
+                        if r.get("success") or r.get("status") == "sent":  # 2026-10-05 fix: send_email returns status, not success (hourly re-send bug)
                             await self.db.leads.update_one(
                                 {"lead_id": lead_id},
                                 {"$set": {"reminder_day_before_sent_at": now.isoformat()}},
@@ -1191,7 +1191,7 @@ class BackgroundTaskRunner:
                         r = await email_service.send_booking_reminder_1h(
                             to_email=email, **data
                         )
-                        if r.get("success"):
+                        if r.get("success") or r.get("status") == "sent":  # 2026-10-05 fix: send_email returns status, not success (hourly re-send bug)
                             await self.db.leads.update_one(
                                 {"lead_id": lead_id},
                                 {"$set": {"reminder_1h_sent_at": now.isoformat()}},
@@ -1242,9 +1242,11 @@ class BackgroundTaskRunner:
                         to_email=lead["email"],
                         name=lead.get("name", ""),
                         course_url=f"{email_service.app_url}/trustee-101",
-                        booking_url=f"{email_service.app_url}/book",
+                        # 2026-10-05 fix: booking CTA must point at the marketing-site
+                        # scheduler (app domain has no /book route -> 404'd)
+                        booking_url="https://trustoffice.app/book-a-call/",
                     )
-                    if r.get("success"):
+                    if r.get("success") or r.get("status") == "sent":  # 2026-10-05 fix: send_email returns status, not success (hourly re-send bug)
                         await self.db.leads.update_one(
                             {"lead_id": lead.get("lead_id")},
                             {"$set": {
@@ -1734,7 +1736,7 @@ class BackgroundTaskRunner:
                 if (lead.get("email") or "").lower().endswith("@agentictrust.app"):
                     continue  # internal test lead — never email
                 first = (lead.get("name") or "there").split()[0]
-                booking_url = f"{email_service.app_url}/book-a-call/"
+                booking_url = "https://trustoffice.app/book-a-call/"  # 2026-10-05: app domain had no such route (404) — canonical scheduler URL
                 try:
                     r = await email_service.send_email(
                         to_email=lead["email"],
@@ -1756,7 +1758,7 @@ class BackgroundTaskRunner:
                         ),
                         tag="no_show_reschedule",
                     )
-                    if r.get("success"):
+                    if r.get("success") or r.get("status") == "sent":  # 2026-10-05 fix: send_email returns status, not success (hourly re-send bug)
                         await self.db.leads.update_one(
                             {"lead_id": lead.get("lead_id")},
                             {"$set": {
@@ -1785,7 +1787,7 @@ class BackgroundTaskRunner:
                 if (lead.get("email") or "").lower().endswith("@agentictrust.app"):
                     continue  # internal test lead — never email
                 first = (lead.get("name") or "there").split()[0]
-                booking_url = f"{email_service.app_url}/book-a-call/"
+                booking_url = "https://trustoffice.app/book-a-call/"  # 2026-10-05: app domain had no such route (404) — canonical scheduler URL
                 try:
                     r = await email_service.send_email(
                         to_email=lead["email"],
@@ -1805,7 +1807,7 @@ class BackgroundTaskRunner:
                         ),
                         tag="no_show_nudge",
                     )
-                    if r.get("success"):
+                    if r.get("success") or r.get("status") == "sent":  # 2026-10-05 fix: send_email returns status, not success (hourly re-send bug)
                         await self.db.leads.update_one(
                             {"lead_id": lead.get("lead_id")},
                             {"$set": {

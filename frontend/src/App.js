@@ -66,6 +66,7 @@ import BeneficiaryReportPage from "@/pages/BeneficiaryReportPage";
 import ExportDashboard from "@/pages/ExportDashboard";
 import WingPointWelcomePage from "@/pages/WingPointWelcomePage";
 import WingPointRedirect from "@/pages/WingPointRedirect";
+import ExternalRedirect from "@/pages/ExternalRedirect";
 import ConnectWingPoint from "@/pages/ConnectWingPoint";
 import NotFoundPage from "@/pages/NotFoundPage";
 import KnowledgeBasePage from "@/pages/KnowledgeBasePage";
@@ -260,6 +261,12 @@ const AppRouter = () => {
       <Route path="/register" element={<SignUpPage />} />
       <Route path="/post-checkout" element={<PostCheckoutPage />} />
       <Route path="/wingpoint" element={<WingPointRedirect />} />
+      {/* 2026-10-05: legacy booking/course links in lead emails 404'd here — heal to marketing site */}
+      <Route path="/book" element={<ExternalRedirect to="https://trustoffice.app/book-a-call/" />} />
+      <Route path="/book-a-call" element={<ExternalRedirect to="https://trustoffice.app/book-a-call/" />} />
+      <Route path="/book-a-call/" element={<ExternalRedirect to="https://trustoffice.app/book-a-call/" />} />
+      <Route path="/meeting" element={<ExternalRedirect to="https://trustoffice.app/book-a-call/" />} />
+      <Route path="/trustee-101" element={<ExternalRedirect to="https://trustoffice.app/trustee-101/" />} />
       {/* Connect to WingPoint — account linking flow (public, checks auth internally) */}
       <Route path="/connect/wingpoint" element={<ConnectWingPoint />} />
       <Route path="/pricing" element={<PricingPage />} />
