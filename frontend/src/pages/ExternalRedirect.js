@@ -1,4 +1,3 @@
-import { Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 
 /**
@@ -14,11 +13,14 @@ import { useEffect } from 'react';
  *   /meeting       -> https://trustoffice.app/book-a-call/
  *   /trustee-101   -> https://trustoffice.app/trustee-101/
  * so every broken link already sitting in a prospect's inbox heals itself.
+ *
+ * NOTE: plain window.location.replace in an effect — <Navigate> only accepts
+ * INTERNAL paths (it would crash on an absolute external URL).
  */
 export default function ExternalRedirect(props) {
   const { to } = props;
   useEffect(() => {
     window.location.replace(to);
   }, [to]);
-  return <Navigate to={to} replace />;
+  return null;
 }
