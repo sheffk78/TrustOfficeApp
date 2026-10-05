@@ -6,7 +6,7 @@ import { useEffect } from 'react';
  *
  * Lead emails sent before 2026-10-05 pointed booking CTAs at this app's
  * domain, where those routes never existed (404). The real, working
- * scheduler lives on the marketing site; course lives there too.
+ * scheduler lives on the marketing site; the course lives there too.
  *
  * This component sends anyone landing on:
  *   /book          -> https://trustoffice.app/book-a-call/
@@ -15,7 +15,8 @@ import { useEffect } from 'react';
  *   /trustee-101   -> https://trustoffice.app/trustee-101/
  * so every broken link already sitting in a prospect's inbox heals itself.
  */
-export default function ExternalRedirect({ to }: { to: string }) {
+export default function ExternalRedirect(props) {
+  const { to } = props;
   useEffect(() => {
     window.location.replace(to);
   }, [to]);
