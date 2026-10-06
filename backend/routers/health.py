@@ -17,8 +17,8 @@ async def _require_owned_trust(trust_id: str, user: dict) -> dict:
 
 
 @router.get("/health")
-"""Global uptime + service status: the root health check."""
 async def global_health():
+    """Global uptime + service status: the root health check."""
     return {"status": "ok", "service": "trustoffice-api", "uptime": "healthy"}
 
 
