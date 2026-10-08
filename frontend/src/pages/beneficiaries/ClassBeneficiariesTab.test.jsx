@@ -130,11 +130,12 @@ function mockOk(data) {
 }
 
 // Expand the class card and wait for the roster fetch to land (roster or
-// empty-roster state, depending on the mocked response).
+// empty-roster state, depending on the mocked response). Since 2026-10-08 the
+// cards render expanded by DEFAULT — the panel is already open after render.
+// The toggle click remains in the helper for collapse/expand round-trips.
 async function openPanel(data = membersResponse) {
   mockOk(data);
   render(<Harness data={data} />);
-  fireEvent.click(screen.getByTestId(`class-toggle-${CLASS_ID}`));
   await screen.findByTestId(`class-panel-${CLASS_ID}`);
   await waitFor(() => {
     expect(
@@ -171,7 +172,8 @@ describe('ClassBeneficiariesTab expanded class member card', () => {
 
     expect(await screen.findByTestId(`split-ways-${CLASS_ID}`)).toHaveTextContent('split 1 way');
     expect(screen.getByTestId(`pool-split-${CLASS_ID}`)).toHaveTextContent('Alice Smith: 60%');
-    expect(screen.getByTestId(`sum-check-${CLASS_ID}`)).toHaveTextContent('Σ = pool ✓');
+    expect(screen.getByTestId(`sum-check-${CLASS_ID}`)).toHaveTextContent('Shares add up ✓');
+    expect(screen.queryByText('Σ = pool ✓')).not.toBeInTheDocument();
     // Fixed-instrument vs computed-pool distinction (one muted caption line).
     expect(
       screen.getByText(/computed pool split live across members, not an issued certificate/i)
@@ -182,7 +184,46 @@ describe('ClassBeneficiariesTab expanded class member card', () => {
     await openPanel({ ...membersResponse, sum_check: false });
 
     await screen.findByTestId(`roster-${CLASS_ID}`);
-    expect(screen.getByTestId(`sum-check-${CLASS_ID}`)).toHaveTextContent('Σ ≠ pool');
+    expect(screen.getByTestId(`sum-check-${CLASS_ID}`)).toHaveTextContent("don't add up to the pool");
+    expect(screen.queryByText('Σ ≠ pool')).not.toBeInTheDocument();
+  });
+
+  it('shows NO sum-check chip and NO split line when the roster is empty (no scary math on first run)', async () => {
+    await openPanel({
+      ...membersResponse,
+      items: [],
+      member_count: 0,
+      active_member_count: 0,
+      per_member_share_percent: {},
+      per_member_shares: [],
+    });
+
+    await screen.findByTestId(`empty-roster-${CLASS_ID}`);
+    expect(screen.queryByTestId(`sum-check-${CLASS_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`split-ways-${CLASS_ID}`)).not.toBeInTheDocument();
+  });
+
+  it('cards render EXPANDED by default with roster and Add Member visible without any click', async () => {
+    mockOk(membersResponse);
+    render(<Harness />);
+    // Panel opens automatically; no toggle click needed.
+    await screen.findByTestId(`class-panel-${CLASS_ID}`);
+    expect(screen.getByTestId(`add-member-btn-${CLASS_ID}`)).toBeInTheDocument();
+    // Toggle collapses; toggle again re-expands.
+    fireEvent.click(screen.getByTestId(`class-toggle-${CLASS_ID}`));
+    expect(screen.queryByTestId(`class-panel-${CLASS_ID}`)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(`class-toggle-${CLASS_ID}`));
+    expect(await screen.findByTestId(`class-panel-${CLASS_ID}`)).toBeInTheDocument();
+  });
+
+  it('collapsed card carries a click affordance line inviting the user to open the panel', async () => {
+    mockOk(membersResponse);
+    render(<Harness />);
+    await screen.findByTestId(`class-panel-${CLASS_ID}`);
+    fireEvent.click(screen.getByTestId(`class-toggle-${CLASS_ID}`)); // collapse
+    expect(screen.getByTestId(`class-hint-${CLASS_ID}`)).toHaveTextContent('Click to view members and add a person');
+    fireEvent.click(screen.getByTestId(`class-toggle-${CLASS_ID}`)); // expand again
+    await screen.findByTestId(`class-panel-${CLASS_ID}`);
   });
 
   it('add member calls POST with {name, date_of_birth} then reloads roster and overview counts', async () => {
@@ -304,8 +345,8 @@ describe('ClassBeneficiariesTab expanded class member card', () => {
     });
 
     const empty = await screen.findByTestId(`empty-roster-${CLASS_ID}`);
-    expect(empty.textContent).toBe('empty roster — pool undistributed until members are added');
     expect(empty.textContent).toBe(EMPTY_ROSTER_TEXT);
+    expect(empty.textContent).toContain('No members yet');
     expect(screen.queryByTestId(`roster-${CLASS_ID}`)).not.toBeInTheDocument();
   });
 

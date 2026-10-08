@@ -236,14 +236,21 @@ function ClassMemberPanel({ cb, membersState, onLoadMembers, onAddMember, onRena
 
   const roster = data?.items || [];
   const activeCount = data?.active_member_count ?? 0;
+  // Human-readable mismatch line (Jeff UX feedback 2026-10-08): total of the
+  // live per-member shares, shown in plain numbers instead of Σ shorthand.
+  const sumOfShares = data?.per_member_share_percent
+    ? Object.values(data.per_member_share_percent).reduce((a, b) => a + (Number(b) || 0), 0)
+    : 0;
 
   return (
     <div className="pt-3 border-t border-border" data-testid={`class-panel-${cb.class_beneficiary_id}`}>
       {/* Pool band */}
       <div className="flex flex-wrap items-center gap-2 mb-1">
-        <span className="text-xs font-mono text-muted-foreground" data-testid={`split-ways-${cb.class_beneficiary_id}`}>
-          {`split ${activeCount} ${activeCount === 1 ? 'way' : 'ways'}`}
-        </span>
+        {data && activeCount > 0 && (
+          <span className="text-xs font-mono text-muted-foreground" data-testid={`split-ways-${cb.class_beneficiary_id}`}>
+            {`split ${activeCount} ${activeCount === 1 ? 'way' : 'ways'}`}
+          </span>
+        )}
         {data && data.per_member_share_percent && activeCount > 0 && (
           <span className="text-xs font-mono text-navy dark:text-gold" data-testid={`pool-split-${cb.class_beneficiary_id}`}>
             {Object.entries(data.per_member_share_percent)
@@ -254,22 +261,22 @@ function ClassMemberPanel({ cb, membersState, onLoadMembers, onAddMember, onRena
               .join(' · ')}
           </span>
         )}
-        {data && (
+        {data && activeCount > 0 && (
           data.sum_check ? (
             <span
-              className="text-xs font-mono text-muted-foreground"
-              title="Member shares sum to the pool"
+              className="text-xs text-muted-foreground"
+              title={`Member shares sum to the pool (${formatSharePct(sumOfShares)} = ${formatSharePct(cb.percentage)})`}
               data-testid={`sum-check-${cb.class_beneficiary_id}`}
             >
-              Σ = pool ✓
+              Shares add up ✓
             </span>
           ) : (
             <span
-              className="text-xs font-mono text-error dark:text-error"
-              title="Member shares do not sum to the pool"
               data-testid={`sum-check-${cb.class_beneficiary_id}`}
+              title={`Member shares total ${formatSharePct(sumOfShares)} vs pool ${formatSharePct(cb.percentage)}`}
+              className="text-xs text-error dark:text-error"
             >
-              Σ ≠ pool
+              Shares ({formatSharePct(sumOfShares)}) don't add up to the pool ({formatSharePct(cb.percentage)})
             </span>
           )
         )}
@@ -357,10 +364,31 @@ export function ClassBeneficiariesTab({
   onRenameMember,
   onStatusChange,
 }) {
-  const [expandedClassId, setExpandedClassId] = useState(null);
+  // Class cards start expanded (Jeff UX feedback 2026-10-08): the roster and
+  // Add Member button are visible on load — nothing hidden behind a chevron.
+  // Collapsing still works per-card; newly loaded classes auto-open.
+  const [expandedIds, setExpandedIds] = useState(
+    () => new Set((overviewData?.class_beneficiaries || []).map((c) => c.class_beneficiary_id))
+  );
+
+  useEffect(() => {
+    const ids = (overviewData?.class_beneficiaries || []).map((c) => c.class_beneficiary_id);
+    setExpandedIds((prev) => {
+      const missing = ids.filter((id) => !prev.has(id));
+      if (!missing.length) return prev;
+      const next = new Set(prev);
+      missing.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [overviewData?.class_beneficiaries]);
 
   const toggleClass = (classId) => {
-    setExpandedClassId((current) => (current === classId ? null : classId));
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(classId)) next.delete(classId);
+      else next.add(classId);
+      return next;
+    });
   };
 
   return (
@@ -426,7 +454,7 @@ export function ClassBeneficiariesTab({
                       className="flex items-center gap-4 text-left min-w-0 flex-1"
                       onClick={() => toggleClass(cb.class_beneficiary_id)}
                       data-testid={`class-toggle-${cb.class_beneficiary_id}`}
-                      aria-expanded={expandedClassId === cb.class_beneficiary_id}
+                      aria-expanded={expandedIds.has(cb.class_beneficiary_id)}
                     >
                       <div className="w-12 h-12 bg-navy/10 dark:bg-gold/10 flex items-center justify-center flex-shrink-0">
                         <UsersRound className="w-6 h-6 text-navy dark:text-gold" />
@@ -446,9 +474,16 @@ export function ClassBeneficiariesTab({
                         {cb.notes && (
                           <p className="text-xs text-muted-foreground mt-1 truncate">{cb.notes}</p>
                         )}
+                        <p className="text-[11px] text-navy/70 dark:text-gold/70 mt-1" data-testid={`class-hint-${cb.class_beneficiary_id}`}>
+                          {expandedIds.has(cb.class_beneficiary_id)
+                            ? ((cb.member_count ?? 0) === 0
+                                ? 'Add each person below — click to collapse'
+                                : `${cb.member_count} member${cb.member_count === 1 ? '' : 's'} listed — click to collapse`)
+                            : 'Click to view members and add a person'}
+                        </p>
                       </div>
                       <ChevronDown
-                        className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${expandedClassId === cb.class_beneficiary_id ? 'rotate-180' : ''}`}
+                        className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${expandedIds.has(cb.class_beneficiary_id) ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </div>
@@ -463,7 +498,7 @@ export function ClassBeneficiariesTab({
                   </Button>
                 </div>
 
-                {expandedClassId === cb.class_beneficiary_id && membersState && (
+                {expandedIds.has(cb.class_beneficiary_id) && membersState && (
                   <ClassMemberPanel
                     cb={cb}
                     membersState={membersState}

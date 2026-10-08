@@ -102,7 +102,7 @@ export function makeCertificateForm() {
 }
 
 // Exact phrasing from the council design (session 3, class-member card UI).
-export const EMPTY_ROSTER_TEXT = 'empty roster — pool undistributed until members are added';
+export const EMPTY_ROSTER_TEXT = 'No members yet — use "Add Member" below to add each person. Shares split equally and update automatically as you add.';
 
 // Format an ISO date string for display; returns em-dash for null/undefined
 export function formatDate(dateStr) {
