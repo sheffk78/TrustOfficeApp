@@ -67,6 +67,7 @@ from routers.compensation import router as compensation_router
 from routers.subscriptions import router as subscriptions_router
 from routers.benevolence import router as benevolence_router
 from routers.benevolence_policy import router as benevolence_policy_router, ensure_indexes as ensure_benevolence_policy_indexes
+from services.class_member_indexes import ensure_class_member_indexes
 from routers.exports import router as exports_router
 from routers.full_export import router as full_export_router
 from routers.expenses import router as expenses_router
@@ -882,6 +883,13 @@ async def startup_event():
         # Class beneficiary indexes
         await db.class_beneficiaries.create_index([("trust_id", 1), ("user_id", 1)])
         await db.class_beneficiaries.create_index("class_beneficiary_id", unique=True)
+
+        # Class member indexes (named class members — 2026-10-07 council design:
+        # collection had ZERO indexes — multi-tenant collection scans on every
+        # roster read). Single shared definition (explicit names, idempotent)
+        # also used by scripts/migrate_class_member_shares.py so deploy-time
+        # and migration-time indexes can never drift apart.
+        await ensure_class_member_indexes(db)
         
         # Personal vendor index for separation alerts
         await db.personal_vendors.create_index("user_id")
