@@ -23,6 +23,20 @@ import os
 
 import pytest
 
+# Tier price IDs are read at module import in routers/subscriptions.py. CI never sets
+# them, giving PRICE_IDS entries = None and 500s ("Price ID not configured") that fire
+# BEFORE Stripe — which broke tests/test_trust_cap_checkout.py's pass-path detection
+# (2026-10-07 CI emails: Backend Tests red since Oct 3). Placeholders make the
+# pass-path deterministic in any env: placeholder key/price → Stripe error path.
+# setdefault preserves real values in local/prod-shaped envs.
+for _env in (
+    "STRIPE_TRUSTEE_MONTHLY_PRICE_ID", "STRIPE_TRUSTEE_ANNUAL_PRICE_ID",
+    "STRIPE_ESTATE_MONTHLY_PRICE_ID", "STRIPE_ESTATE_ANNUAL_PRICE_ID",
+    "STRIPE_ADVISOR_MONTHLY_PRICE_ID", "STRIPE_ADVISOR_ANNUAL_PRICE_ID",
+    "STRIPE_WINGPOINT_MONTHLY_PRICE_ID", "STRIPE_WINGPOINT_ANNUAL_PRICE_ID",
+):
+    os.environ.setdefault(_env, "price_test_placeholder")
+
 PROD_HOST_MARKERS = ("api.trustoffice.app", "app.trustoffice.app", "trustoffice.app")
 
 URL_ENV_VARS = ("REACT_APP_BACKEND_URL", "BACKEND_URL", "TEST_BASE_URL")
