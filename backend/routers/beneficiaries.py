@@ -225,7 +225,12 @@ async def _txn_supported(client) -> bool:
     try:
         async with await client.start_session() as session:
             async with session.start_transaction():
-                pass
+                # `pass` issues NO server command — a standalone mongod
+                # accepts the (never-materialized) transaction locally and
+                # the probe returns a FALSE positive; the first real write
+                # then dies with IllegalOperation(20). The probe must make
+                # an actual transactioned server round trip: ping on admin.
+                await client.admin.command("ping", session=session)
         supported = True
     except OperationFailure:
         supported = False

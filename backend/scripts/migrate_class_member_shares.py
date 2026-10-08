@@ -108,6 +108,7 @@ async def migrate(dry_run: bool) -> dict:
             {"member_status": {"$exists": False}},
             {"share_weight": {"$exists": False}},
             {"member_order": {"$exists": False}},
+            {"member_order": None},  # explicit null present-but-unset (null query matches missing too)
             {"name_history": {"$exists": False}},
             {"status_reason": {"$exists": False}},
             {"status_changed_at": {"$exists": False}},
@@ -157,7 +158,7 @@ async def migrate(dry_run: bool) -> dict:
                 set_ops["status_changed_at"] = None
             if d.get("share_weight") is None:
                 set_ops["share_weight"] = 1
-            if "member_order" not in d:
+            if d.get("member_order") is None:  # missing key AND explicit null
                 set_ops["member_order"] = d.get("_assigned_member_order", 0)
             if d.get("name_history") is None:
                 set_ops["name_history"] = []
