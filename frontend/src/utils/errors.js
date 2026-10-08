@@ -197,7 +197,9 @@ export async function reportErrorToBackend(error, context = {}) {
     // has this guard; this closes the same gap on the alert pipeline.
     if (_isDev()) return;
 
-    // Get user context from localStorage (best-effort)
+    // Get user context: prefer decoded session (token) over localStorage key
+    // that no writer has ever set ('user' — nothing calls setItem('user')).
+    // 2026-10-08 fix: error reports now carry real user identity for triage.
     let userId = null;
     let email = null;
     try {
@@ -208,6 +210,17 @@ export async function reportErrorToBackend(error, context = {}) {
         email = user.email || null;
       }
     } catch { /* ignore */ }
+    if (!userId) {
+      // Fallback: decode the JWT payload (best-effort; signature verified server-side)
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (token && token.includes('.')) {
+          const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          userId = payload.user_id || payload.sub || null;
+          email = payload.email || null;
+        }
+      } catch { /* ignore */ }
+    }
 
     const token = localStorage.getItem('auth_token');
     const headers = { 'Content-Type': 'application/json' };

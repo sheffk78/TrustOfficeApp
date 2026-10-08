@@ -102,7 +102,7 @@ export default function WingPointWelcomePage() {
       const verifyToken = async () => {
         try {
           const response = await fetch(
-            `${API}/api/auth/verify-reset-token?token=${token}`,
+            `${API}/auth/verify-reset-token?token=${token}`,
             { signal: controller.signal }
           );
           clearTimeout(timeoutId);
@@ -144,7 +144,7 @@ export default function WingPointWelcomePage() {
     }
     setSettingPassword(true);
     try {
-      const response = await fetch(`${API}/api/auth/reset-password`, {
+      const response = await fetch(`${API}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, new_password: password }),
@@ -181,7 +181,7 @@ export default function WingPointWelcomePage() {
     e.preventDefault();
     setLoginLoading(true);
     try {
-      const response = await fetch(`${API}/api/auth/login`, {
+      const response = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),

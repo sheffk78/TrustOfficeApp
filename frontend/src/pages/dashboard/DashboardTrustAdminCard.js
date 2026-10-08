@@ -16,7 +16,7 @@ export function DashboardTrustAdminCard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetchWithAuth('/api/trust-admin-service/scheduling');
+        const res = await fetchWithAuth('/trust-admin-service/scheduling');
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled) setState(data);
