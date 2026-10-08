@@ -517,8 +517,30 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         return {"checkout_url": session.url, "session_id": session.id}
 
     except stripe.StripeError as e:
-        logger.error(f"Stripe error: {e}")
-        raise HTTPException(status_code=500, detail="Payment service is currently unavailable. Please try again in a few minutes. If this continues, contact support@trustoffice.app.")
+        # Stripe errors return error_type + detailed messages
+        error_msg = str(e)
+        if hasattr(e, "error") and e.error:
+            error_msg += f" — Error type: {type(e.error)}"
+        if hasattr(e, "message"):
+            error_msg += f" ({e.message})"
+
+        logger.error(f"Stripe checkout session failed: {error_msg}")
+
+        # Extract specific error codes for tailored messages
+        error_dict = getattr(e, "json_body", {})
+        stripe_code = error_dict.get("error", {}).get("code")
+
+        if stripe_code == "invalid_request_error":
+            raise HTTPException(status_code=400, detail="Invalid payment details. Please check your card information.")
+        elif stripe_code == "resource_missing":
+            raise HTTPException(status_code=400, detail="The selected plan is unavailable. Please contact support@trustoffice.app.")
+        elif stripe_code in ["price_id_invalid", "price_not_found"]:
+            raise HTTPException(status_code=400, detail="Invalid pricing configuration. Please try another plan.")
+        else:
+            raise HTTPException(
+                status_code=400 if not stripe_code else 500,
+                detail=f"Checkout failed. Error: {error_msg}. Contact support@trustoffice.app for help."
+            )
 
 
 async def _validate_guest_checkout(checkout) -> tuple[str, str]:
