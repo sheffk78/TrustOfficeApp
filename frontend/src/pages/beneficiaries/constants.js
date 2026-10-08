@@ -101,6 +101,9 @@ export function makeCertificateForm() {
   return { ...DEFAULT_CERTIFICATE_FORM, issue_date: iso };
 }
 
+// Exact phrasing from the council design (session 3, class-member card UI).
+export const EMPTY_ROSTER_TEXT = 'empty roster — pool undistributed until members are added';
+
 // Format an ISO date string for display; returns em-dash for null/undefined
 export function formatDate(dateStr) {
   if (!dateStr) return '—';

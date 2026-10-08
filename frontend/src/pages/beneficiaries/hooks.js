@@ -513,6 +513,150 @@ export function useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal,
   };
 }
 
+// ========== CLASS MEMBERS HOOK (roster inside an expanded class card) ==========
+// Backend contract (live on api.trustoffice.app, 2026-10-08):
+//   GET  /beneficiaries/class-beneficiaries/{id}/members
+//   POST /beneficiaries/class-beneficiaries/{id}/members               {name, date_of_birth?, ...}
+//   POST /beneficiaries/class-beneficiaries/{id}/members/{mid}/status  {status, reason(1-1000), ...}
+//   PATCH /beneficiaries/class-beneficiaries/{id}/members/{mid}        {name}
+// NO member delete endpoint exists — status change is the only removal path.
+export function useClassMembers(selectedTrust, loadOverviewData) {
+  const [membersByClass, setMembersByClass] = useState({});
+  const [loadingClassId, setLoadingClassId] = useState(null);
+  const [mutatingClassId, setMutatingClassId] = useState(null);
+
+  const base = useCallback(
+    (classBeneficiaryId, suffix = '') => (
+      `/beneficiaries/class-beneficiaries/${classBeneficiaryId}/members${suffix}`
+    ),
+    []
+  );
+
+  // Roster read — per response contract: {items, member_count, active_member_count,
+  // pool_percentage, per_member_share_percent:{mid:pct}, sum_check, share_mode, ...}
+  const loadMembers = useCallback(async (classBeneficiaryId) => {
+    if (!classBeneficiaryId) return null;
+    setLoadingClassId(classBeneficiaryId);
+    try {
+      const response = await fetchWithAuth(base(classBeneficiaryId));
+      if (response.ok) {
+        const data = await response.json();
+        setMembersByClass((prev) => ({ ...prev, [classBeneficiaryId]: data }));
+        return data;
+      }
+      const errBody = await response.json().catch(() => null);
+      showError(toast, errBody || { detail: `Failed to load members (${response.status})` }, { operation: 'load', page: 'Beneficiaries' });
+      return null;
+    } catch (error) {
+      showError(toast, error, { operation: 'load', page: 'Beneficiaries' });
+      return null;
+    } finally {
+      setLoadingClassId(null);
+    }
+  }, [base]);
+
+  // Add member — name required (≤200). Server assigns order/active status, shares recompute.
+  const addMember = useCallback(async (classBeneficiaryId, { name, date_of_birth }) => {
+    if (!name || !name.trim()) {
+      toast.error('Member name is required');
+      return false;
+    }
+    setMutatingClassId(classBeneficiaryId);
+    try {
+      const body = {};
+      body.name = name;
+      if (date_of_birth) {
+        body.date_of_birth = date_of_birth;
+      }
+      const response = await fetchWithAuth(base(classBeneficiaryId), {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (response.ok) {
+        toast.success('Member added');
+        await loadMembers(classBeneficiaryId);
+        if (loadOverviewData) loadOverviewData();
+        return true;
+      }
+      const errBody = await response.json().catch(() => null);
+      showError(toast, errBody || { detail: `Failed to add member (${response.status})` }, { operation: 'add', page: 'Beneficiaries' });
+      return false;
+    } catch (error) {
+      showError(toast, error, { operation: 'add', page: 'Beneficiaries' });
+      return false;
+    } finally {
+      setMutatingClassId(null);
+    }
+  }, [base, loadMembers, loadOverviewData]);
+
+  // Status change — reason REQUIRED by API (1-1000 chars). Shares recompute server-side.
+  const setMemberStatus = useCallback(async (classBeneficiaryId, classMemberId, status, reason) => {
+    if (!(reason || '').trim()) {
+      toast.error('Reason is required');
+      return false;
+    }
+    setMutatingClassId(classBeneficiaryId);
+    try {
+      const response = await fetchWithAuth(base(classBeneficiaryId, `/${classMemberId}/status`), {
+        method: 'POST',
+        body: JSON.stringify({ status, reason: (reason || '').trim() }),
+      });
+      if (response.ok) {
+        toast.success('Member status updated');
+        await loadMembers(classBeneficiaryId);
+        if (loadOverviewData) loadOverviewData();
+        return true;
+      }
+      const errBody = await response.json().catch(() => null);
+      showError(toast, errBody || { detail: `Failed to update status (${response.status})` }, { operation: 'update', page: 'Beneficiaries' });
+      return false;
+    } catch (error) {
+      showError(toast, error, { operation: 'update', page: 'Beneficiaries' });
+      return false;
+    } finally {
+      setMutatingClassId(null);
+    }
+  }, [base, loadMembers, loadOverviewData]);
+
+  // Rename — PATCH {name}; server appends name_history (never a silent overwrite).
+  const renameMember = useCallback(async (classBeneficiaryId, classMemberId, name) => {
+    if (!name || !name.trim()) {
+      toast.error('Member name is required');
+      return false;
+    }
+    setMutatingClassId(classBeneficiaryId);
+    try {
+      const response = await fetchWithAuth(base(classBeneficiaryId, `/${classMemberId}`), {
+        method: 'PATCH',
+        body: JSON.stringify({ name: (name || '').trim() }),
+      });
+      if (response.ok) {
+        toast.success('Member renamed');
+        await loadMembers(classBeneficiaryId);
+        return true;
+      }
+      const errBody = await response.json().catch(() => null);
+      showError(toast, errBody || { detail: `Failed to rename member (${response.status})` }, { operation: 'update', page: 'Beneficiaries' });
+      return false;
+    } catch (error) {
+      showError(toast, error, { operation: 'update', page: 'Beneficiaries' });
+      return false;
+    } finally {
+      setMutatingClassId(null);
+    }
+  }, [base, loadMembers]);
+
+  return {
+    membersByClass,
+    loadingClassId,
+    mutatingClassId,
+    loadMembers,
+    addMember,
+    setMemberStatus,
+    renameMember,
+  };
+}
+
 // ========== PERSON (ADD BENEFICIARY) HOOK ==========
 export function usePersonForm(selectedTrust, isReadOnly, showUpgradeModal, summary, loadCertificatesData, loadOverviewData, allocationMode) {
   const [showPersonModal, setShowPersonModal] = useState(false);

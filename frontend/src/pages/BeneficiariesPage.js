@@ -20,6 +20,7 @@ import {
   useSettings,
   usePdfPreview,
   useClassBeneficiary,
+  useClassMembers,
   usePersonForm,
   useAllocationMode,
 } from './beneficiaries/hooks';
@@ -88,6 +89,9 @@ export default function BeneficiariesPage() {
 
   // Class beneficiary hook
   const classBeneficiary = useClassBeneficiary(selectedTrust, isReadOnly, showUpgradeModal, loadOverviewData);
+
+  // Class member roster state (expanded class cards)
+  const classMembers = useClassMembers(selectedTrust, loadOverviewData);
 
   // Allocation mode hook
   const allocationMode = useAllocationMode(summary);
@@ -239,6 +243,11 @@ export default function BeneficiariesPage() {
                 overviewData={overviewData}
                 setShowClassBeneficiaryModal={classBeneficiary.setShowClassBeneficiaryModal}
                 setDeleteConfirmClass={classBeneficiary.setDeleteConfirmClass}
+                membersState={classMembers.membersByClass ? classMembers : null}
+                onLoadMembers={classMembers.loadMembers}
+                onAddMember={classMembers.addMember}
+                onRenameMember={classMembers.renameMember}
+                onStatusChange={classMembers.setMemberStatus}
               />
             </TabsContent>
           </Tabs>
