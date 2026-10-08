@@ -412,10 +412,17 @@ async def add_class_member(
 
     # member_order = next free rank (no unique index violation on concurrent adds)
     last = await db.class_beneficiary_members.find_one(
-        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id,
+         "member_order": {"$ne": None}},
+        {"_id": 0, "member_order": 1},
         sort=[("member_order", -1)],
     )
-    member_order = (last.get("member_order", 0) + 1) if last else 1
+    if last and last.get("member_order") is not None:
+        member_order = int(last["member_order"]) + 1
+    else:
+        # empty roster OR roster of only pre-migration docs (member_order
+        # missing/None): a None would crash `None + 1` — rank from 1.
+        member_order = 1
 
     doc = {
         "class_member_id": member_id,

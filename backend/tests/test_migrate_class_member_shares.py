@@ -60,13 +60,20 @@ import scripts.migrate_class_member_shares as mig
 db = database.db
 
 
+_FROZEN = None  # set once by the fixture so asserts see the same timestamps
+
+
 def _now(i=0):
     from datetime import datetime, timedelta, timezone
-    return (datetime.now(timezone.utc) + timedelta(seconds=i)).isoformat()
+    base = _FROZEN or datetime.now(timezone.utc)
+    return (base + timedelta(seconds=i)).isoformat()
 
 
 @pytest_asyncio.fixture(loop_scope="module", scope="module")
 async def seeded():
+    global _FROZEN
+    from datetime import datetime, timezone
+    _FROZEN = datetime.now(timezone.utc)
     for coll in ("class_beneficiaries", "class_beneficiary_members",
                  "class_member_events", "trust_unit_certificates"):
         await db[coll].delete_many({})
@@ -125,7 +132,7 @@ async def test_dry_run_writes_nothing(seeded):
     stats = await mig.migrate(dry_run=True)
     assert stats["mode"] == "DRY RUN"
     assert stats["members_scanned"] == 4
-    assert stats["member_docs_updated"] == 3  # the three bare docs
+    assert stats["member_docs_updated"] == 4  # 3 bare docs + cm_old (event back-pointer only)
     assert stats["classes_scanned"] == 2
     assert stats["class_docs_updated"] == 2   # both classes need fields
     # nothing actually written
@@ -138,6 +145,10 @@ async def test_dry_run_writes_nothing(seeded):
     assert any(r[0] == "cb_mig1" and r[1] == 5 and r[2] == 3
                for r in stats["member_count_repairs"])
     assert not stats["sum_check_failures"]
+    # backdated ledger events: PLANNED in stats but never written (session-2)
+    assert stats["events_backfilled"] == 4   # cm_a, cm_b, cm_c, cm_old
+    assert stats["events_skipped_existing"] == 0
+    assert await db.class_member_events.count_documents({}) == 0
 
 
 # ==================== EXECUTE ====================
@@ -146,7 +157,7 @@ async def test_dry_run_writes_nothing(seeded):
 async def test_execute_backfills_and_repairs(seeded):
     stats = await mig.migrate(dry_run=False)
     assert stats["mode"] == "EXECUTE"
-    assert stats["member_docs_updated"] == 3
+    assert stats["member_docs_updated"] == 4  # 3 bare docs + cm_old pointer-only
     assert stats["class_docs_updated"] == 2
 
     cm = await db.class_beneficiary_members.find(
@@ -190,6 +201,32 @@ async def test_execute_backfills_and_repairs(seeded):
     assert band["combined_ppm"] == 1_250_000
     assert band["within_budget"] is False  # pools overlap certs by design — REPORTED
 
+    # ===== session-2: backdated ledger events (council migration step 2) =====
+    assert stats["events_backfilled"] == 4   # cm_a, cm_b, cm_c, cm_old
+    assert stats["events_skipped_existing"] == 0
+    events = await db.class_member_events.find(
+        {"event_type": "member_added"}, {"_id": 0}
+    ).to_list(None)
+    assert len(events) == 4
+    ev_by_member = {e["class_member_id"]: e for e in events}
+    # backdated to confirmed_at, honestly labeled, full provenance
+    assert ev_by_member["cm_c"]["created_at"] == _now(0)
+    assert ev_by_member["cm_b"]["created_at"] == _now(20)
+    for mid in ("cm_a", "cm_b", "cm_c", "cm_old"):
+        ev = ev_by_member[mid]
+        assert ev["backdated"] is True
+        assert ev["recorded_at"] == stats["started_at"]
+        assert ev["before"] is None
+        assert ev["after"]["backfill"] is True
+        assert ev["after"]["name"] == (f"Member {mid}" if mid != "cm_old" else "Elder")
+        assert ev["trust_id"] == "trust_mig" and ev["user_id"] == "u_mig"
+        assert "predates the ledger" in ev["reason"]
+    # deceased member's backdated event records its true (non-active) status
+    assert ev_by_member["cm_old"]["after"]["member_status"] == "deceased"
+    # member docs carry the back-pointer to their event
+    doc = await db.class_beneficiary_members.find_one({"class_member_id": "cm_a"})
+    assert doc["member_added_event_id"] == ev_by_member["cm_a"]["event_id"]
+
 
 @pytest.mark.asyncio(loop_scope="module")
 async def test_execute_creates_indexes(seeded):
@@ -219,10 +256,17 @@ async def test_rerun_is_noop(seeded):
     await mig.migrate(dry_run=False)
     member_docs = await db.class_beneficiary_members.count_documents({})
     class_docs = await db.class_beneficiaries.count_documents({})
+    event_docs = await db.class_member_events.count_documents({})
     stats2 = await mig.migrate(dry_run=False)
     assert stats2["member_docs_updated"] == 0
     assert stats2["class_docs_updated"] == 0
     assert stats2["member_count_repairs"] == []
+    # ledger backfill is idempotent too: no duplicate member_added events.
+    # Every member is covered by the ledger sweep on every run, so a rerun
+    # skips all 4 (each already has its member_added event).
+    assert stats2["events_backfilled"] == 0
+    assert stats2["events_skipped_existing"] == 4
+    assert await db.class_member_events.count_documents({}) == event_docs
     assert await db.class_beneficiary_members.count_documents({}) == member_docs
     assert await db.class_beneficiaries.count_documents({}) == class_docs
 

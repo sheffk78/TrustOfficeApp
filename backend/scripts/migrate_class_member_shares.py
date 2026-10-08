@@ -20,9 +20,13 @@ What it does (per collection):
     active_member_count advisory recount over share-eligible members
     member_count        REPAIRED to the true roster size when drifted
                         (mismatch report printed/returned; self-healing cache)
-  class_member_events — index creation only (synthesized backdated events
-                        deferred to the mutation-phase session; this session
-                        must not fabricate history)
+  class_member_events — append-only ledger:
+    member_added        for every pre-existing member doc that has NO ledger
+                        event yet (backdated to confirmed_at — "recorded
+                        2026-10-08" style creation_order provenance, reason
+                        marked backfill). Idempotent: members keep their
+                        member_added_event_id; any future duplicate insert
+                        on a member that already has one is refused.
   Indexes (both collections + event ledger) — created idempotently.
 
 Safety:
@@ -49,6 +53,7 @@ import asyncio
 import logging
 import os
 import sys
+import uuid
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -93,9 +98,11 @@ async def migrate(dry_run: bool) -> dict:
         "reconciliation": [],         # per-trust two-band report
         "sum_check_failures": [],     # verification gate failures
         "classes_empty_roster": 0,
+        "events_backfilled": 0,       # backdated member_added ledger events
+        "events_skipped_existing": 0, # members that already had an added event
     }
 
-    # ---------- 1. Backfill member docs (additive $set on missing fields) ----------
+    # ---------- 1. Scan member docs needing backfill (additive $set planned) ----------
     members_filter = {
         "$or": [
             {"member_status": {"$exists": False}},
@@ -115,6 +122,17 @@ async def migrate(dry_run: bool) -> dict:
         full = await db.class_beneficiary_members.find_one({"_id": m["_id"]})
         by_class.setdefault(full.get("class_beneficiary_id"), []).append(full)
 
+    # the ledger backfill covers EVERY member doc (not just field-gap ones) —
+    # a member with all fields present but no member_added event (e.g. left
+    # behind by a pre-session-2 partial run) still needs its backdated event.
+    for m in (await db.class_beneficiary_members.find(
+        {"class_member_id": {"$nin": sorted({d.get("class_member_id") for docs in by_class.values() for d in docs})}},
+        {"_id": 1},
+    ).to_list(None)):
+        full = await db.class_beneficiary_members.find_one({"_id": m["_id"]})
+        by_class.setdefault(full.get("class_beneficiary_id"), []).append(full)
+
+    planned_member_sets = {}  # _id -> set_ops (applied in pass 3 with back-pointers)
     for class_id, docs in by_class.items():
         # Rank by confirmed_at, then class_member_id — but NEVER demote a doc
         # that already carries member_order (idempotent re-runs keep it).
@@ -144,21 +162,106 @@ async def migrate(dry_run: bool) -> dict:
             if d.get("name_history") is None:
                 set_ops["name_history"] = []
             if set_ops:
-                if dry_run:
-                    logger.info(
-                        "[DRY] member %s (%s): +{%s}",
-                        d.get("class_member_id"), d.get("name"),
-                        ", ".join(sorted(set_ops)),
-                    )
-                    stats["member_docs_updated"] += 1
-                else:
-                    await db.class_beneficiary_members.update_one(
-                        {"_id": d["_id"]},
-                        {"$set": set_ops},
-                    )
-                    stats["member_docs_updated"] += 1
+                planned_member_sets[d["_id"]] = (d, set_ops)
 
-    # ---------- 2. Per-class pass: pool shadows, counts, repairs, verification ----------
+    # ---------- 2. Backdated ledger events (council migration step 2) ----------
+    # Every member without a member_added event gets one, backdated to the
+    # member's confirmed_at (immutable history, honestly labeled as backfill).
+    # NOT fabricated history: the event records exactly what is true — this
+    # member exists on this roster, was confirmed at confirmed_at, and has no
+    # recorded add-mutation because it predates the ledger. Idempotency uses
+    # a roster-wide existing-added-member lookup (an event may exist without
+    # the member back-pointer on partial migrations). The member back-pointer
+    # rides the same member write pass below.
+    existing_added = await db.class_member_events.find(
+        {"event_type": "member_added"}, {"_id": 0, "class_member_id": 1}
+    ).to_list(None)
+    members_with_added = {r["class_member_id"] for r in existing_added if r.get("class_member_id")}
+
+    def _event_after(doc: dict) -> dict:
+        return {
+            "class_member_id": doc.get("class_member_id"),
+            "class_beneficiary_id": doc.get("class_beneficiary_id"),
+            "name": doc.get("name"),
+            "member_status": doc.get("member_status") if doc.get("member_status") is not None else "active",
+            "member_order": doc.get("member_order") if doc.get("member_order") is not None else doc.get("_assigned_member_order"),
+            "share_weight": doc.get("share_weight") if doc.get("share_weight") is not None else 1,
+            "backfill": True,
+        }
+
+    _newly_backfilled = {}  # member _id -> event_id (or planned event_id: None)
+    for class_id, docs in by_class.items():
+        for d in docs:
+            mid = d.get("class_member_id")
+            if mid in members_with_added:
+                stats["events_skipped_existing"] += 1
+                continue
+            confirmed_at = d.get("confirmed_at") or d.get("created_at") or stats["started_at"]
+            event = {
+                "event_id": f"cme_{uuid.uuid4().hex[:16]}",
+                "trust_id": d.get("trust_id"),
+                "user_id": d.get("user_id"),
+                "class_beneficiary_id": class_id,
+                "class_member_id": mid,
+                "event_type": "member_added",
+                "before": None,
+                "after": _event_after(d),
+                "reason": "Backfill: member predates the ledger (created before event recording began)",
+                "minutes_record_id": d.get("minutes_record_id"),
+                "created_at": confirmed_at,
+                "backdated": True,
+                "recorded_at": stats["started_at"],
+            }
+            if dry_run:
+                # planned, not written: the pointer sweep in pass 3 must still
+                # SEE this member as newly-backfilled to count its write
+                logger.info(
+                    "[DRY] backdated event member_added for %s (%s) @ %s",
+                    mid, d.get("name"), confirmed_at,
+                )
+                _newly_backfilled[d["_id"]] = None
+            else:
+                await db.class_member_events.insert_one(event)
+                _newly_backfilled[d["_id"]] = event["event_id"]
+            stats["events_backfilled"] += 1
+            members_with_added.add(mid)
+
+    # ---------- 3. Member-doc write pass: 1's planned sets + 2's back-pointers ----------
+    for d_id, (d, set_ops) in planned_member_sets.items():
+        if d_id in _newly_backfilled and d.get("member_added_event_id") is None:
+            event_id = _newly_backfilled[d_id]
+            if event_id is not None:  # None = planned-only (dry run)
+                set_ops["member_added_event_id"] = event_id
+        if dry_run:
+            logger.info(
+                "[DRY] member %s (%s): +{%s}",
+                d.get("class_member_id"), d.get("name"),
+                ", ".join(sorted(set_ops)),
+            )
+            stats["member_docs_updated"] += 1
+        else:
+            await db.class_beneficiary_members.update_one(
+                {"_id": d_id},
+                {"$set": set_ops},
+            )
+            stats["member_docs_updated"] += 1
+    # members whose ONLY missing field is the new back-pointer (already fully
+    # backfilled by a previous run before this feature existed)
+    fully_backfilled_needing_pointer = await db.class_beneficiary_members.find(
+        {"member_added_event_id": {"$exists": False}}, {"_id": 1, "class_member_id": 1}
+    ).to_list(None)
+    for m in fully_backfilled_needing_pointer:
+        if m["_id"] in _newly_backfilled and m["_id"] not in planned_member_sets:
+            set_ops = {"member_added_event_id": _newly_backfilled[m["_id"]]}
+            if dry_run or set_ops["member_added_event_id"] is None:
+                stats["member_docs_updated"] += 1
+            else:
+                await db.class_beneficiary_members.update_one(
+                    {"_id": m["_id"]}, {"$set": set_ops}
+                )
+                stats["member_docs_updated"] += 1
+
+    # ---------- 4. Per-class pass: pool shadows, counts, repairs, verification ----------
     classes = await db.class_beneficiaries.find({}, {"_id": 0}).to_list(None)
     stats["classes_scanned"] = len(classes)
     # certificates per trust, for the reconciliation band
@@ -323,6 +426,10 @@ async def main() -> int:
     stats = await migrate(dry_run=dry_run)
 
     logger.info("Members scanned: %d | updated: %d", stats["members_scanned"], stats["member_docs_updated"])
+    logger.info(
+        "Ledger backfill: %d backdated member_added events | %d skipped (already recorded)",
+        stats["events_backfilled"], stats["events_skipped_existing"],
+    )
     logger.info("Classes scanned: %d | updated: %d", stats["classes_scanned"], stats["class_docs_updated"])
     if stats["member_count_repairs"]:
         for class_id, stored, actual in stats["member_count_repairs"]:
