@@ -25,6 +25,17 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "trustoffice_test_trust_cap")
 os.environ.setdefault("JWT_SECRET", "test-jwt-cap")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_placeholder")
+# Tier price IDs are read at module import in routers/subscriptions.py — unset env vars
+# there make PRICE_IDS entries None, which 500s "Price ID not configured" before Stripe
+# can 500 "Payment service unavailable". CI never sets the 8 tier IDs; feed placeholders
+# so the pass-path is deterministic (placeholder key reaches Stripe → error path).
+for _stripe_env in (
+    "STRIPE_TRUSTEE_MONTHLY_PRICE_ID", "STRIPE_TRUSTEE_ANNUAL_PRICE_ID",
+    "STRIPE_ESTATE_MONTHLY_PRICE_ID", "STRIPE_ESTATE_ANNUAL_PRICE_ID",
+    "STRIPE_ADVISOR_MONTHLY_PRICE_ID", "STRIPE_ADVISOR_ANNUAL_PRICE_ID",
+    "STRIPE_WINGPOINT_MONTHLY_PRICE_ID", "STRIPE_WINGPOINT_ANNUAL_PRICE_ID",
+):
+    os.environ.setdefault(_stripe_env, "price_test_placeholder")
 
 import motor.motor_asyncio
 import mongomock_motor
@@ -95,9 +106,60 @@ CHANGE_CASES = [case for case in CAP_CASES if case[1] != "wingpoint"]
 
 
 class TestCheckoutCapGuard:
+    @pytest.fixture
+    def stripe_probe(self, monkeypatch):
+        """Stub Stripe's session_create and record whether it fired.
+
+        The cap guard runs BEFORE the Stripe call, so 'Stripe was reached' is
+        the definition of 'guard passed' — no error-text coupling to whatever
+        the placeholder key makes Stripe reply (Payment service / plan
+        unavailable messages are env-dependent)."""
+        calls = []
+
+        class _FakeSession:
+            @staticmethod
+            def create(**kwargs):
+                calls.append(("checkout", kwargs))
+                return type("S", (), {"url": "https://stripe.test/checkout", "id": "cs_test_1"})
+
+        class _FakeSubscription:
+            @staticmethod
+            def retrieve(sub_id):
+                # change-plan flow reads stripe_sub["items"]["data"][0]...
+                return {"id": sub_id, "items": {"data": [{"id": "si_test", "price": {"id": "price_test_placeholder"}}]}}
+
+            @staticmethod
+            def modify(sub_id, **kwargs):
+                calls.append(("modify", kwargs))
+                return {"id": sub_id}
+
+        class _FakeCustomer:
+            @staticmethod
+            def retrieve(customer_id):
+                # real Stripe 404s unknown customers; the test user's placeholder id
+                return {"id": customer_id}
+
+            @staticmethod
+            def create(**kwargs):
+                calls.append(("customer", kwargs))
+                return {"id": "cus_test"}
+
+        class _FakeCoupon:
+            @staticmethod
+            def retrieve(code):
+                raise sub_mod.stripe.error.InvalidRequestError(
+                    "No such coupon: %s" % code, param="coupon")
+
+        monkeypatch.setattr(sub_mod.stripe.checkout, "Session", _FakeSession)
+        monkeypatch.setattr(sub_mod.stripe, "Subscription", _FakeSubscription)
+        monkeypatch.setattr(sub_mod.stripe, "Customer", _FakeCustomer)
+        if hasattr(sub_mod.stripe, "Coupon"):
+            monkeypatch.setattr(sub_mod.stripe, "Coupon", _FakeCoupon)
+        return calls
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("n,plan,blocked", CAP_CASES)
-    async def test_create_checkout_cap(self, seeded, n, plan, blocked):
+    async def test_create_checkout_cap(self, seeded, stripe_probe, n, plan, blocked):
         u = seeded
         await _set_trust_count(u["user_id"], n)
         c = _client(u)
@@ -113,17 +175,16 @@ class TestCheckoutCapGuard:
         if blocked:
             assert res.status_code == 400, res.text[:200]
             assert "select a higher tier" in detail
+            assert not stripe_probe, "Stripe reached despite cap-guard block"
         else:
-            # Guard must NOT fire: the only acceptable pass-path failure here
-            # is the Stripe-config 500 ("Payment service unavailable") from
-            # the placeholder key — reaching Stripe means the guard passed.
+            # Guard must NOT fire: Stripe's session-create must be reached
+            # (the guard blocks BEFORE Stripe; reaching Stripe = guard passed).
             assert "select a higher tier" not in detail
-            assert "Payment service" in detail or res.status_code == 200, (
-                f"{res.status_code} {detail[:160]}")
+            assert stripe_probe, f"Stripe not reached: {res.status_code} {detail[:160]}"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("n,plan,blocked", CAP_CASES)
-    async def test_change_plan_cap(self, seeded, n, plan, blocked):
+    async def test_change_plan_cap(self, seeded, stripe_probe, n, plan, blocked):
         if (n, plan, blocked) not in CHANGE_CASES:
             pytest.skip("wingpoint is checkout-only")
         u = seeded
@@ -148,9 +209,10 @@ class TestCheckoutCapGuard:
             assert res.status_code == 400, res.text[:200]
             assert "select a higher tier" in detail
         else:
-            # Stripe placeholder key → 500 "Could not change plan" AFTER the
-            # guard; that's pass-the-guard for this suite's scope.
+            # Pass-the-guard: Stripe's subscription-update must be reached
+            # (guard blocks BEFORE Stripe). No error-text coupling.
             assert "select a higher tier" not in detail
+            assert stripe_probe, f"Stripe not reached: {res.status_code} {detail[:160]}"
 
 
 class TestCreationGuardsUnchanged:

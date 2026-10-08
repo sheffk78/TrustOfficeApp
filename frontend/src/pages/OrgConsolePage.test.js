@@ -103,7 +103,7 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     expect(screen.getByText('Jane Grantor')).toBeInTheDocument();
     expect(screen.getByText('Bob Trustee')).toBeInTheDocument();
     expect(screen.getByText(hasText('2 minutes pending review'))).toBeInTheDocument();
-    expect(screen.getByText(textOf(/deadline/))).toBeInTheDocument();
+    expect(screen.getByText(textOf(/Next deadline/))).toBeInTheDocument();
   });
 
   it('pre-staged client trust: renders honest unclaimed state, no phantom client line', async () => {
