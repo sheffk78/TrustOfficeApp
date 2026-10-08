@@ -23,6 +23,16 @@ import os
 
 import pytest
 
+# PRISTINE motor capture (2026-10-07, class-members integration suites): any
+# suite that mongomock-patches motor.motor_asyncio.AsyncIOMotorClient does it
+# at MODULE IMPORT (pytest collection order) — a later suite's own capture then
+# gets the MOCK and its replica-set fixture silently runs against an in-memory
+# fake. conftest is imported before every test module, so this capture is the
+# pristine real client class. Suites needing real motor MUST import it from
+# here instead of re-capturing (fixes the admin-customers/... contamination).
+from motor import motor_asyncio as _motor_aio
+REAL_MOTOR_CLIENT_CLASS = _motor_aio.AsyncIOMotorClient
+
 # Tier price IDs are read at module import in routers/subscriptions.py. CI never sets
 # them, giving PRICE_IDS entries = None and 500s ("Price ID not configured") that fire
 # BEFORE Stripe — which broke tests/test_trust_cap_checkout.py's pass-path detection

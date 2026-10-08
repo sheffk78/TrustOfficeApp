@@ -11,6 +11,7 @@ Features:
 import re
 import html
 import asyncio
+import os
 from collections import defaultdict
 from datetime import datetime, timezone
 from functools import wraps
@@ -27,7 +28,20 @@ logger = logging.getLogger(__name__)
 
 class RateLimitConfig:
     """Rate limit configuration per endpoint pattern"""
-    
+
+    def __init__(self, config: dict = None):
+        # RATE_LIMIT_DISABLED=1 disables the limiter entirely (returns
+        # 'not limited' for every request). Default OFF — prod behavior is
+        # unchanged; the flag exists so local live-server test suites that
+        # log in once per test class aren't throttled by the 5/min auth limit.
+        self.disabled = os.environ.get("RATE_LIMIT_DISABLED", "") == "1"
+        if self.disabled:
+            logger.warning("RATE_LIMIT_DISABLED=1 — rate limiting is OFF (local/test use only)")
+        if config:
+            self.DEFAULT_LIMITS = {**type(self).DEFAULT_LIMITS, **config}
+
+    def is_disabled(self) -> bool:
+        return self.disabled
     # Default limits: requests per minute
     DEFAULT_LIMITS = {
         # Auth endpoints - stricter limits to prevent brute force
@@ -162,9 +176,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # (BaseHTTPMiddleware buffers request body, which breaks file uploads)
         if request.url.path in ["/health", "/api/health"] or "/vault/upload" in request.url.path:
             return await call_next(request)
-        
+
         # Skip for OPTIONS requests (CORS preflight)
         if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # RATE_LIMIT_DISABLED=1 — limiter off entirely (local/test use only)
+        if self.config.is_disabled():
             return await call_next(request)
         
         # Get client identifier and rate limit config

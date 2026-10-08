@@ -1374,6 +1374,48 @@ class ClassBeneficiaryResponse(BaseModel):
     reserved_units: Optional[float] = None
     member_count: int = 0
     created_at: str
+    # ===== Derived-share extension (2026-10-07 council design) =====
+    # Additive + optional: legacy callers that construct this model without
+    # the new fields (e.g. old tests, sibling code paths) stay valid.
+    share_mode: str = "per_capita_equal"
+    pool_percentage_ppm: Optional[int] = None
+    active_member_count: int = 0
+    members: List[dict] = []
+
+
+# ==================== CLASS MEMBER MUTATION MODELS (session 2) ====================
+
+class ClassMemberCreate(BaseModel):
+    """Structured create for a named class member (council design 2026-10-07).
+    Name is required/trimmed (max 200); DOB, notes and minutes linkage are
+    optional. Shares are never sent — they are derived from the pool."""
+    name: str = Field(min_length=1, max_length=200)
+    date_of_birth: Optional[str] = Field(None, max_length=10)
+    notes: Optional[str] = Field(None, max_length=2000)
+    minutes_record_id: Optional[str] = Field(None, max_length=64)
+
+
+class ClassMemberStatusUpdate(BaseModel):
+    """Status transition — no hard delete ever (council design #3).
+    Reason is REQUIRED and audited in the append-only event ledger."""
+    status: str  # validated in endpoint against active|deceased|removed|inactive
+    reason: str = Field(min_length=1, max_length=1000)
+    minutes_record_id: Optional[str] = Field(None, max_length=64)
+
+
+class ClassMemberRename(BaseModel):
+    """Rename only — every rename appends a name_history entry, never a
+    silent overwrite (council design #4)."""
+    name: str = Field(min_length=1, max_length=200)
+
+
+class ClassBeneficiaryPatch(BaseModel):
+    """Patchable class fields. percentage changes pass the same 100%-cap
+    aggregate check as the create path."""
+    description: Optional[str] = Field(None, max_length=500)
+    notes: Optional[str] = Field(None, max_length=2000)
+    percentage: Optional[float] = Field(None, ge=0, le=100)
+    distribution_convention: Optional[str] = Field(None, max_length=32)
 
 
 # ==================== BENEFICIARY MANAGEMENT MODELS ====================

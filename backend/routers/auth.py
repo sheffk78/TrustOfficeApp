@@ -84,8 +84,16 @@ def rate_limit(max_requests: int, window_seconds: int = 60):
     """
     FastAPI dependency that enforces per-IP, per-endpoint rate limiting.
     Raises HTTP 429 when the limit is exceeded.
+
+    RATE_LIMIT_DISABLED=1 disables this limiter entirely (no-op dependency).
+    Default OFF — prod behavior unchanged; the flag exists so local
+    live-server test suites that log in once per test class aren't throttled.
     """
+    disabled = os.environ.get("RATE_LIMIT_DISABLED", "") == "1"
+
     async def _check_rate_limit(request: Request):
+        if disabled:
+            return
         client_ip = request.client.host if request.client else "unknown"
         # Honour X-Forwarded-For for proxied requests
         forwarded = request.headers.get("X-Forwarded-For", "")

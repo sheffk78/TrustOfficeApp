@@ -8,6 +8,8 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
+from pymongo.errors import OperationFailure
+
 from dependencies import get_current_user, require_write_access, auto_update_onboarding
 from database import db
 from models import (
@@ -15,7 +17,9 @@ from models import (
     ClassBeneficiaryCreate, ClassBeneficiaryResponse, ClassBeneficiaryType,
     BeneficiaryCreate, BeneficiaryUpdate, SendCertificateRequest,
     TrustUnitCertificateCreate,
+    ClassMemberCreate, ClassMemberStatusUpdate, ClassMemberRename, ClassBeneficiaryPatch,
 )
+import share_math
 from routers.trust_units import create_unit_certificate as _create_cert, get_or_create_units_settings, get_next_certificate_number
 
 router = APIRouter(prefix="/beneficiaries", tags=["beneficiaries"])
@@ -118,62 +122,671 @@ async def delete_class_beneficiary(
     class_beneficiary_id: str,
     user: dict = Depends(require_write_access)
 ):
-    """Remove a class beneficiary designation"""
+    """
+    Remove a class beneficiary designation.
+
+    Session-2 cascade fix (council defect): class deletion also deletes its
+    class_beneficiary_members docs and writes a member_removed event per doc —
+    member rows were previously ORPHANED, still scanning in aggregate queries.
+    Classes (the pool container) are hard-deletable; NAMED MEMBERS are not —
+    their audit trail lands in the append-only ledger before the docs go.
+    Route signature and response contract unchanged ({status: deleted}).
+    """
     user_id = user["user_id"]
-    
-    result = await db.class_beneficiaries.delete_one({
-        "class_beneficiary_id": class_beneficiary_id,
-        "user_id": user_id
-    })
-    
-    if result.deleted_count == 0:
+
+    class_doc = await db.class_beneficiaries.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    )
+    if not class_doc:
         raise HTTPException(status_code=404, detail="Class beneficiary not found")
-    
+
+    members = await db.class_beneficiary_members.find(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0, "class_member_id": 1, "name": 1, "member_status": 1}
+    ).to_list(500)
+    now = _utc_now_iso()
+    events = [
+        _make_member_event(
+            trust_id=class_doc["trust_id"], user_id=user_id,
+            class_beneficiary_id=class_beneficiary_id,
+            class_member_id=m.get("class_member_id"),
+            event_type="member_removed",
+            before={"name": m.get("name"), "member_status": m.get("member_status", "active")},
+            after=None,
+            reason="Class removed — member cascade deleted with its class",
+            now=now,
+        )
+        for m in members
+    ]
+
+    async def _cascade_delete_ops(session):
+        if events:
+            await db.class_member_events.insert_many(events, session=session)
+        await db.class_beneficiary_members.delete_many(
+            {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+            session=session,
+        )
+        await db.class_beneficiaries.delete_one(
+            {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+            session=session,
+        )
+
+    await _run_with_txn(db.client, _cascade_delete_ops)
+
     return {"status": "deleted"}
+
+
+VALID_MEMBER_STATUSES = ("active", "deceased", "removed", "inactive")
+# Statuses whose members drop out of the pool division but whose rows remain.
+_SHARE_EXCLUDED_STATUSES = ("deceased", "removed", "inactive")
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _make_member_event(
+    trust_id: str, user_id: str, class_beneficiary_id: str, class_member_id,
+    event_type: str, before, after, reason: str,
+    minutes_record_id=None, now: Optional[str] = None,
+) -> dict:
+    """
+    Append-only class_member_events ledger entry (council design #4).
+    user_id is ALWAYS the authenticated owner — the ledger is owner-scoped,
+    never written with anyone else's identity.
+    """
+    return {
+        "event_id": f"cme_{uuid.uuid4().hex[:16]}",
+        "trust_id": trust_id,
+        "user_id": user_id,
+        "class_beneficiary_id": class_beneficiary_id,
+        "class_member_id": class_member_id,  # null for class_updated events
+        "event_type": event_type,  # member_added | member_status_changed | member_updated | class_updated
+        "before": before,
+        "after": after,
+        "reason": reason,
+        "minutes_record_id": minutes_record_id,
+        "created_at": now or _utc_now_iso(),
+    }
+
+
+async def _txn_supported(client) -> bool:
+    """
+    Probe ONCE per client whether the deployment supports multi-document
+    transactions (replica set). Standalone mongod raises OperationFailure at
+    start_transaction — cached False thereafter. Distinguishing initiation
+    failures from mid-transaction failures by exception shape is unreliable,
+    so fallback happens ONLY at the boundary: once a transaction is known
+    supported, mid-transaction errors propagate and roll back (never a
+    partially-applied fallback double-write).
+    """
+    cached = getattr(client, "_trustoffice_txn_supported", None)
+    if cached is not None:
+        return cached
+    try:
+        async with await client.start_session() as session:
+            async with session.start_transaction():
+                pass
+        supported = True
+    except OperationFailure:
+        supported = False
+    except Exception:
+        supported = False
+    try:
+        client._trustoffice_txn_supported = supported
+    except Exception:
+        pass
+    return supported
+
+
+async def _run_with_txn(client, ops):
+    """
+    Run a member-mutation write set atomically when possible.
+
+    ops(session_or_none): the same ordered writes either way — collection
+    calls accept session=None. With a replica set they run inside
+    client.start_session + start_transaction (council: insert + event write +
+    member_version bump + member_count recompute all-or-nothing). Without one
+    (standalone mongod), start_transaction raises OperationFailure, so we
+    fall back to the same ordered sequential writes — degraded atomicity,
+    documented here, because refusing every write on standalone deploys would
+    take the subsystem offline.
+    """
+    if await _txn_supported(client):
+        async with await client.start_session() as session:
+            async with session.start_transaction():
+                await ops(session)
+    else:
+        await ops(None)
+
+
+async def _bump_class_version_and_count(user_id: str, class_beneficiary_id: str, session=None):
+    """
+    Advisory-cache recompute + member_version bump for every member mutation
+    (council: member_version monotonic, member_count self-healing derived value).
+    member_count = total roster rows (incl. deceased/removed — their rows remain);
+    active_member_count = share-eligible members. Runs inside the caller's
+    transaction session when provided.
+    """
+    base = {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}
+    total = await db.class_beneficiary_members.count_documents(base, session=session)
+    active = await db.class_beneficiary_members.count_documents(
+        {**base, "member_status": {"$nin": list(_SHARE_EXCLUDED_STATUSES)}}, session=session
+    )
+    await db.class_beneficiaries.update_one(
+        base,
+        {
+            "$inc": {"member_version": 1},
+            "$set": {"member_count": total, "active_member_count": active},
+        },
+        session=session,
+    )
+
+
+def _active_member_orders(members: list, roster_order: list = None) -> List[int]:
+    """Share-eligible member order-keys, in creation order.
+
+    roster_order is the id-keyed creation order (share_math.member_sort_key)
+    computed once by the caller; members without member_order (legacy docs)
+    get their POSITION in that order as a stable stand-in — they must never
+    collapse onto order-key 0 (which would hand several members the first
+    member's share). Kept list-based for the legacy math path.
+    """
+    order_lookup = {}
+    if roster_order:
+        order_lookup = {mid: idx for idx, mid in enumerate(roster_order)}
+    def _key(m):
+        if m.get("member_order") is not None:
+            return m["member_order"]
+        mid = m.get("class_member_id")
+        return order_lookup.get(mid, 0) if order_lookup else 0
+    return [
+        _key(m)
+        for m in sorted(members, key=lambda x: (_key(x), x.get("created_at", "")))
+        if m.get("member_status", "active") not in _SHARE_EXCLUDED_STATUSES
+    ]
+
+
+def _class_share_payload(class_doc: dict, active_orders: List[int], class_member_ids=None) -> dict:
+    """
+    Derived per-member shares (NEVER stored): pool ppm split by largest
+    remainder with roster-order tie-break. Visible-formula fields per council
+    legibility rule (pool ÷ members, sum pinned to pool).
+    """
+    pool_pct = float(class_doc.get("percentage", 0) or 0)
+    pool_ppm = share_math.percent_to_ppm(pool_pct)
+    split_ppm = share_math.largest_remainder_share_ppm(pool_ppm, active_orders)
+    if class_member_ids is None:
+        per_member_ppm = {order: ppm for order, ppm in zip(active_orders, split_ppm)}
+    else:
+        # Id-keyed form: shares belong to class_member_ids (same creation
+        # order as active_orders), never to a possibly-colliding order value.
+        per_member_ppm = {mid: ppm for mid, ppm in zip(class_member_ids, split_ppm)}
+    return {
+        "pool_percentage": pool_pct,
+        "pool_percentage_ppm": pool_ppm,
+        "active_member_count": len(active_orders),
+        "per_member_share_ppm": per_member_ppm,
+        "per_member_share_percent": {
+            order: share_math.ppm_to_percent(ppm) for order, ppm in per_member_ppm.items()
+        },
+        "sum_check": share_math.shares_sum_check(pool_ppm, split_ppm),
+    }
+
+
+def _member_share_preview(pool_pct: float, active_before: int, active_after: int) -> dict:
+    """Before/after split preview for status-change responses (share_math)."""
+    preview = share_math.share_preview_ppm(
+        share_math.percent_to_ppm(pool_pct), active_before, active_after
+    )
+    return {
+        "pool_percentage": pool_pct,
+        "active_members_before": active_before,
+        "active_members_after": active_after,
+        "per_member_share_percent_before": preview["per_member_share_percent_before"],
+        "per_member_share_percent_after": preview["per_member_share_percent_after"],
+        "sum_check": preview["sum_check"],
+    }
+
+
+async def _attach_share_preview(class_doc: dict, member_doc: dict) -> None:
+    """
+    Attach the new member's DERIVED share + a live (n-1 → n) split preview to
+    a freshly-added member doc — the council's visible-math requirement.
+    Shares are computed, never stored.
+    """
+    roster = await db.class_beneficiary_members.find(
+        {"class_beneficiary_id": class_doc["class_beneficiary_id"], "user_id": class_doc["user_id"]},
+        {"_id": 0, "class_member_id": 1, "member_status": 1, "member_order": 1,
+         "confirmed_at": 1},
+    ).to_list(500)
+    # id-keyed creation order (legacy docs rank by confirmed_at, then id)
+    ordered_ids = share_math.sort_members_in_creation_order(roster)
+    ordered_ids = [m.get("class_member_id") for m in ordered_ids if share_math.doc_is_active(m)]
+    active_orders = _active_member_orders(roster, roster_order=ordered_ids)
+    shares = _class_share_payload(class_doc, active_orders, class_member_ids=ordered_ids)
+    member_doc["member_share_ppm"] = shares["per_member_share_ppm"].get(
+        member_doc.get("class_member_id"), 0)
+    member_doc["member_share_percent"] = share_math.ppm_to_percent(
+        member_doc["member_share_ppm"])
+    member_doc["share_preview"] = _member_share_preview(
+        float(class_doc.get("percentage", 0) or 0),
+        max(len(active_orders) - 1, 0),
+        len(active_orders),
+    )
 
 
 @router.post("/class-beneficiaries/{class_beneficiary_id}/members")
 async def add_class_member(
     class_beneficiary_id: str,
-    member: dict,
+    member: ClassMemberCreate,
     user: dict = Depends(require_write_access),
 ):
-    """Record a trustee-confirmed class member without inferring eligibility."""
+    """
+    Record a trustee-confirmed class member without inferring eligibility.
+
+    Session-2 hardening (council design 2026-10-07):
+    - Structured ClassMemberCreate body (name required/trimmed ≤200; optional
+      date_of_birth, notes, minutes_record_id).
+    - member_order = next free rank; member_status='active', share_weight=1.
+    - Insert + member_added event + member_version bump + member_count
+      recompute wrapped in a Mongo transaction (client.start_session).
+      Fallback to sequential ops on OperationFailure — standalone mongod
+      (no replica set) cannot run transactions, so atomicity degrades to
+      ordered sequential writes rather than refusing the write entirely.
+    """
     user_id = user["user_id"]
     class_doc = await db.class_beneficiaries.find_one(
         {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
     )
     if not class_doc:
         raise HTTPException(status_code=404, detail="Class beneficiary not found")
-    name = (member.get("name") or "").strip()
+
+    name = (member.name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Member name is required")
+    if len(name) > 200:
+        raise HTTPException(status_code=400, detail="Member name must be 200 characters or fewer")
+
     now = datetime.now(timezone.utc).isoformat()
+    member_id = f"cm_{uuid.uuid4().hex[:12]}"
+
+    # member_order = next free rank (no unique index violation on concurrent adds)
+    last = await db.class_beneficiary_members.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+        sort=[("member_order", -1)],
+    )
+    member_order = (last.get("member_order", 0) + 1) if last else 1
+
     doc = {
-        "class_member_id": f"cm_{uuid.uuid4().hex[:12]}",
+        "class_member_id": member_id,
         "class_beneficiary_id": class_beneficiary_id,
         "trust_id": class_doc["trust_id"], "user_id": user_id,
         "name": name, "confirmed_by_user_id": user_id,
         "confirmed_at": now, "created_at": now,
+        "member_status": "active",
+        "status_reason": None, "status_changed_at": None,
+        "share_weight": 1,
+        "member_order": member_order,
+        "minutes_record_id": member.minutes_record_id,
+        "date_of_birth": member.date_of_birth,
+        "notes": member.notes,
+        "name_history": [],
     }
-    await db.class_beneficiary_members.insert_one(doc)
-    count = await db.class_beneficiary_members.count_documents({"class_beneficiary_id": class_beneficiary_id, "user_id": user_id})
-    await db.class_beneficiaries.update_one({"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"$set": {"member_count": count}})
+    event = _make_member_event(
+        trust_id=class_doc["trust_id"], user_id=user_id,
+        class_beneficiary_id=class_beneficiary_id, class_member_id=member_id,
+        event_type="member_added", before=None, after=doc,
+        reason=f"Member added: {name}",
+        minutes_record_id=member.minutes_record_id, now=now,
+    )
+
+    # member_version bump + member_count recompute (advisory cache) ride in the
+    # same transaction so a crash can never leave class/member disagreeing.
+
+    async def _member_add_ops(session):
+        await db.class_beneficiary_members.insert_one(doc, session=session)
+        await _bump_class_version_and_count(user_id, class_beneficiary_id, session=session)
+        await db.class_member_events.insert_one(event, session=session)
+
+    await _run_with_txn(db.client, _member_add_ops)
+
     doc.pop("_id", None)
+    await _attach_share_preview(class_doc, doc)
     return doc
 
 
 @router.get("/class-beneficiaries/{class_beneficiary_id}/members")
 async def list_class_members(class_beneficiary_id: str, user: dict = Depends(get_current_user)):
+    """
+    Roster read with DERIVED per-member shares (session 2):
+    pool ppm split across share-eligible members via share_math — never stored
+    per member. Every query filters by the AUTHENTICATED user's user_id.
+    """
+    user_id = user["user_id"]
     items = await db.class_beneficiary_members.find(
-        {"class_beneficiary_id": class_beneficiary_id, "user_id": user["user_id"]}, {"_id": 0}
-    ).sort("created_at", 1).to_list(500)
-    class_doc = await db.class_beneficiaries.find_one({"class_beneficiary_id": class_beneficiary_id, "user_id": user["user_id"]}, {"_id": 0})
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    ).sort("member_order", 1).to_list(500)
+    class_doc = await db.class_beneficiaries.find_one({"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0})
     if not class_doc:
         raise HTTPException(status_code=404, detail="Class beneficiary not found")
-    pool_pct = class_doc.get("percentage", 0)
-    share_pct = round(pool_pct / len(items), 4) if items else 0
-    return {"items": items, "member_count": len(items), "pool_percentage": pool_pct, "per_member_percentage": share_pct}
+    # Creation order in id terms (member_order, confirmed_at, id — legacy docs
+    # fall back to confirmed_at/id). Drives BOTH share paths so legacy docs
+    # without member_order can never collapse onto order-key 0.
+    derived = share_math.derive_class_member_shares(
+        class_doc.get("percentage", 0) or 0, items
+    )
+    roster_order = derived["ordered_active_member_ids"]
+    active_orders = _active_member_orders(items, roster_order=roster_order)
+    active_ids_in_order = [
+        m.get("class_member_id") for m in
+        sorted(
+            (m for m in items if m.get("member_status", "active") not in _SHARE_EXCLUDED_STATUSES),
+            key=lambda x: share_math.member_sort_key(x),
+        )
+    ]
+    shares = _class_share_payload(class_doc, active_orders, class_member_ids=active_ids_in_order)
+    share_by_id = shares["per_member_share_ppm"]
+    for item in items:
+        mid = item.get("class_member_id")
+        ppm = share_by_id.get(mid, 0)
+        item["member_share_ppm"] = ppm
+        item["member_share_percent"] = share_math.ppm_to_percent(ppm)
+    # ===== Derived-share contract keys (council 2026-10-07, additive) =====
+    # id-keyed computation via share_math.derive_class_member_shares: split
+    # over ACTIVE members (missing member_status treated active), sorted in
+    # creation order (member_order, then confirmed_at, then id). Legacy docs
+    # that all lack member_order must never collapse onto order-key 0.
+    # (derived also feeds roster_order above — one creation order everywhere.)
+    return {
+        "items": items,
+        "member_count": len(items),
+        "active_member_count": len(active_orders),
+        "pool_percentage": shares["pool_percentage"],
+        "pool_percentage_ppm": shares["pool_percentage_ppm"],
+        "per_member_percentage": (
+            shares["per_member_share_percent"].get(active_orders[0], 0.0)
+            if active_orders else 0.0
+        ),
+        "per_member_share_percent": shares["per_member_share_percent"],
+        "sum_check": shares["sum_check"],
+        # Contract extension: per_member_shares (class_member_id, share_ppm,
+        # share_pct) over ACTIVE members, integer pool shadow + integer
+        # sum-check. active_member_count above already carries the contract
+        # value (same roster), so no duplicate key is added here.
+        "per_member_shares": derived["per_member_shares"],
+        "share_mode": "per_capita_equal",
+        "sum_check_ppm": derived["sum_check_ppm"],
+    }
+
+
+# ========== MEMBER MUTATION ENDPOINTS (session 2 — council design) ==========
+
+@router.post("/class-beneficiaries/{class_beneficiary_id}/members/{class_member_id}/status")
+async def set_class_member_status(
+    class_beneficiary_id: str,
+    class_member_id: str,
+    body: ClassMemberStatusUpdate,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Status transition — NO hard delete of members, ever (council design #3).
+    deceased/removed/inactive drop out of the pool division; rows and history
+    remain. Reason REQUIRED. Writes before/after event, bumps member_version,
+    recomputes member_count, and returns a before/after per-member share
+    preview (pool split old n vs new n via share_math).
+    """
+    user_id = user["user_id"]
+    if body.status not in VALID_MEMBER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of {', '.join(VALID_MEMBER_STATUSES)}",
+        )
+    reason = (body.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="reason is required")
+
+    class_doc = await db.class_beneficiaries.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    )
+    if not class_doc:
+        raise HTTPException(status_code=404, detail="Class beneficiary not found")
+
+    member_doc = await db.class_beneficiary_members.find_one(
+        {
+            "class_member_id": class_member_id,
+            "class_beneficiary_id": class_beneficiary_id,
+            "user_id": user_id,  # owner-only — member id alone is never trusted
+        },
+        {"_id": 0},
+    )
+    if not member_doc:
+        raise HTTPException(status_code=404, detail="Class member not found")
+
+    before_status = member_doc.get("member_status", "active")
+    if before_status == body.status:
+        raise HTTPException(status_code=400, detail=f"Member is already {body.status}")
+
+    now = _utc_now_iso()
+    event = _make_member_event(
+        trust_id=member_doc["trust_id"], user_id=user_id,
+        class_beneficiary_id=class_beneficiary_id, class_member_id=class_member_id,
+        event_type="member_status_changed",
+        before={"member_status": before_status},
+        after={"member_status": body.status},
+        reason=reason, minutes_record_id=body.minutes_record_id, now=now,
+    )
+
+    set_body = {
+        "member_status": body.status,
+        "status_reason": reason,
+        "status_changed_at": now,
+        **({"minutes_record_id": body.minutes_record_id}
+           if body.minutes_record_id else {}),
+    }
+
+    async def _status_ops(session):
+        await db.class_beneficiary_members.update_one(
+            {"class_member_id": class_member_id, "user_id": user_id},
+            {"$set": set_body},
+            session=session,
+        )
+        await _bump_class_version_and_count(user_id, class_beneficiary_id, session=session)
+        await db.class_member_events.insert_one(event, session=session)
+
+    await _run_with_txn(db.client, _status_ops)
+
+    # Before/after share preview: pool split across old n vs new n actives.
+    roster = await db.class_beneficiary_members.find(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+        {"_id": 0, "class_member_id": 1, "member_status": 1, "member_order": 1,
+         "confirmed_at": 1},
+    ).to_list(500)
+    ordered_ids = [
+        m.get("class_member_id") for m in share_math.sort_members_in_creation_order(roster)
+        if share_math.doc_is_active(m)
+    ]
+    active_now_n = len(_active_member_orders(roster, roster_order=ordered_ids))
+    before_excluded = before_status in _SHARE_EXCLUDED_STATUSES
+    after_excluded = body.status in _SHARE_EXCLUDED_STATUSES
+    if not before_excluded and after_excluded:
+        active_before_n, active_after_n = active_now_n + 1, active_now_n
+    elif before_excluded and not after_excluded:
+        active_before_n, active_after_n = active_now_n - 1, active_now_n
+    else:
+        # excluded → excluded transition: neither state counts toward the split
+        active_before_n = active_after_n = active_now_n
+    share_preview = _member_share_preview(
+        float(class_doc.get("percentage", 0) or 0), active_before_n, active_after_n
+    )
+
+    updated = await db.class_beneficiary_members.find_one(
+        {"class_member_id": class_member_id, "user_id": user_id}, {"_id": 0}
+    )
+    return {
+        "member": updated,
+        "before_status": before_status,
+        "after_status": body.status,
+        "reason": reason,
+        "event_id": event["event_id"],
+        "share_preview": share_preview,
+    }
+
+
+@router.patch("/class-beneficiaries/{class_beneficiary_id}/members/{class_member_id}")
+async def rename_class_member(
+    class_beneficiary_id: str,
+    class_member_id: str,
+    body: ClassMemberRename,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Rename only — every rename appends a name_history entry
+    {previous_name, changed_at, changed_by_user_id} and a member_updated
+    event; never a silent overwrite (council design).
+    """
+    user_id = user["user_id"]
+    class_doc = await db.class_beneficiaries.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    )
+    if not class_doc:
+        raise HTTPException(status_code=404, detail="Class beneficiary not found")
+
+    member_doc = await db.class_beneficiary_members.find_one(
+        {
+            "class_member_id": class_member_id,
+            "class_beneficiary_id": class_beneficiary_id,
+            "user_id": user_id,
+        },
+        {"_id": 0},
+    )
+    if not member_doc:
+        raise HTTPException(status_code=404, detail="Class member not found")
+
+    new_name = (body.name or "").strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Member name is required")
+    if len(new_name) > 200:
+        raise HTTPException(status_code=400, detail="Member name must be 200 characters or fewer")
+    old_name = member_doc.get("name", "")
+    if new_name == old_name:
+        raise HTTPException(status_code=400, detail="New name is identical to the current name")
+
+    now = _utc_now_iso()
+    history_entry = {
+        "previous_name": old_name,
+        "changed_at": now,
+        "changed_by_user_id": user_id,
+    }
+
+    async def _rename_ops(session):
+        await db.class_beneficiary_members.update_one(
+            {"class_member_id": class_member_id, "user_id": user_id},
+            {"$set": {"name": new_name}, "$push": {"name_history": history_entry}},
+            session=session,
+        )
+        await _bump_class_version_and_count(user_id, class_beneficiary_id, session=session)
+        await db.class_member_events.insert_one(
+            _make_member_event(
+                trust_id=member_doc["trust_id"], user_id=user_id,
+                class_beneficiary_id=class_beneficiary_id,
+                class_member_id=class_member_id,
+                event_type="member_updated",
+                before={"name": old_name}, after={"name": new_name},
+                reason="Member renamed", now=now,
+            ),
+            session=session,
+        )
+
+    await _run_with_txn(db.client, _rename_ops)
+
+    updated = await db.class_beneficiary_members.find_one(
+        {"class_member_id": class_member_id, "user_id": user_id}, {"_id": 0}
+    )
+    return updated
+
+
+@router.patch("/class-beneficiaries/{class_beneficiary_id}")
+async def patch_class_beneficiary(
+    class_beneficiary_id: str,
+    body: ClassBeneficiaryPatch,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Patch description/notes/percentage/distribution_convention on the class —
+    replaces delete+recreate churn (council defect fix). Percentage changes
+    pass the same 100%-cap aggregate check the create path uses. Returns the
+    recomputed share preview and writes a class_updated event
+    (class_member_id null). member_version bumps on percentage change because
+    it alters every derived member share.
+    """
+    user_id = user["user_id"]
+    class_doc = await db.class_beneficiaries.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    )
+    if not class_doc:
+        raise HTTPException(status_code=404, detail="Class beneficiary not found")
+
+    updates = {}
+    if body.description is not None:
+        updates["description"] = body.description
+    if body.notes is not None:
+        updates["notes"] = body.notes
+    if body.distribution_convention is not None:
+        if body.distribution_convention not in {"per_capita", "per_stirpes"}:
+            raise HTTPException(status_code=400, detail="Unsupported class distribution convention.")
+        updates["distribution_convention"] = body.distribution_convention
+    if body.percentage is not None:
+        updates["percentage"] = body.percentage
+        settings = await get_or_create_units_settings(class_doc["trust_id"], user_id)
+        if settings.get("allocation_mode", "percentage") == "percentage":
+            existing_pools = await db.class_beneficiaries.aggregate([
+                {"$match": {"trust_id": class_doc["trust_id"], "user_id": user_id}},
+                {"$group": {"_id": None, "total": {"$sum": "$percentage"}}},
+            ]).to_list(1)
+            current_pct = existing_pools[0]["total"] if existing_pools else 0
+            if current_pct - class_doc.get("percentage", 0) + body.percentage > 100:
+                raise HTTPException(status_code=400, detail="Class-beneficiary pools cannot exceed 100% combined.")
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    now = _utc_now_iso()
+    before_snapshot = {k: class_doc.get(k) for k in updates}
+    event = _make_member_event(
+        trust_id=class_doc["trust_id"], user_id=user_id,
+        class_beneficiary_id=class_beneficiary_id, class_member_id=None,
+        event_type="class_updated", before=before_snapshot, after=updates,
+        reason="Class updated", now=now,
+    )
+
+    async def _class_patch_ops(session):
+        await db.class_beneficiaries.update_one(
+            {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+            {"$set": updates, "$inc": {"member_version": 1}},
+            session=session,
+        )
+        await db.class_member_events.insert_one(event, session=session)
+
+    await _run_with_txn(db.client, _class_patch_ops)
+
+    updated_class = await db.class_beneficiaries.find_one(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0}
+    )
+    roster = await db.class_beneficiary_members.find(
+        {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id},
+        {"_id": 0, "class_member_id": 1, "member_status": 1, "member_order": 1,
+         "confirmed_at": 1},
+    ).to_list(500)
+    ordered_ids = [
+        m.get("class_member_id") for m in share_math.sort_members_in_creation_order(roster)
+        if share_math.doc_is_active(m)
+    ]
+    share_preview = _class_share_payload(
+        updated_class,
+        _active_member_orders(roster, roster_order=ordered_ids),
+        class_member_ids=ordered_ids,
+    )
+    return {"class": updated_class, "share_preview": share_preview, "event_id": event["event_id"]}
 
 
 # ========== DASHBOARD ENDPOINT (updated) ==========
@@ -284,6 +897,42 @@ async def get_beneficiary_dashboard(
         {"trust_id": trust_id, "user_id": user_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
+
+    # ===== Derived-share extension (council 2026-10-07, additive) =====
+    # One roster read for the whole trust (mirrors roster endpoint's 500-cap
+    # per class); attaches members[] with computed shares + active_member_count
+    # to each class. Existing keys/semantics untouched; roster-less classes
+    # get members=[] (Harmony Haven case: "pool undistributed until members
+    # are added" still renders with pool_percentage intact).
+    if class_beneficiaries:
+        roster_query = {"trust_id": trust_id, "user_id": user_id}
+        class_ids = [cb["class_beneficiary_id"] for cb in class_beneficiaries]
+        roster_query["class_beneficiary_id"] = {"$in": class_ids}
+        rosters = await db.class_beneficiary_members.find(
+            roster_query,
+            {"_id": 0, "class_member_id": 1, "class_beneficiary_id": 1, "name": 1,
+             "member_status": 1, "member_order": 1, "confirmed_at": 1,
+             "created_at": 1, "share_weight": 1},
+        ).limit(10000).to_list(10000)
+        rosters_by_class = {}
+        for m in rosters:
+            rosters_by_class.setdefault(m.get("class_beneficiary_id"), []).append(m)
+        for cb in class_beneficiaries:
+            class_roster = rosters_by_class.get(cb["class_beneficiary_id"], [])
+            derived = share_math.derive_class_member_shares(
+                cb.get("percentage", 0) or 0,
+                class_roster,
+            )
+            names = {m.get("class_member_id"): m.get("name") for m in class_roster}
+            member_rows = []
+            for share_row in derived["per_member_shares"]:
+                row = dict(share_row)
+                row["name"] = names.get(share_row["class_member_id"])
+                member_rows.append(row)
+            cb["members"] = member_rows
+            cb["active_member_count"] = derived["active_member_count"]
+            cb["pool_percentage_ppm"] = derived["pool_percentage_ppm"]
+            cb["share_mode"] = "per_capita_equal"
 
     # Compute allocation totals.
     # Certificate percentages are ISSUED ownership (additive, capped at 100 by
