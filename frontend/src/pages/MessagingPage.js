@@ -395,6 +395,11 @@ export default function MessagingPage() {
     if (!userId) return;
     try {
       const res = await fetchWithAuth('/messaging/conversations');
+      // Session expired: fetchWithAuth cleared the token and AuthContext is
+      // redirecting to /login — expected after an idle signout, not an error.
+      // (2026-10-08: 3 logged copies of toast noise from this path — none were
+      // product failures; the API verified healthy.)
+      if (res.status === 401 && !localStorage.getItem('auth_token')) return;
       if (!res.ok) throw new Error('Failed to load conversations');
       const data = await res.json();
       setConversations(data.conversations || []);
