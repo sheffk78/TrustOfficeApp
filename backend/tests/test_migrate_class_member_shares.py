@@ -39,7 +39,6 @@ import pytest_asyncio
 # LATER suite (e.g. test_trust_cap_checkout.py's TestClient portals) then hits
 # closed-loop futures (established 2026-10-07). Run:
 #   TR_MIGRATE_SHARES_SUITE=1 .venv/bin/python -m pytest tests/test_migrate_class_member_shares.py
-)
 
 # motor futures bind to the loop running at first use; with pytest-asyncio's
 # default function-scoped loop the SECOND test's loop gets futures created on
