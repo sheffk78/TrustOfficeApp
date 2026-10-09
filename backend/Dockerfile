@@ -1,4 +1,6 @@
-FROM python:3.11-slim
+# public.ecr.aws mirrors docker.io/library 1:1 (Docker Official Images) with generous
+# rate limits — docker.io was 429-throttling Railway's builder on 2026-10-09 for 3+ attempts.
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 # Cache bust — forces Railway to rebuild image from scratch
 ARG CACHE_BUST=2026-09-05-calendar-fix-v1
