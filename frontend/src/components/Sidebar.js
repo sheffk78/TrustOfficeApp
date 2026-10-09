@@ -112,7 +112,7 @@ const NAV_GROUPS = [
   ]},
 
   // ═══ STANDALONE ITEMS ═══
-  { key: 'org-console', icon: Building2, label: 'Org Console', items: [], adminOnly: true },
+  { key: 'org-console', icon: Building2, label: 'Org Console', items: [] },
   { key: 'settings', icon: Settings, label: 'Settings', items: [] },
 ];
 

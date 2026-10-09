@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
   Settings,
   UsersRound,
+  Building2,
   Network,
   MessageSquare,
   FolderOpen,
@@ -122,6 +123,7 @@ const BASE_MORE_NAV_GROUPS = [
     items: [
       { path: '/settings', icon: Settings, label: 'Settings' },
       { path: '/trust-roles', icon: UsersRound, label: 'Trust Roles' },
+      { path: '/org-console', icon: Building2, label: 'Org Console' },
     ],
   },
 ];
