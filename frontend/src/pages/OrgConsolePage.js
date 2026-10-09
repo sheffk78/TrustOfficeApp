@@ -620,16 +620,18 @@ export default function OrgConsolePage() {
           ) : (
             <>
             <ul className="space-y-2 md:max-h-64 md:overflow-y-auto md:pr-1">
-              {events.slice(0, 12).map(ev => {
+              {events.filter(ev => ev && (ev.action || ev.activity_type)).slice(0, 12).map(ev => {
                 // 2026-10-09: every row names the CLIENT it's about — the feed's job is
                 // 'who did what, for which client, when'. Trust→client via the roster.
+                // Defensively handle raw lifecycle rows (old backend, pre-normalization):
+                const action0 = ev.action || ev.activity_type || '';
                 const t = (trustsByOrg[o.org_id] || []).find(x => x.trust_id === ev.trust_id);
-                const who = ev.member_name || (ev.action.startsWith('minutes_') || ev.action.startsWith('distribution_') || ev.action.startsWith('schedule_a_') || ev.action === 'kit_generated' ? 'The firm' : 'The client');
+                const who = ev.member_name || (action0.startsWith('minutes_') || action0.startsWith('distribution_') || action0.startsWith('schedule_a_') || action0 === 'kit_generated' ? 'The firm' : 'The client');
                 return (
                 <li key={ev.event_id || ev.created_at} className="text-sm border-b last:border-0 border-border/50 pb-2 last:pb-0">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-navy min-w-0 truncate">
-                      {ACTION_LABELS[ev.action] || ev.action}
+                      {ACTION_LABELS[action0] || action0}
                       {t?.owner_name ? <span className="text-muted-foreground"> — {t.owner_name}</span> : (t?.name ? <span className="text-muted-foreground"> — {t.name}</span> : null)}
                     </p>
                     <span className="text-xs text-muted-foreground shrink-0">{fmtRelative(ev.created_at)}</span>
