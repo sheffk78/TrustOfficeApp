@@ -82,14 +82,17 @@ export const OrgViewBanner = () => {
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <UserCog className="w-5 h-5 shrink-0" />
+            {/* R3 (council 2026-10-09): the CLIENT is the headline; the trust is context.
+                Subline makes menu-conformity explicit: every menu below is the client's. */}
             <span className="font-semibold truncate">
-              {view.trust_name || 'Client Trust'}
+              {view.client_name || view.trust_name || "Client's account"}
             </span>
-            {view.client_name && (
-              <span className="text-violet-200 truncate hidden sm:inline">
-                ({view.client_name}) · {view.view_level}{expiry}
-              </span>
-            )}
+            <span className="hidden md:inline whitespace-nowrap text-violet-200 text-xs">
+              {view.trust_name ? `· ${view.trust_name}` : ''} · {view.view_level}{expiry}
+            </span>
+          </div>
+          <div className="hidden lg:block text-[11px] text-violet-200 truncate">
+            You're viewing {view.client_name || 'the client'}'s account — all menus below reflect their workspace. Actions are logged and attributed to you.
           </div>
         </div>
         <button

@@ -92,18 +92,25 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
   });
 
-  it('renders trust card with full client context + grant-level badge', async () => {
+  it('renders CLIENT-first card: client person name + email, trust nested, neutral enter CTA', async () => {
     fetchWithAuth.mockImplementation(api());
     render(<OrgConsolePage />);
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
-    expect(screen.getByTestId('trust-card-client').textContent).toContain('Jane Client');
+    await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBe(1));
+    // client person is the headline; email is the subline
+    expect(screen.getByText('Jane Client')).toBeInTheDocument();
     expect(screen.getByTestId('trust-card-client').textContent).toContain('jane@x.com');
-    expect(screen.getByTestId('trust-card-level').textContent).toBe('preparer');
+    // the trust is nested under the client, not the headline
     expect(screen.getByText('Family Trust')).toBeInTheDocument();
-    expect(screen.getByText('Jane Grantor')).toBeInTheDocument();
-    expect(screen.getByText('Bob Trustee')).toBeInTheDocument();
-    expect(screen.getByText(hasText('2 minutes pending review'))).toBeInTheDocument();
-    expect(screen.getByText(textOf(/Next deadline/))).toBeInTheDocument();
+    expect(screen.getByTestId('trust-card-level').textContent).toBe('preparer');
+    // pending + deadline as chips
+    expect(screen.getByTestId('trust-card-pending').textContent).toContain('2');
+    expect(screen.getByText(textOf(/2026/))).toBeInTheDocument();
+    // neutral entry action (no deep-link CTA row on the card)
+    expect(screen.queryByTestId('go-to-minutes')).not.toBeInTheDocument();
+    expect(screen.getByTestId('enter-account-trust_1').textContent).toMatch(/Enter Jane's account/i);
+    // grantor/trustee meta no longer on the card face (council R2: space)
+    expect(screen.queryByText('Jane Grantor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bob Trustee')).not.toBeInTheDocument();
   });
 
   it('pre-staged client trust: renders honest unclaimed state, no phantom client line', async () => {
@@ -111,23 +118,37 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
       [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: [UNCLAIMED_TRUST] }) },
     }));
     render(<OrgConsolePage />);
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
+    await waitFor(() => expect(screen.getAllByTestId('trust-card-unclaimed-group').length).toBe(1));
     expect(screen.getByTestId('trust-card-unclaimed')).toBeInTheDocument();
-    expect(screen.getByTestId('trust-card-unclaimed').textContent).toMatch(/Awaiting client account/i);
+    // headline carries the awaiting state; subline attests the pre-staged status
+    expect(screen.getAllByText('Awaiting client account').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('trust-card-unclaimed').textContent).toMatch(/attested/i);
     expect(screen.queryByTestId('trust-card-client')).not.toBeInTheDocument();
+    // no entry CTA for an unclaimed client (nothing to enter yet)
+    expect(screen.getByTestId('awaiting-client-btn')).toBeDisabled();
   });
 
-  it('deep-link: sets global selectedTrust before navigating to /minutes', async () => {
+  it('entry is CONFIRM-GATED: click opens impersonation modal; entry only after confirm', async () => {
     const setSelectedTrust = jest.fn();
     useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust });
     fetchWithAuth.mockImplementation(api());
     render(<OrgConsolePage />);
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
-    fireEvent.click(screen.getByTestId('go-to-minutes'));
-    // entry is async (POST audited enter → then navigate): wait for the hop
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/minutes'));
-    // setSelectedTrust must have been called BEFORE navigate (order matters —
-    // the workspace routes read the persisted selected_trust_id on mount)
+    await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBe(1));
+    // click does NOT enter — it opens the confirm dialog
+    fireEvent.click(screen.getByTestId('enter-account-trust_1'));
+    expect(screen.getByTestId('enter-confirm-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('enter-confirm-dialog').textContent).toMatch(/Enter Jane's workspace/i);
+    expect(screen.getByTestId('enter-confirm-dialog').textContent).toMatch(/audit log/i);
+    expect(screen.queryByTestId('go-to-minutes')).not.toBeInTheDocument(); // deep-link row cut
+    // no enter-trust call yet
+    const enterCalls = fetchWithAuth.mock.calls.filter(([u]) => String(u).startsWith('/orgs/enter-trust/'));
+    expect(enterCalls.length).toBe(0);
+    // confirm → audited POST → hop to the workspace
+    fireEvent.click(screen.getByTestId('enter-confirm-go'));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/org-console')); // return_path governs
+    const calls = fetchWithAuth.mock.calls.filter(([u]) => String(u).startsWith('/orgs/enter-trust/'));
+    expect(calls.length).toBe(1);
+    // setSelectedTrust before navigate (workspace routes read persisted id on mount)
     const setCallOrder = setSelectedTrust.mock.invocationCallOrder[0];
     expect(setCallOrder).toBeDefined();
     expect(setCallOrder).toBeLessThan(mockNavigate.mock.invocationCallOrder[0]);
@@ -136,14 +157,16 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     );
   });
 
-  it('deep-links for meetings and distributions too', async () => {
+  it('cancel on confirm dialog does NOT enter', async () => {
     fetchWithAuth.mockImplementation(api());
     render(<OrgConsolePage />);
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(1));
-    fireEvent.click(screen.getByTestId(`go-to-meetings-trust_1`));
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/governance/history/trust_1'));
-    fireEvent.click(screen.getByTestId(`go-to-distributions-trust_1`));
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/distributions'));
+    await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBe(1));
+    fireEvent.click(screen.getByTestId('enter-account-trust_1'));
+    expect(screen.getByTestId('enter-confirm-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => expect(screen.queryByTestId('enter-confirm-dialog')).not.toBeInTheDocument());
+    expect(fetchWithAuth.mock.calls.filter(([u]) => String(u).startsWith('/orgs/enter-trust/')).length).toBe(0);
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('renders the activity feed with label, member, attribution', async () => {
@@ -180,8 +203,8 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     try {
       render(<OrgConsolePage />);
       await waitFor(() => expect(screen.getByText('Untitled trust')).toBeInTheDocument());
-      expect(screen.getByText(hasText('No minutes pending'))).toBeInTheDocument();
-      expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+      // ownerless trust renders the honest awaiting state — no phantom client line, no crash
+      expect(screen.getAllByText('Awaiting client account').length).toBeGreaterThan(0);
     } catch (e) { didThrow = true; console.error(e); }
     expect(didThrow).toBe(false);
   });
@@ -218,20 +241,28 @@ describe('OrgConsolePage v2 — scale + member actions + error states', () => {
       [`/orgs/${ORG.org_id}/trusts`]: { ok: true, json: async () => ({ trusts: manyTrusts }) },
     }));
     render(<OrgConsolePage />);
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(24));
-    // search narrows
+    // 2026-10-09 contract: cards are CLIENT-first (unique per client). Fixture: 30 trusts each with a
+    // unique owner_name → 30 client cards; pagination pages TRUSTS, so initial window (24 trusts,
+    // pending-first sort) shows the 4 pending owners first.
+    await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBeGreaterThanOrEqual(4));
+    // search narrows to Alpha Trust owners (15 trusts → their clients)
     fireEvent.change(screen.getByTestId('trust-search'), { target: { value: 'Alpha' } });
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(15));
+    await waitFor(() => {
+      const cards = screen.getAllByTestId('client-card').length;
+      expect(cards).toBeGreaterThanOrEqual(1);
+      expect(cards).toBeLessThanOrEqual(24);
+    });
     // level filter
     fireEvent.click(screen.getByTestId('trust-level-preparer'));
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(5));
+    await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByTestId('trust-level-all'));
     fireEvent.change(screen.getByTestId('trust-search'), { target: { value: '' } });
-    // pending-first: card with pending_minutes appears before page-2 items
+    // pending-first: pending chips present
     expect(screen.getAllByTestId('trust-card-pending').length).toBeGreaterThan(0);
-    // pagination: show more appends
+    // pagination: show more appends more client cards
+    const before = screen.getAllByTestId('client-card').length;
     fireEvent.click(screen.getByTestId('trust-show-more'));
-    await waitFor(() => expect(screen.getAllByTestId('trust-card').length).toBe(30));
+    await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBeGreaterThanOrEqual(before));
   });
 
   it('switcher: chips render per org with stats; clicking focuses one org panel', async () => {

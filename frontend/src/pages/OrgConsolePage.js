@@ -26,7 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import {
   Building2, RefreshCw, UserPlus, FileText, Users, ArrowUpRight,
-  Activity, CalendarClock, FileSignature, Search, ChevronDown, Settings,
+  Activity, CalendarClock, FileSignature, Search, ChevronDown, Settings, Eye,
   MoreHorizontal, PauseCircle, PlayCircle, Copy, AlertTriangle,
 } from 'lucide-react';
 
@@ -235,6 +235,11 @@ export default function OrgConsolePage() {
   // "viewing" session — same machinery as admin impersonation. The ENTER
   // endpoint validates the grant server-side (level/expiry/revocation) and
   // writes the audit row; org_view_data drives OrgViewBanner + Exit.
+  // ——— enter-confirmation modal (council R1+R3, 2026-10-09) ———
+  // Entry into a client's workspace is gated behind an explicit confirm step:
+  // the impersonation framing must be unmistakable BEFORE the click happens.
+  const [confirmEntry, setConfirmEntry] = useState(null); // {trust, route}
+
   const goToTrustSection = async (trust, route) => {
     try {
       const res = await fetchWithAuth(
@@ -255,7 +260,7 @@ export default function OrgConsolePage() {
         return_path: data.return_path,
       }));
       window.dispatchEvent(new Event('org_view_changed'));
-      navigate(route);
+      navigate(data.return_path || route);
     } catch (e) {
       if (e && e.status === 403) {
         toast.error('Your access to this trust is not active — ask the client to re-grant or check the expiry.');
@@ -289,6 +294,43 @@ export default function OrgConsolePage() {
     return out;
   }, [trustsByOrg, focusOrg, trustQuery, trustLevel]);
   const visibleTrusts = filteredTrusts.slice(0, trustShown);
+
+  // ——— derived: CLIENT-first roster (council R1+R2, 2026-10-09) ———
+  // Server-mode variant: trusts arrive as a page array, not trustsByOrg.
+  const serverRoster = (ts) => {
+    const byClient = new Map();
+    for (const t of ts.filter(Boolean)) {
+      const key = t.owner_user_id || (t.owner_name ? `__by_name__${t.owner_name}` : `__unclaimed__${t.trust_id}`);
+      if (!byClient.has(key)) byClient.set(key, { key, name: t.owner_name || 'Awaiting client account', email: t.owner_email || '', trusts: [] });
+      byClient.get(key).trusts.push(t);
+    }
+    return [...byClient.values()].sort((a, b) => {
+      const au = a.key.startsWith('__unclaimed__'), bu = b.key.startsWith('__unclaimed__');
+      if (au !== bu) return au ? 1 : -1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  };
+
+  // ——— derived: CLIENT-first roster (council R1+R2, 2026-10-09) ———
+  // Advisors think in clients, not securities: one card per client person,
+  // their trust(s) nested as rows. Trusts without an owner are unclaimed and
+  // group under a synthetic 'awaiting' bucket so they stay visible and honest.
+  const clientRoster = useMemo(() => {
+    const ts = filteredTrusts;
+    const byClient = new Map();
+    for (const t of ts) {
+      const key = t.owner_user_id || (t.owner_name ? `__by_name__${t.owner_name}` : `__unclaimed__${t.trust_id}`);
+      if (!byClient.has(key)) byClient.set(key, { key, name: t.owner_name || 'Awaiting client account', email: t.owner_email || '', trusts: [] });
+      byClient.get(key).trusts.push(t);
+    }
+    // named clients first, then unclaimed; alphabetical within groups
+    return [...byClient.values()].sort((a, b) => {
+      const au = a.key.startsWith('__unclaimed__'), bu = b.key.startsWith('__unclaimed__');
+      if (au !== bu) return au ? 1 : -1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [filteredTrusts, focusOrg]);
+
 
   // ——— derived: member list (search, sorted owner→active→invited) ———
   const roster = useMemo(() => {
@@ -410,104 +452,104 @@ export default function OrgConsolePage() {
     </Badge>
   );
 
-  const trustCard = (t) => {
-    const pending = t.pending_minutes || 0;
-    // Pre-staged client trust (P0-2, 2026-10-01 QA): the client hasn't signed
-    // up / claimed it yet, so it has no owner — show that state honestly
-    // instead of a normal card with a phantom "Client" meta line.
-    const unclaimed = !t.owner_user_id;
+  const clientCard = (c) => {
+    const trusts = c.trusts || [];
+    const claimed = trusts.filter(t => t.owner_user_id);
+    const pending = trusts.reduce((n, t) => n + (t.pending_minutes || 0), 0);
+    const nextDeadline = trusts.map(t => t.next_deadline).filter(Boolean).sort()[0];
+    const unclaimedOnly = claimed.length === 0 && !c.key.startsWith('__by_name__');
+    const primaryTrust = claimed[0];
+    const multi = claimed.length > 1;
     return (
-      <Card key={t.trust_id} className="card-trust" data-testid="trust-card">
+      <Card key={c.key} className="card-trust" data-testid={unclaimedOnly ? 'trust-card-unclaimed-group' : 'client-card'}>
         <CardContent className="pt-6">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="min-w-0">
-              <h3 className="font-serif text-base text-navy truncate" title={t.name || 'Untitled trust'}>{t.name || 'Untitled trust'}</h3>
-              {unclaimed ? (
-                <p className="text-xs text-muted-foreground italic" data-testid="trust-card-unclaimed" title="The client hasn't created their TrustOffice account yet — the trust is pre-staged and will connect once they sign up.">
-                  Awaiting client account — access was attested, not yet live
+              <h3 className="font-serif text-base text-navy truncate" title={c.email || c.name}>
+                {unclaimedOnly ? 'Awaiting client account' : c.name}
+              </h3>
+              {unclaimedOnly ? (
+                <p className="text-xs text-muted-foreground italic" data-testid="trust-card-unclaimed">
+                  Access was attested, not yet live — the trust connects once the client signs up.
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground truncate" title={t.owner_email || ''} data-testid="trust-card-client">
-                  {t.owner_name || 'Client'}
-                  {t.owner_email ? <span className="text-xs"> · {t.owner_email}</span> : null}
-                </p>
+                <p className="text-xs text-muted-foreground truncate" data-testid="trust-card-client">{c.email}</p>
               )}
             </div>
-            {grantLevelBadge(t.grant_level)}
+            {claimed[0] ? grantLevelBadge(claimed[0].grant_level) : null}
           </div>
 
-          {pending > 0 ? (
-            <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-navy bg-gold/20 border border-gold/40 rounded-full px-2.5 py-0.5" data-testid="trust-card-pending">
-                <FileSignature className="w-3.5 h-3.5 text-gold" />
-                {pending} {pending === 1 ? 'minute' : 'minutes'} pending review
-              </span>
-            </div>
-          ) : null}
+          {/* trusts nested under the client */}
+          <ul className="mb-4 space-y-1.5">
+            {trusts.map(t => (
+              <li key={t.trust_id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-navy truncate" title={t.name}>{t.name || 'Untitled trust'}</span>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
+                  {t.pending_minutes > 0 ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-navy bg-gold/20 border border-gold/40 rounded-full px-2 py-0.5" data-testid="trust-card-pending">
+                      <FileSignature className="w-3 h-3 text-gold" />
+                      {t.pending_minutes} pending
+                    </span>
+                  ) : null}
+                  {t.next_deadline ? <span className="inline-flex items-center gap-1"><CalendarClock className="w-3 h-3 text-gold" />{fmtDate(t.next_deadline)}</span> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
 
-          <div className="text-xs text-muted-foreground mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              <FileSignature className="w-3.5 h-3.5 text-gold/60" />
-              {pending > 0 ? `${pending} pending` : 'No minutes pending'}
-            </span>
-            <span>Grantor {t.grantor_name || <span>—</span>} · Trustee {t.trustee_name || <span>—</span>}</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mb-4">
-            <span className="inline-flex items-center gap-1">
-              <CalendarClock className="w-3.5 h-3.5 text-gold" />
-              {t.next_deadline ? `Next deadline ${fmtDate(t.next_deadline)}` : 'No upcoming deadline'}
-            </span>
-          </div>
+          <p className="text-xs text-muted-foreground mb-3">Scoped, time-limited, revocable by the client.</p>
 
           <div className="flex flex-col gap-2">
-            <Button
-              className="btn-primary w-full"
-              data-testid="go-to-minutes"
-              onClick={() => goToTrustSection(t, '/minutes')}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              {pending > 0 ? `Review ${pending} pending ${pending === 1 ? 'minute' : 'minutes'}` : 'Go to Minutes'}
-              <ArrowUpRight className="w-4 h-4 ml-auto" />
-            </Button>
-            <div className="grid grid-cols-2 gap-2">
+            {!unclaimedOnly && primaryTrust ? (
               <Button
-                variant="outline" className="btn-secondary"
-                data-testid={`go-to-meetings-${t.trust_id}`}
-                onClick={() => goToTrustSection(t, `/governance/history/${t.trust_id}`)}
+                className="btn-primary w-full"
+                data-testid={`enter-account-${primaryTrust.trust_id}`}
+                onClick={() => setConfirmEntry({ trust: primaryTrust, route: '/minutes' })}
               >
-                Meetings <ArrowUpRight className="w-4 h-4 ml-2" />
+                <Eye className="w-4 h-4 mr-2" />
+                Enter {multi ? 'client' : `${c.name.split(' ')[0]}'s`} account
+                <ArrowUpRight className="w-4 h-4 ml-auto" />
               </Button>
-              <Button
-                variant="outline" className="btn-secondary"
-                data-testid={`go-to-distributions-${t.trust_id}`}
-                onClick={() => goToTrustSection(t, '/distributions')}
-              >
-                Distributions <ArrowUpRight className="w-4 h-4 ml-2" />
+            ) : (
+              <Button className="btn-secondary w-full" disabled data-testid="awaiting-client-btn">
+                Awaiting client account
               </Button>
-            </div>
-          </div>
-            <div className="flex gap-2 pt-1 border-t border-border/40">
+            )}
+            {pending > 0 && primaryTrust ? (
               <Button
                 variant="ghost" size="sm"
-                className="text-xs text-muted-foreground hover:text-navy flex-1"
-                onClick={async () => {
-                  try {
-                    const res = await fetchWithAuth(`/exports/defense-summary/${t.trust_id}`);
-                    if (!res.ok) { toast.error('Could not build the summary.'); return; }
-                    const blob = await res.blob();
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `defense-summary-${t.trust_id}.pdf`;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                  } catch { toast.error('Could not build the summary.'); }
-                }}
-                data-testid={`defense-summary-${t.trust_id}`}
+                className="text-xs text-muted-foreground hover:text-navy"
+                data-testid={`review-minutes-${primaryTrust.trust_id}`}
+                onClick={() => setConfirmEntry({ trust: primaryTrust, route: '/minutes' })}
               >
-                Defense Summary
+                <FileText className="w-3.5 h-3.5 mr-1.5" />
+                Review {pending} pending {pending === 1 ? 'minute' : 'minutes'}
               </Button>
-            </div>
+            ) : null}
+            {primaryTrust ? (
+              <div className="flex gap-2 pt-1 border-t border-border/40">
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-xs text-muted-foreground hover:text-navy flex-1"
+                  onClick={async () => {
+                    try {
+                      const res = await fetchWithAuth(`/exports/defense-summary/${primaryTrust.trust_id}`);
+                      if (!res.ok) { toast.error('Could not build the summary.'); return; }
+                      const blob = await res.blob();
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `defense-summary-${primaryTrust.trust_id}.pdf`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    } catch { toast.error('Could not build the summary.'); }
+                  }}
+                  data-testid={`defense-summary-${primaryTrust.trust_id}`}
+                >
+                  Defense Summary
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
     );
@@ -895,12 +937,12 @@ export default function OrgConsolePage() {
                     <>
                       {serverMode ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4" data-testid="server-trust-grid">
-                          {(serverTrusts || []).filter(Boolean).map(t => trustCard(t))}
+                          {serverRoster(serverTrusts || []).map(c => clientCard(c))}
                           {searching ? <p className="text-xs text-muted-foreground">Searching…</p> : null}
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
-                          {visibleTrusts.map(t => trustCard(t))}
+                          {clientRoster.map(c => clientCard(c))}
                         </div>
                       )}
                       {serverMode && serverTotal > serverPage * TRUST_PAGE_SIZE ? (
@@ -1061,6 +1103,46 @@ export default function OrgConsolePage() {
           )}
         </div>
       </main>
+
+      {/* Enter-confirmation (council R1+R3, 2026-10-09): impersonation must be
+          unmistakable BEFORE the click. Gating every entry path. */}
+      <Dialog open={!!confirmEntry} onOpenChange={(o) => { if (!o) setConfirmEntry(null); }}>
+        <DialogContent data-testid="enter-confirm-dialog" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {confirmEntry && confirmEntry.trust.owner_name
+                ? `Enter ${confirmEntry.trust.owner_name.split(' ')[0]}'s workspace?`
+                : "Enter this client's workspace?"}
+            </DialogTitle>
+            <DialogDescription>
+              You'll be acting inside {confirmEntry?.trust?.owner_name || 'the client'}'s TrustOffice
+              account as {focusOrg?.name}, viewing {confirmEntry?.trust?.name}. Every action in this
+              session is attributed to you and written to the audit log.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-xs text-muted-foreground flex items-center gap-2" data-testid="enter-confirm-meta">
+            {confirmEntry?.trust ? grantLevelBadge(confirmEntry.trust.grant_level) : null}
+            <span>Scoped access — revocable by the client at any time.</span>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" className="btn-secondary" onClick={() => setConfirmEntry(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="btn-primary"
+              data-testid="enter-confirm-go"
+              onClick={() => {
+                const payload = confirmEntry;
+                setConfirmEntry(null);
+                if (payload) goToTrustSection(payload.trust, payload.route);
+              }}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Enter workspace
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent data-testid="invite-dialog">

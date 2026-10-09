@@ -88,12 +88,19 @@ export const fetchWithAuth = async (endpoint, options = {}) => {
 
   // Guard: callers may pass an absolute URL (e.g. `${API_BASE}/api/...`).
   // Strip the backend origin + /api prefix so we never produce `${API}https://...`.
+  // Then strip any leading `/api/` that SURVIVED the origin strip — callers who
+  // write `${API_BASE}/api/trusts/...` (origin-style) leave a bare '/api/...' path
+  // here, and appending API would double the prefix -> '/api/api/...' -> 404
+  // (Brent Roufs 2026-10-09, email-archive/status lockout loop).
   let path = endpoint;
   if (typeof path === 'string' && path.startsWith(BACKEND_URL)) {
     path = path.slice(BACKEND_URL.length);
   }
   if (typeof path === 'string' && path.startsWith(`${API}/`)) {
     path = path.slice(API.length);
+  }
+  if (typeof path === 'string' && path.startsWith('/api/')) {
+    path = path.slice('/api'.length);
   }
 
   const doFetch = () =>
