@@ -440,10 +440,15 @@ async def get_trust_banking_summary(
     accounts_with_balance = 0
 
     for acct in accounts:
+        # Legacy rows (pre-account_id seeding era) may lack account_id — skip
+        # them rather than 500ing the whole account list (KeyError 2026-10-09).
+        acct_id = acct.get("account_id")
+        if not acct_id:
+            continue
         # Get latest statement for this account
         latest = await db.bank_statements.find_one(
             {
-                "account_id": acct["account_id"],
+                "account_id": acct_id,
                 "trust_id": trust_id,
                 "user_id": effective_user_id,
                 "extraction_status": {"$in": ["completed", "needs_review"]},
@@ -456,7 +461,7 @@ async def get_trust_banking_summary(
             total_latest_balance += balance
             accounts_with_balance += 1
         account_summaries.append({
-            "account_id": acct["account_id"],
+            "account_id": acct_id,
             "nickname": acct.get("nickname", "Unknown"),
             "institution_name": acct.get("institution_name", ""),
             "last_four": acct.get("last_four", ""),
