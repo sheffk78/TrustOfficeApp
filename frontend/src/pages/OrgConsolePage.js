@@ -91,9 +91,6 @@ const ACTION_LABELS = {
   asset_updated: 'Updated an asset record',
   beneficiary_updated: 'Updated a beneficiary',
   trustee_appointment_sent: 'Sent a trustee appointment',
-
-  minutes_finalized: 'Finalized minutes',
-  minutes_autosaved: 'Autosaved a minutes draft',
   distribution_created: 'Recorded a distribution',
   distribution_approved: 'Approved a distribution',
   distribution_status_changed: 'Updated a distribution status',
