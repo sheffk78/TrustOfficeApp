@@ -49,7 +49,49 @@ const fmtRelative = (iso) => {
 };
 
 // Activity feed verbs → readable labels
+// "quarterly_review" → "Quarterly Review" (calendar/queue fallback titles)
+const humanizeTaskType = (key) =>
+  (key || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+// "2026-W43" → "Week of Oct 13" (ISO week from week key)
+const weekLabel = (wk) => {
+  const m = /^([0-9]{4})-W([0-9]{2})$/.exec(wk || '');
+  if (!m) return wk;
+  const d = new Date(Date.UTC(Number(m[1]), 0, 1 + (Number(m[2]) - 1) * 7));
+  const dow = d.getUTCDay() || 7;
+  if (dow <= 4) d.setUTCDate(d.getUTCDate() - dow + 1); else d.setUTCDate(d.getUTCDate() + 8 - dow);
+  const md = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(d);
+  return `Week of ${md}`;
+};
+const dueChip = (iso) => {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!iso) return null;
+  const day = String(iso).slice(0, 10);
+  if (day < today) return { text: `Overdue ${day.slice(5)}`, cls: 'text-red-600 bg-red-50 border-red-200' };
+  if (day === today) return { text: 'Today', cls: 'text-navy bg-gold/25 border-gold/50' };
+  if (day === new Date(Date.now() + 864e5).toISOString().slice(0, 10)) return { text: 'Tomorrow', cls: 'text-navy bg-gold/15 border-gold/40' };
+  return null;
+};
+
 const ACTION_LABELS = {
+  // lifecycle events (schema-B, normalized backfeed — Jeff 2026-10-09)
+  org_created: 'Created the organization',
+  invite_sent: 'Invited a team member',
+  invite_accepted: 'Joined the organization',
+  grant_created: 'Granted account access',
+  grant_revoked: 'Revoked account access',
+  grant_expiring: 'Access expiring soon',
+  // misc advisor actions seen in prod
+  minutes_finalized: 'Finalized minutes',
+  minutes_autosaved: 'Autosaved a minutes draft',
+  minutes_created: 'Drafted minutes',
+  minutes_updated: 'Updated minutes',
+  meeting_recorded: 'Recorded a meeting',
+  upload_vault_document: 'Uploaded a vault document',
+  list_vault_documents: 'Viewed vault documents',
+  asset_updated: 'Updated an asset record',
+  beneficiary_updated: 'Updated a beneficiary',
+  trustee_appointment_sent: 'Sent a trustee appointment',
+
   minutes_finalized: 'Finalized minutes',
   minutes_autosaved: 'Autosaved a minutes draft',
   distribution_created: 'Recorded a distribution',
@@ -581,20 +623,26 @@ export default function OrgConsolePage() {
           ) : (
             <>
             <ul className="space-y-2 md:max-h-64 md:overflow-y-auto md:pr-1">
-              {events.slice(0, 12).map(ev => (
+              {events.slice(0, 12).map(ev => {
+                // 2026-10-09: every row names the CLIENT it's about — the feed's job is
+                // 'who did what, for which client, when'. Trust→client via the roster.
+                const t = (trustsByOrg[o.org_id] || []).find(x => x.trust_id === ev.trust_id);
+                const who = ev.member_name || (ev.action.startsWith('minutes_') || ev.action.startsWith('distribution_') || ev.action.startsWith('schedule_a_') || ev.action === 'kit_generated' ? 'The firm' : 'The client');
+                return (
                 <li key={ev.event_id || ev.created_at} className="text-sm border-b last:border-0 border-border/50 pb-2 last:pb-0">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-navy min-w-0 truncate">{ACTION_LABELS[ev.action] || ev.action}</p>
+                    <p className="text-navy min-w-0 truncate">
+                      {ACTION_LABELS[ev.action] || ev.action}
+                      {t?.owner_name ? <span className="text-muted-foreground"> — {t.owner_name}</span> : (t?.name ? <span className="text-muted-foreground"> — {t.name}</span> : null)}
+                    </p>
                     <span className="text-xs text-muted-foreground shrink-0">{fmtRelative(ev.created_at)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {ev.member_name || 'Org member'} · {fmtRelative(ev.created_at)}
+                    {who}{ev.attribution ? ` · ${ev.attribution}` : ''}
                   </p>
-                  {ev.attribution ? (
-                    <p className="text-xs text-muted-foreground/80 italic mt-0.5">{ev.attribution}</p>
-                  ) : null}
                 </li>
-              ))}
+                );
+              })}
             </ul>
             {events.length > 12 ? (
               <p className="text-xs text-muted-foreground mt-3">Showing the 12 most recent of {events.length}.</p>
@@ -974,7 +1022,7 @@ export default function OrgConsolePage() {
                           {queue.items.slice(0, 8).map(it => (
                             <li key={it.task_id} className="flex items-center justify-between gap-3 py-2 border-b last:border-0 border-border/50 text-sm">
                               <div className="min-w-0">
-                                <p className="text-navy truncate">{it.title || it.task_type}</p>
+                                <p className="text-navy truncate">{it.title || humanizeTaskType(it.task_type)}</p>
                                 <p className="text-xs text-muted-foreground truncate">
                                   {it.trust_name || it.trust_id} · due {it.due_date ? String(it.due_date).slice(0, 10) : '—'}
                                 </p>
@@ -1021,21 +1069,28 @@ export default function OrgConsolePage() {
                           icon={CalendarClock} title="Firm Calendar"
                           right={<span className="text-xs text-muted-foreground">{firmCal.counts?.total || 0} upcoming · next 90 days</span>}
                         />
-                        <div className="space-y-3">
+                        <div className="space-y-3" data-testid="firm-calendar-body">
                           {firmCal.weeks.slice(0, 6).map(wk => (
                             <div key={wk.week} data-testid={`cal-week-${wk.week}`}>
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{wk.week}</p>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{weekLabel(wk.week)}</p>
                               <ul className="space-y-1.5">
-                                {wk.items.map(it => (
+                                {wk.items.map(it => {
+                                  const chip = dueChip(it.due_date);
+                                  return (
                                   <li key={it.task_id} className="flex items-center justify-between gap-2 text-sm py-1.5 border-b last:border-0 border-border/40">
                                     <div className="min-w-0">
-                                      <p className="text-navy truncate">
-                                        {it.title}
+                                      <p className="text-navy truncate" title={it.title || it.task_type}>
+                                        {it.title || humanizeTaskType(it.task_type)}
+                                        {chip ? (
+                                          <span className={`ml-2 inline-flex items-center text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 border ${chip.cls}`} data-testid="due-chip">{chip.text}</span>
+                                        ) : null}
                                         {it.automated ? (
                                           <span className="ml-2 inline-flex items-center text-[10px] uppercase tracking-wide text-navy bg-gold/25 border border-gold/50 rounded px-1.5 py-0.5" data-testid="automated-badge">Automated</span>
                                         ) : null}
                                       </p>
-                                      <p className="text-xs text-muted-foreground truncate">{it.trust_name || it.trust_id} · {String(it.due_date).slice(0, 10)}</p>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {it.trust_name || it.trust_id}{it.due_date ? ` · due ${String(it.due_date).slice(0, 10)}` : ''}
+                                      </p>
                                     </div>
                                     <Button variant="outline" size="sm" className="btn-secondary shrink-0"
                                       onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
@@ -1044,7 +1099,8 @@ export default function OrgConsolePage() {
                                       Open
                                     </Button>
                                   </li>
-                                ))}
+                                  );
+                                })}
                               </ul>
                             </div>
                           ))}

@@ -38,7 +38,7 @@ const UNCLAIMED_TRUST = {
   grant_level: 'viewer', pending_minutes: 0, next_deadline: null,
 };
 const EVENT = {
-  event_id: 'e1', action: 'distribution_approved',
+  event_id: 'e1', action: 'distribution_approved', trust_id: 'trust_1',
   member_name: 'Associate', created_at: '2026-09-27T00:00:00Z',
   attribution: 'For Jane Client',
 };
@@ -97,7 +97,7 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     render(<OrgConsolePage />);
     await waitFor(() => expect(screen.getAllByTestId('client-card').length).toBe(1));
     // client person is the headline; email is the subline
-    expect(screen.getByText('Jane Client')).toBeInTheDocument();
+    expect(screen.getByTestId('client-card').textContent).toMatch(/Jane Client/);
     expect(screen.getByTestId('trust-card-client').textContent).toContain('jane@x.com');
     // the trust is nested under the client, not the headline
     expect(screen.getByText('Family Trust')).toBeInTheDocument();
@@ -173,9 +173,11 @@ describe('OrgConsolePage (institution M4 frontend upgrade)', () => {
     fetchWithAuth.mockImplementation(api());
     render(<OrgConsolePage />);
     await waitFor(() => expect(screen.getAllByTestId('activity-feed').length).toBeGreaterThan(0));
-    expect(screen.getByText('Approved a distribution')).toBeInTheDocument();
-    expect(screen.getByText(textOf(/Associate ·/))).toBeInTheDocument();
-    expect(screen.getByText('For Jane Client')).toBeInTheDocument();
+    // 2026-10-09 contract: title row carries the label + the CLIENT it's for
+    expect(screen.getByText(textOf(/Approved a distribution/))).toBeInTheDocument();
+    expect(screen.getByText(textOf(/Approved a distribution — Jane Client/))).toBeInTheDocument();
+    // who-line joins member + attribution
+    expect(screen.getByText(textOf(/Associate · For Jane Client/))).toBeInTheDocument();
   });
 
   it('empty state: no orgs → create-org prompt; empty trusts and activity lists render', async () => {

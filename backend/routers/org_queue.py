@@ -196,7 +196,7 @@ async def org_queue(
                 "task_id": row.get("task_id"),
                 "trust_id": row.get("trust_id"),
                 "task_type": row.get("task_type"),
-                "title": row.get("description") or row.get("task_type"),
+                "title": row.get("description") or (row.get("task_type") or "").replace("_", " ").title(),
                 "due_date": row.get("due_date"),
                 "urgency": {0: "overdue", 1: "due_week", 2: "due_month", 3: "later"}.get(row.get("_bucket"), "later"),
                 "grant_level": level_by_trust.get(row.get("trust_id"), "viewer"),
@@ -362,7 +362,7 @@ async def org_firm_calendar(
             "trust_id": ev.get("trust_id"),
             "trust_name": tmap.get(ev.get("trust_id")),
             "task_type": ev.get("task_type"),
-            "title": ev.get("description") or ev.get("task_type"),
+            "title": ev.get("description") or (ev.get("task_type") or "").replace("_", " ").title(),
             "due_date": ev.get("due_date"),
             "automated": ev.get("created_via") == "recurring_automation",
         })

@@ -656,8 +656,33 @@ async def org_activity_feed(
         .sort("created_at", -1)
         .limit(limit)
     )
+    # 2026-10-09 (Jeff): the feed previously rendered lifecycle rows BLANK —
+    # two writer schemas live in this collection (advisor-action docs carry
+    # action/member_name/attribution; lifecycle docs carry activity_type/
+    # actor_user_id/target/detail). Normalize BOTH into the action shape.
+    LIFECYCLE_LABELS = {
+        "org_created": "Created the organization",
+        "invite_sent": "Invited a team member",
+        "invite_accepted": "Joined the organization",
+        "grant_created": "Granted account access",
+        "grant_revoked": "Revoked account access",
+        "grant_expiring": "Access expiring soon",
+    }
     async for ev in cursor:
-        events.append(ev)
+        action = ev.get("action") or ev.get("activity_type")
+        if not action:
+            continue
+        events.append({
+            "event_id": ev.get("event_id") or ev.get("activity_id"),
+            "org_id": org_id,
+            "trust_id": ev.get("trust_id") or "",
+            "member_name": ev.get("member_name") or "",
+            "org_name": ev.get("org_name") or "",
+            "action": action,
+            "attribution": ev.get("attribution") or ev.get("detail") or None,
+            "target": ev.get("target") or None,
+            "created_at": ev.get("created_at"),
+        })
     return {"org_id": org_id, "events": events, "count": len(events)}
 
 
