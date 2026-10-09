@@ -514,9 +514,16 @@ const NavList = ({
 export const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, trusts, selectedTrust, setSelectedTrust, logout } = useAuth();
+  const { user, trusts: allTrusts, selectedTrust, setSelectedTrust, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef(null);
+
+  // 2026-10-09 (Jeff): the Active Trust selector is for the advisor's OWN
+  // trusts only. Client trusts accessed through the Org Console (grant
+  // metadata on the row) never belong in this dropdown — selection happens
+  // inside the Org Console via enter-trust impersonation. The org-view banner
+  // still identifies the client while an org-view session is active.
+  const trusts = allTrusts.filter(t => !t.org_grant_level);
 
   // Determine which group should be expanded based on current route
   const activeGroup = NAV_GROUPS.find(g =>

@@ -229,22 +229,24 @@ def _trusts_client(user, seeded_state):
 
 
 class TestGrantedTrustContext:
-    """GET /trusts and GET /trusts/{id} include actively granted trusts with a
-    SAFE projection (no owner/PII fields) + grant metadata. Reload-safe:
-    useTrustsLoader's reconcile can restore a granted member's selection."""
+    """2026-10-09 contract change (Jeff): granted client trusts must NOT be
+    listed in GET /trusts — the advisor's Active Trust selector lists only
+    their own trusts, and client selection happens exclusively through the
+    Org Console (POST /orgs/enter-trust). GET /trusts/{id} keeps the org-grant
+    fallback (safe projection + grant metadata) so an ACTIVE org-view session
+    can resolve single-trust reads and survives reloads. Dead grants (expired,
+    revoked) must never read a trust."""
 
     @pytest.mark.asyncio
-    async def test_granted_trust_listed_safe_projection(self, seeded):
+    async def test_granted_trust_NOT_listed_in_trusts(self, seeded):
         tid = seeded["trust"]["trust_id"]
         res = _trusts_client(seeded["prep"], seeded).get("/api/trusts")
         assert res.status_code == 200, res.text[:140]
         rows = res.json()
-        granted = [t for t in rows if t["trust_id"] == tid]
-        assert granted, f"granted trust missing from /trusts: rows={[t['trust_id'] for t in rows]}"
-        row = granted[0]
-        assert row.get("org_grant_level") == "preparer", row
-        assert row.get("granted_via_org_id") == "o_authz", row
-        assert row.get("org_grant_expires_at"), "grant expiry missing"
+        listed = [t for t in rows if t["trust_id"] == tid]
+        assert not listed, (
+            f"granted trust leaked into /trusts selector: rows={[t['trust_id'] for t in rows]}"
+        )
 
     @pytest.mark.asyncio
     async def test_granted_trust_single_get(self, seeded):
@@ -279,5 +281,6 @@ class TestGrantedTrustContext:
         rows = res.json()
         assert not [t for t in rows if t["trust_id"] == tid2], \
             "ungranted trust leaked into member's /trusts"
-        assert [t for t in rows if t["trust_id"] == seeded["trust"]["trust_id"]], \
-            "granted trust should appear"
+        # 2026-10-09: granted trusts are excluded from /trusts entirely
+        assert not [t for t in rows if t["trust_id"] == seeded["trust"]["trust_id"]], \
+            "granted trust must not appear in /trusts (Org Console is the only entry)"

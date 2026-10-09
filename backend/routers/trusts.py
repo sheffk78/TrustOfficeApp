@@ -492,16 +492,14 @@ async def get_trusts(user: dict = Depends(get_current_user)):
         health = await calculate_health_score(trust["trust_id"], user["user_id"], save_snapshot=False)
         result.append(TrustResponse(**trust, governance_score=health["total_score"]))
     
-    # Granted trusts (org console workspace entry): active org grants appear
-    # after the user's own trusts with a safe projection + grant metadata.
-    granted = await _granted_trusts_for(user)
-    seen = {getattr(t, "trust_id", None) for t in result}
-    for trust, grant in granted:
-        if trust["trust_id"] in seen:
-            continue
-        health = await calculate_health_score(trust["trust_id"], user["user_id"], save_snapshot=False)
-        result.append(_safe_grant_trust_response(trust, grant, health["total_score"]))
-    
+    # Granted client trusts intentionally do NOT ride in /trusts (Jeff 2026-10-09):
+    # an advisor's Active Trust selector must list ONLY their own trusts. Client
+    # trust selection lives exclusively inside the Org Console, entered through
+    # POST /orgs/enter-trust/{trust_id} — the same machinery as admin
+    # impersonation. Reload-safety for an ACTIVE org-view session is handled in
+    # useTrustsLoader via sessionStorage org_view_data, not by list membership.
+    # Single-trust reads by granted members still resolve via the org-grant
+    # fallback in GET /trusts/{trust_id} below.
     return result
 
 
