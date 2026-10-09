@@ -10,10 +10,10 @@ import re
 
 from database import db
 from dependencies import (
-    get_current_user, require_write_access, calculate_health_score, 
+    get_current_user, require_write_access, calculate_health_score,
     create_initial_governance_tasks, check_feature_access, Feature,
     PREMIUM_FEATURE_ERROR_MESSAGE, PREMIUM_FEATURE_ERROR_CODE,
-    get_trust_limit, PLAN_TRUST_LIMITS
+    get_trust_limit, PLAN_TRUST_LIMITS, auto_update_onboarding
 )
 from trustee_utils import parse_trustees
 
@@ -605,6 +605,14 @@ async def update_trust(trust_id: str, update: TrustUpdate, user: dict = Depends(
             logger.warning(f"Failed to backfill threshold alerts: {e}")
     
     updated = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
+    # Onboarding checklist auto-mark (Brent Roufs 2026-10-09): entering the EIN
+    # (or formation date) in Settings never flipped the "Getting Started" flags
+    # because only minutes/tasks/banking paths recomputed onboarding. Run the
+    # same auto-update here; failures must not block the save.
+    try:
+        await auto_update_onboarding(user["user_id"], trust_id)
+    except Exception as e:
+        logger.warning(f"onboarding auto-update failed for {trust_id}: {e}")
     health = await calculate_health_score(trust_id, user["user_id"], save_snapshot=False)
     return TrustResponse(**updated, governance_score=health["total_score"])
 

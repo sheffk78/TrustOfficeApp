@@ -958,10 +958,11 @@ export default function OrgConsolePage() {
                     </>
                   )}
 
-                  {/* Review queue + firm calendar: BELOW the client-trust selection (Jeff, 2026-10-09) —
-                       the console opens with clients first; queue/calendar sit under it. */}
+                  {/* Review queue + firm calendar: BELOW the client-trust selection (Jeff, 2026-10-09),
+                       sharing a two-column row — queue left, calendar right (Jeff follow-up same day). */}
+                  <div className="grid gap-4 md:grid-cols-2 items-start" data-testid="queue-calendar-row">
                   {queue && queue.items && queue.items.length > 0 ? (
-                    <Card className="card-trust mb-4" data-testid="review-queue">
+                    <Card className="card-trust" data-testid="review-queue">
                       <CardContent className="pt-6">
                         <SectionHeader
                           icon={RefreshCw} title="Review Queue"
@@ -1051,6 +1052,8 @@ export default function OrgConsolePage() {
                       </CardContent>
                     </Card>
                   ) : null}
+                  </div> {/* queue-calendar-row */}
+
                   {/* two-column zone on xl: trusts already full-width above; activity + team side by side on wide screens */}
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {activityFeed(focusOrg)}

@@ -158,7 +158,8 @@ class TestEnterMatrix:
             assert body["client"]["email"] == "client@e2e.test"
             assert body["view_level"] == "preparer"
             assert body["org"]["org_id"] == "org_e2e"
-            assert body["return_path"] == "/org-console"
+            # 2026-10-09 (Jeff): entry lands on the CLIENT's dashboard, not back in the console.
+            assert body["return_path"] == "/dashboard"
             assert body["expires_at"] == _future(30) or body["expires_at"]
 
             # 2. viewer

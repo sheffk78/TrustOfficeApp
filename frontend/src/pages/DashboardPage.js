@@ -30,6 +30,21 @@ import { getOnboardingProgress, computeNextAction } from './dashboard/constants'
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  // Org-view session detection (council R3, 2026-10-09): when an advisor is
+  // inside a client's workspace the dashboard must present THAT client's
+  // account — own-trust management UI stays hidden. Reactive to enter/exit.
+  const [orgViewTick, setOrgViewTick] = useState(0);
+  useEffect(() => {
+    const onChange = () => setOrgViewTick((t) => t + 1);
+    window.addEventListener('org_view_changed', onChange);
+    return () => window.removeEventListener('org_view_changed', onChange);
+  }, []);
+  const orgView = (() => {
+    try { return JSON.parse(sessionStorage.getItem('org_view_data') || 'null'); } catch (e) { return null; }
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  void orgViewTick;
+  const clientName = orgView?.client_name || '';
   const [nextActionDismissed, setNextActionDismissed] = useState(false);
   const [weeklyBriefingDismissed, setWeeklyBriefingDismissed] = useState(false);
   const {
@@ -174,7 +189,9 @@ export default function DashboardPage() {
             <div>
               <h1 className="page-title">Dashboard</h1>
               <p className="page-subtitle">
-                Trust administration at a glance — view key metrics, upcoming deadlines, and quick actions for {selectedTrust?.name || 'your trust'}
+                {orgView
+                ? `${clientName || 'The client'}'s workspace — trust administration at a glance for ${selectedTrust?.name || orgView.trust_name || 'their trust'}`
+                : <>Trust administration at a glance — view key metrics, upcoming deadlines, and quick actions for {selectedTrust?.name || 'your trust'}</>}
               </p>
             </div>
             <PageHelpButton
@@ -187,8 +204,11 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Trust Manager Section — shown when user has 2+ trusts */}
-          {trusts.length >= 2 && !loading && (
+          {/* Trust Manager Section — shown when user has 2+ trusts.
+              NEVER during an org-view session (council R3, 2026-10-09): inside a
+              client's workspace the dashboard reflects THEIR account only — the
+              advisor's own trust roster must not render here. */}
+          {trusts.length >= 2 && !loading && !orgView && (
             <div className="mb-8" data-testid="trust-manager-section">
               <TrustManager embedded />
             </div>

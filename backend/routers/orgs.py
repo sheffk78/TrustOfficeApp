@@ -898,7 +898,10 @@ async def enter_trust_workspace(
         "view_level": view_level,
         "expires_at": (grant or {}).get("expires_at"),
         "entered_at": now,
-        "return_path": "/org-console",
+        # 2026-10-09 (Jeff): entering a client's workspace lands on the CLIENT's
+        # dashboard, not back in the Org Console. /org-console stays the EXIT
+        # path (banner Back button), never the entry landing.
+        "return_path": "/dashboard",
     }
 
 

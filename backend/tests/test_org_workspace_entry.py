@@ -136,7 +136,8 @@ async def test_enter_authorized_member_returns_context_and_audits(clean_db):
     assert res["client"]["email"] == "cl_m5@test.com"
     assert res["view_level"] == "preparer"
     assert res["expires_at"] == grant["expires_at"]
-    assert res["return_path"] == "/org-console"
+    # 2026-10-09 (Jeff): entry lands on the CLIENT's dashboard, not back in the console.
+    assert res["return_path"] == "/dashboard"
     assert res["org"]["name"] == "M5 Org"
     audit = await db.admin_audit_log.find_one({"action": "org_enter_workspace"})
     assert audit and audit["trust_id"] == trust["trust_id"]
