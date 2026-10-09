@@ -800,97 +800,6 @@ export default function OrgConsolePage() {
                       ))}
                     </div>
                   ) : null}
-                  {queue && queue.items && queue.items.length > 0 ? (
-                    <Card className="card-trust mb-4" data-testid="review-queue">
-                      <CardContent className="pt-6">
-                        <SectionHeader
-                          icon={RefreshCw} title="Review Queue"
-                          right={<span className="text-xs text-muted-foreground">
-                            {queue.counts?.overdue ? `${queue.counts.overdue} overdue · ` : ''}{queue.counts?.due_week || 0} this week
-                          </span>}
-                        />
-                        <ul className="space-y-2">
-                          {queue.items.slice(0, 8).map(it => (
-                            <li key={it.task_id} className="flex items-center justify-between gap-3 py-2 border-b last:border-0 border-border/50 text-sm">
-                              <div className="min-w-0">
-                                <p className="text-navy truncate">{it.title || it.task_type}</p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {it.trust_name || it.trust_id} · due {it.due_date ? String(it.due_date).slice(0, 10) : '—'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {it.urgency === 'overdue' ? (
-                                  <Badge className="bg-red-900 text-white text-xs">Overdue</Badge>
-                                ) : (
-                                  <Badge variant="secondary" className="text-xs">{it.urgency === 'due_week' ? 'This week' : 'Upcoming'}</Badge>
-                                )}
-                                {(it.grant_level === 'preparer') ? (
-                                  <Button variant="outline" size="sm" className="btn-secondary"
-                                    disabled={queueBusy === it.task_id}
-                                    onClick={async () => {
-                                      setQueueBusy(it.task_id);
-                                      try {
-                                        const res = await fetchWithAuth(`/org/queue/${it.task_id}/complete`, { method: 'POST' });
-                                        if (res.ok) { toast.success('Task completed — next cycle scheduled.'); await load(); loadOverview(focusOrg.org_id); }
-                                        else toast.error('Could not complete that task.');
-                                      } finally { setQueueBusy(null); }
-                                    }}
-                                    data-testid={`queue-complete-${it.task_id}`}
-                                  >
-                                    {queueBusy === it.task_id ? '…' : 'Complete'}
-                                  </Button>
-                                ) : null}
-                                <Button variant="outline" size="sm" className="btn-secondary"
-                                  onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
-                                  data-testid={`queue-open-${it.task_id}`}
-                                >
-                                  Open
-                                </Button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  ) : null}
-                  {firmCal && firmCal.weeks && firmCal.weeks.length > 0 ? (
-                    <Card className="card-trust mb-4" data-testid="firm-calendar">
-                      <CardContent className="pt-6">
-                        <SectionHeader
-                          icon={CalendarClock} title="Firm Calendar"
-                          right={<span className="text-xs text-muted-foreground">{firmCal.counts?.total || 0} upcoming · next 90 days</span>}
-                        />
-                        <div className="space-y-3">
-                          {firmCal.weeks.slice(0, 6).map(wk => (
-                            <div key={wk.week} data-testid={`cal-week-${wk.week}`}>
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{wk.week}</p>
-                              <ul className="space-y-1.5">
-                                {wk.items.map(it => (
-                                  <li key={it.task_id} className="flex items-center justify-between gap-2 text-sm py-1.5 border-b last:border-0 border-border/40">
-                                    <div className="min-w-0">
-                                      <p className="text-navy truncate">
-                                        {it.title}
-                                        {it.automated ? (
-                                          <span className="ml-2 inline-flex items-center text-[10px] uppercase tracking-wide text-navy bg-gold/25 border border-gold/50 rounded px-1.5 py-0.5" data-testid="automated-badge">Automated</span>
-                                        ) : null}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground truncate">{it.trust_name || it.trust_id} · {String(it.due_date).slice(0, 10)}</p>
-                                    </div>
-                                    <Button variant="outline" size="sm" className="btn-secondary shrink-0"
-                                      onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
-                                      data-testid={`cal-open-${it.task_id}`}
-                                    >
-                                      Open
-                                    </Button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : null}
                   {/* trusts */}
                   <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
@@ -1007,6 +916,99 @@ export default function OrgConsolePage() {
                     </>
                   )}
 
+                  {/* Review queue + firm calendar: BELOW the client-trust selection (Jeff, 2026-10-09) —
+                       the console opens with clients first; queue/calendar sit under it. */}
+                  {queue && queue.items && queue.items.length > 0 ? (
+                    <Card className="card-trust mb-4" data-testid="review-queue">
+                      <CardContent className="pt-6">
+                        <SectionHeader
+                          icon={RefreshCw} title="Review Queue"
+                          right={<span className="text-xs text-muted-foreground">
+                            {queue.counts?.overdue ? `${queue.counts.overdue} overdue · ` : ''}{queue.counts?.due_week || 0} this week
+                          </span>}
+                        />
+                        <ul className="space-y-2">
+                          {queue.items.slice(0, 8).map(it => (
+                            <li key={it.task_id} className="flex items-center justify-between gap-3 py-2 border-b last:border-0 border-border/50 text-sm">
+                              <div className="min-w-0">
+                                <p className="text-navy truncate">{it.title || it.task_type}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {it.trust_name || it.trust_id} · due {it.due_date ? String(it.due_date).slice(0, 10) : '—'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {it.urgency === 'overdue' ? (
+                                  <Badge className="bg-red-900 text-white text-xs">Overdue</Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">{it.urgency === 'due_week' ? 'This week' : 'Upcoming'}</Badge>
+                                )}
+                                {(it.grant_level === 'preparer') ? (
+                                  <Button variant="outline" size="sm" className="btn-secondary"
+                                    disabled={queueBusy === it.task_id}
+                                    onClick={async () => {
+                                      setQueueBusy(it.task_id);
+                                      try {
+                                        const res = await fetchWithAuth(`/org/queue/${it.task_id}/complete`, { method: 'POST' });
+                                        if (res.ok) { toast.success('Task completed — next cycle scheduled.'); await load(); loadOverview(focusOrg.org_id); }
+                                        else toast.error('Could not complete that task.');
+                                      } finally { setQueueBusy(null); }
+                                    }}
+                                    data-testid={`queue-complete-${it.task_id}`}
+                                  >
+                                    {queueBusy === it.task_id ? '…' : 'Complete'}
+                                  </Button>
+                                ) : null}
+                                <Button variant="outline" size="sm" className="btn-secondary"
+                                  onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
+                                  data-testid={`queue-open-${it.task_id}`}
+                                >
+                                  Open
+                                </Button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  {firmCal && firmCal.weeks && firmCal.weeks.length > 0 ? (
+                    <Card className="card-trust mb-4" data-testid="firm-calendar">
+                      <CardContent className="pt-6">
+                        <SectionHeader
+                          icon={CalendarClock} title="Firm Calendar"
+                          right={<span className="text-xs text-muted-foreground">{firmCal.counts?.total || 0} upcoming · next 90 days</span>}
+                        />
+                        <div className="space-y-3">
+                          {firmCal.weeks.slice(0, 6).map(wk => (
+                            <div key={wk.week} data-testid={`cal-week-${wk.week}`}>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{wk.week}</p>
+                              <ul className="space-y-1.5">
+                                {wk.items.map(it => (
+                                  <li key={it.task_id} className="flex items-center justify-between gap-2 text-sm py-1.5 border-b last:border-0 border-border/40">
+                                    <div className="min-w-0">
+                                      <p className="text-navy truncate">
+                                        {it.title}
+                                        {it.automated ? (
+                                          <span className="ml-2 inline-flex items-center text-[10px] uppercase tracking-wide text-navy bg-gold/25 border border-gold/50 rounded px-1.5 py-0.5" data-testid="automated-badge">Automated</span>
+                                        ) : null}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground truncate">{it.trust_name || it.trust_id} · {String(it.due_date).slice(0, 10)}</p>
+                                    </div>
+                                    <Button variant="outline" size="sm" className="btn-secondary shrink-0"
+                                      onClick={() => goToTrustSection({ trust_id: it.trust_id, name: it.trust_name }, '/tasks')}
+                                      data-testid={`cal-open-${it.task_id}`}
+                                    >
+                                      Open
+                                    </Button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
                   {/* two-column zone on xl: trusts already full-width above; activity + team side by side on wide screens */}
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {activityFeed(focusOrg)}
