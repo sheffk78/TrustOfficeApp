@@ -69,6 +69,52 @@ def _is_noise(status_code: int, detail: object, path: str) -> bool:
     return False
 
 
+def _json_safe(value: object) -> str:
+    """Render any pydantic error field (input_value, ctx, url, loc, ...) as a
+    JSON-serializable string.
+
+    Error payloads are attacker-influenced request data — `input` can be ANY
+    object the request carried, including raw `bytes` (binary body with a
+    non-JSON content type) or nested structures. Passing those through to
+    JSONResponse crashed json.dumps with "Object of type bytes is not JSON
+    serializable" and turned a 4xx into a 500 (TypeError 2026-10-10,
+    /api/auth/login). Everything becomes a string here, no exceptions.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, (list, tuple, set)):
+        return "[" + ", ".join(_json_safe(v) for v in value) + "]"
+    if isinstance(value, dict):
+        return "{" + ", ".join(
+            f"{_json_safe(k)}: {_json_safe(v)}" for k, v in value.items()
+        ) + "}"
+    return str(value)
+
+
+def _format_validation_detail(errors: list) -> object:
+    """Build the `detail` payload for the 422 response.
+
+    FastAPI's default shape is a raw list of error dicts; that list leaks
+    non-JSON-safe `input` values (same crash as _json_safe documents) and
+    buries the human message in nested keys. We keep ONE compact,
+    JSON-safe representation: "loc: msg" pairs joined by "; ". Callers that
+    parsed the old list-shape fall back fine — a string detail is exactly
+    what HTTPException handlers already emit.
+    """
+    try:
+        pairs = []
+        for err in list(errors or [])[:5]:
+            loc = ".".join(str(p) for p in (err.get("loc") or [])[1:]) or "?"
+            msg = err.get("msg") or err.get("message") or "validation failed"
+            pairs.append(f"{loc}: {_json_safe(msg)}")
+        return "; ".join(pairs) if pairs else "validation failed"
+    except Exception:
+        # Last resort: nothing from this path may ever 500.
+        return "validation failed"
+
+
 def _looks_like_drift(detail: object, status_code: int) -> bool:
     """Heuristic: rejection messages that smell like contract drift — the
     class of bug that bit us on 2026-09-19 (422 + enum name). These page
@@ -223,7 +269,7 @@ def install_4xx_capture(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=422,
-            content={"detail": exc.errors()},
+            content={"detail": _format_validation_detail(exc.errors())},
         )
 
     logger.info("4xx capture installed (TO_CAPTURE_4XX=%s)" % os.environ.get(_CAPTURE_ENV, "1"))

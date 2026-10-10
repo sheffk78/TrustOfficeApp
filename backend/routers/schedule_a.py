@@ -72,6 +72,18 @@ def _apply_legacy_defaults(item):
         item["disposition_date"] = None
     if "disposition_notes" not in item:
         item["disposition_notes"] = None
+    # 2026-10-10: seeded rows (kit showcase demo) missing core string fields
+    # crashed the whole list endpoint on ScheduleAItemResponse(**item) —
+    # ValidationError "Input should be a valid string, input_value=None".
+    # Response model keeps them required; storage tolerates absence here.
+    if item.get("identifier") is None:
+        item["identifier"] = ""
+    if item.get("location") is None:
+        item["location"] = ""
+    if item.get("date_conveyed") is None:
+        item["date_conveyed"] = ""
+    if item.get("created_at") is None and "created_at" not in item:
+        item["created_at"] = ""
     return item
 
 
