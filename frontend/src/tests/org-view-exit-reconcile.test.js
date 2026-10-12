@@ -25,9 +25,8 @@
 import fs from 'fs';
 import path from 'path';
 
-const __dirname = path.dirname(fs.realpathSync(__filename));
-const bannerPath = path.join(__dirname, '..', 'components', 'OrgViewBanner.js');
-const authCtxPath = path.join(__dirname, '..', 'context', 'AuthContext.js');
+const authCtxPath = path.join(process.cwd(), 'src', 'context', 'AuthContext.js');
+const bannerPath = path.join(process.cwd(), 'src', 'components', 'OrgViewBanner.js');
 const bannerSrc = fs.readFileSync(bannerPath, 'utf8');
 const authSrc = fs.readFileSync(authCtxPath, 'utf8');
 
