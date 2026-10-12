@@ -666,6 +666,17 @@ export const AuthProvider = ({ children }) => {
     return loadSubscriptionState();
   }, [loadSubscriptionState]);
 
+  // 2026-10-12 (demo-battery defect D1): OrgViewBanner exit clears the sticky
+  // selection and fires this event; re-run the reconcile so the active trust
+  // drops back to the advisor's OWN trust immediately (no hard reload needed).
+  // With org_view_data gone, the previously-selected client trust is no longer
+  // valid via isOrgViewTrust and the stale branch clears it + falls back.
+  useEffect(() => {
+    const reReconcile = () => { loadTrustsInternal(false); };
+    window.addEventListener('trust_selection_invalidated', reReconcile);
+    return () => window.removeEventListener('trust_selection_invalidated', reReconcile);
+  }, [loadTrustsInternal]);
+
   // Initial auth check on mount
   useEffect(() => {
     checkAuth();

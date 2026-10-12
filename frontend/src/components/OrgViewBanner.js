@@ -59,6 +59,15 @@ export const OrgViewBanner = () => {
       }
       sessionStorage.removeItem('org_view_data');
       window.dispatchEvent(new Event('org_view_changed'));
+      // 2026-10-12 (demo-battery defect D1): the client trust was still the
+      // sticky active-trust selection after exit — localStorage kept it "valid"
+      // via the isOrgViewTrust reconcile only while org_view_data existed, so
+      // Money pages could render the CLIENT's data inside the advisor's own
+      // workspace until a hard reload. Clear the selection with the view and
+      // ask AuthContext to re-reconcile (it self-heals to the advisor's own
+      // first real trust once org_view_data is gone).
+      localStorage.removeItem('selected_trust_id');
+      window.dispatchEvent(new Event('trust_selection_invalidated'));
       toast.success('Returned to Org Console');
       navigate('/org-console');
     } finally {
