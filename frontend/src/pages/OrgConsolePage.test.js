@@ -449,6 +449,7 @@ describe('OrgConsolePage Phase 2 — firm calendar + automated badge', () => {
           { week: '2026-W40', items: [
             { task_id: 'a1', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'quarterly_review', title: 'Quarterly review', due_date: '2026-10-02', automated: true },
             { task_id: 'a2', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'custom', title: 'Read ledger', due_date: '2026-10-02', automated: false },
+            { task_id: 'a3', trust_id: 'trust_1', trust_name: 'Family Trust', task_type: 'annual_review', title: 'Annual re-valuation', due_date: '2026-11-04', automated: false },
           ] },
         ],
         counts: { total: 2 },
@@ -461,6 +462,9 @@ describe('OrgConsolePage Phase 2 — firm calendar + automated badge', () => {
     expect(screen.getAllByTestId('cal-week-2026-W40')).toHaveLength(1);
     expect(screen.getByText('Automated')).toBeInTheDocument();
     expect(screen.getByTestId('cal-open-a1')).toBeInTheDocument();
+    // date render regression (2026-10-13): calendar cards show "due Nov 4", not raw ISO "2026-11-04"
+    expect(screen.getByText(/due Nov 4/)).toBeInTheDocument();
+    expect(screen.queryByText(/due 2026-11-04/)).not.toBeInTheDocument();
   });
 });
 

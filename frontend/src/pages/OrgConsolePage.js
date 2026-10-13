@@ -69,11 +69,20 @@ const weekLabel = (wk) => {
   const md = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(d);
   return `Week of ${md}`;
 };
+const fmtShort = (iso) => {
+  // "2026-11-04" / ISO timestamp → "Nov 4" (no UTC shift for date-only strings)
+  try {
+    const day = String(iso || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return String(iso || '');
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch { return String(iso || ''); }
+};
 const dueChip = (iso) => {
   const today = new Date().toISOString().slice(0, 10);
   if (!iso) return null;
   const day = String(iso).slice(0, 10);
-  if (day < today) return { text: `Overdue ${day.slice(5)}`, cls: 'text-red-600 bg-red-50 border-red-200' };
+  if (day < today) return { text: `Overdue ${fmtShort(day)}`, cls: 'text-red-600 bg-red-50 border-red-200' };
   if (day === today) return { text: 'Today', cls: 'text-navy bg-gold/25 border-gold/50' };
   if (day === new Date(Date.now() + 864e5).toISOString().slice(0, 10)) return { text: 'Tomorrow', cls: 'text-navy bg-gold/15 border-gold/40' };
   return null;
@@ -644,7 +653,7 @@ export default function OrgConsolePage() {
                     <span className="text-xs text-muted-foreground shrink-0">{fmtRelative(ev.created_at)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {who}{ev.attribution ? ` · ${ev.attribution}` : ''}
+                    {who}{ev.attribution ? ` · ${String(ev.attribution).replace(/\(expires (\d{4}-\d{2}-\d{2})\)/g, (_, d) => `(expires ${fmtShort(d)})`)}` : ''}
                   </p>
                 </li>
                 );
@@ -1030,7 +1039,7 @@ export default function OrgConsolePage() {
                               <div className="min-w-0">
                                 <p className="text-navy truncate">{it.title || humanizeTaskType(it.task_type)}</p>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {it.trust_name || it.trust_id} · due {it.due_date ? String(it.due_date).slice(0, 10) : '—'}
+                                  {it.trust_name || it.trust_id} · due {it.due_date ? fmtShort(it.due_date) : '—'}
                                 </p>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
@@ -1095,7 +1104,7 @@ export default function OrgConsolePage() {
                                         ) : null}
                                       </p>
                                       <p className="text-xs text-muted-foreground truncate">
-                                        {it.trust_name || it.trust_id}{it.due_date ? ` · due ${String(it.due_date).slice(0, 10)}` : ''}
+                                        {it.trust_name || it.trust_id}{it.due_date ? ` · due ${fmtShort(it.due_date)}` : ''}
                                       </p>
                                     </div>
                                     <Button variant="outline" size="sm" className="btn-secondary shrink-0"
