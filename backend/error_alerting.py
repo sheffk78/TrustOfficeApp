@@ -297,7 +297,16 @@ async def report_error(
     # these explicitly; defense-in-depth: also match the known benign pattern
     # in case a caller forgets to pass severity.
     _BENIGN = error_message == "Not authenticated" and error_type == "auth_check"
-    is_info = (severity or "").lower() == "info" or (_BENIGN and source == "frontend")
+    _BASE_MW_DISCONNECT = (
+        source == "server"
+        and error_type == "RuntimeError"
+        and "No response returned." in error_message
+    )
+    is_info = (
+        (severity or "").lower() == "info"
+        or (_BENIGN and source == "frontend")
+        or _BASE_MW_DISCONNECT
+    )
 
     # --- Log with full context (always, even if deduped) ---
     log_lines = [
