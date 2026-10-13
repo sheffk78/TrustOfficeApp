@@ -106,19 +106,15 @@ export default function RiskDashboardPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="main-layout">
-        <Sidebar />
-        <main className="main-content mobile-layout-offset">
-          <div className="page-container">
-            <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
-              <Shield className="w-12 h-12 text-muted-foreground/60 mb-3"/>
-              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-muted-foreground">Choose a trust to view the Risk Dashboard.</p>
-            </div>
+      <>
+        <div className="page-container">
+          <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
+            <Shield className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+            <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+            <p className="text-sm text-muted-foreground">Choose a trust to view the Risk Dashboard.</p>
           </div>
-        </main>
-        <MobileBottomNav />
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -126,12 +122,10 @@ export default function RiskDashboardPage() {
   const label = data?.assessment_label || 'Low Risk';
 
   return (
-    <div className="main-layout">
-      <Sidebar />
-      <main className="main-content mobile-layout-offset">
-        <div className="page-container">
+    <>
+      <div className="page-container">
 
-          <div className="page-header flex items-center justify-between">
+        <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Risk Dashboard</h1>
               <p className="page-subtitle">Monitor trust risks, compliance gaps, and alerts — review flagged items and take corrective action</p>
@@ -350,8 +344,6 @@ export default function RiskDashboardPage() {
             </>
           )}
         </div>
-      </main>
-      <MobileBottomNav />
-    </div>
+    </>
   );
 }

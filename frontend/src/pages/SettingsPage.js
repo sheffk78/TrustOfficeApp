@@ -883,6 +883,14 @@ export default function SettingsPage() {
       <Sidebar />
       <main className="main-content">
         <div className="page-container max-w-3xl">
+          <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mb-2">
+            {!rolePage && (
+              <TabsList className="inline-flex mb-6 mobile-tabs-scroll">
+                <TabsTrigger value="profile">Trust Profile</TabsTrigger>
+                <TabsTrigger value="compliance">Governance</TabsTrigger>
+                <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>
+              </TabsList>
+            )}
           {/* Page Header */}
           <div className="page-header flex items-center justify-between">
             <div>
@@ -927,18 +935,6 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-
-          {/* Settings Tabs (Fix 15: split single scroll wall into 4 tabs).
-              Hidden on /trust-roles: that page has one section only, so a lone
-              "Trust Roles" tab would just duplicate the page title above it. */}
-          <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mb-8">
-            {!rolePage && (
-              <TabsList className="grid grid-cols-2 md:grid-cols-3 mb-6 mobile-tabs-scroll">
-                <TabsTrigger value="profile">Trust Profile</TabsTrigger>
-                <TabsTrigger value="compliance">Governance</TabsTrigger>
-                <TabsTrigger value="account">Account &amp; Billing</TabsTrigger>
-              </TabsList>
-            )}
 
           <TabsContent value="profile">
           {/* Trust Settings */}

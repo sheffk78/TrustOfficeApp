@@ -374,19 +374,15 @@ export default function StateCompliancePage() {
 
   if (!selectedTrust) {
     return (
-      <div className="main-layout">
-        <Sidebar />
-        <main className="main-content mobile-layout-offset">
-          <div className="page-container">
-            <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
-              <MapPin className="w-12 h-12 text-muted-foreground/60 mb-3"/>
-              <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
-              <p className="text-sm text-muted-foreground">Choose a trust to view state compliance requirements.</p>
-            </div>
+      <>
+        <div className="page-container">
+          <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
+            <MapPin className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+            <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
+            <p className="text-sm text-muted-foreground">Choose a trust to view state compliance requirements.</p>
           </div>
-        </main>
-        <MobileBottomNav />
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -394,12 +390,10 @@ export default function StateCompliancePage() {
   const compliance = stateData?.compliance;
 
   return (
-    <div className="main-layout">
-      <Sidebar />
-      <main className="main-content mobile-layout-offset">
-        <div className="page-container">
+    <>
+      <div className="page-container">
 
-          {/* Header */}
+        {/* Header */}
           <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">State Compliance</h1>
@@ -768,8 +762,6 @@ export default function StateCompliancePage() {
             </div>
           )}
         </div>
-      </main>
-      <MobileBottomNav />
-    </div>
+    </>
   );
 }

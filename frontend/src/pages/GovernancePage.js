@@ -145,11 +145,9 @@ export default function GovernancePage() {
   const trend = getTrend();
 
   return (
-    <div className="main-layout" data-testid="governance-page">
-      <Sidebar />
-      <main className="main-content dot-grid">
-        <div className="page-container">
-          {/* Page Header */}
+    <div data-testid="governance-page">
+      <div className="page-container">
+        {/* Page Header */}
           <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Trust Health</h1>
@@ -695,9 +693,7 @@ export default function GovernancePage() {
               </div>
             </>
           )}
-        </div>
-      </main>
-      <MobileBottomNav />
+      </div>
     </div>
   );
 }
