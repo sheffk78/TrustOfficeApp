@@ -1274,18 +1274,41 @@ async def get_governance_history(trust_id: str, days: int = 30, user: dict = Dep
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     
     snapshots = await db.health_score_snapshots.find(
-        {"trust_id": trust_id, "user_id": user["user_id"], "calculated_at": {"$gte": cutoff}},
+        {
+            "trust_id": trust_id,
+            "user_id": user["user_id"],
+            "$or": [
+                # v3 shape (calculated_at) and legacy shape (created_at, or no
+                # date at all — those are unchartable but shouldn't be dropped
+                # silently for score history older than the field rename).
+                {"calculated_at": {"$gte": cutoff}},
+                {"created_at": {"$gte": cutoff}},
+                {"created_at": {"$exists": False}, "calculated_at": {"$exists": False}},
+            ],
+        },
         {"_id": 0}
     ).sort("calculated_at", -1).to_list(1000)
     
     daily_scores = {}
     for snap in snapshots:
-        date_key = snap["calculated_at"][:10]
+        # Snapshot schema v3 stores `score_value` with `calculated_at`; legacy rows
+        # used `score`/`total_score` with `created_at`. Trusts migrating from either
+        # shape can hold both, so read both — a bare v3 read 500s (KeyError) on the
+        # legacy shape (same hybrid read as defense_summary/org_queue/org_search).
+        snap_date = snap.get("calculated_at") or snap.get("created_at") or ""
+        if not snap_date:
+            continue
+        date_key = snap_date[:10]
+        snap_score = (
+            snap["score_value"]
+            if snap.get("score_value") is not None
+            else (snap["score"] if snap.get("score") is not None else snap.get("total_score"))
+        )
         if date_key not in daily_scores:
             daily_scores[date_key] = {
                 "date": date_key,
-                "score": snap["score_value"],
-                "color": snap["color"]
+                "score": snap_score,
+                "color": snap.get("color")
             }
     
     history = sorted(daily_scores.values(), key=lambda x: x["date"])
