@@ -27,7 +27,7 @@ db = database.db
 ORG_ID = "org_q"
 
 
-async def _seed(member_level="preparer", health=72, pending=0):
+async def _seed(member_level="preparer", health: "int | None" = 72, pending=0):
     user = {"user_id": "u_adv", "email": "adv@firm.com", "name": "Advisor", "is_admin": False}
     member_id = "mem_adv"
     await db.orgs.insert_one({"org_id": ORG_ID, "name": "Firm"})
@@ -160,3 +160,36 @@ async def test_toggle_off_404(ctx, monkeypatch):
     with pytest.raises(Exception) as ei:
         await _oq.org_overview(ORG_ID, user=user)
     assert ei.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_overview_health_reads_snapshot_schema_v3(ctx):
+    """Prod health snapshots (schema v3) store `score_value` + `calculated_at`,
+    not `score`/`created_at` — the overview rollup must read BOTH shapes
+    (regression: portfolio health showed '—' for every real trust, 2026-10-13)."""
+    user = await _seed(health=None)
+    now = datetime.now(timezone.utc)
+    await db.health_score_snapshots.insert_one({
+        "trust_id": "t_a", "score_value": 88, "calculated_at": now.isoformat(),
+        "schema_version": 3,
+    })
+    out = await _oq.org_overview(ORG_ID, user=user)
+    row = out["trusts"][0]
+    assert row["health_score"] == 88
+    assert row["health_chip"] == "excellent"
+    assert out["portfolio"]["average_health"] == 88.0
+
+
+@pytest.mark.asyncio
+async def test_overview_health_prefers_newer_v3_snapshot(ctx):
+    """A v3 snapshot (new timestamp) must beat an older legacy `score` row."""
+    user = await _seed(health=None)
+    await db.health_score_snapshots.insert_one({
+        "trust_id": "t_a", "score": 50, "created_at": "2026-01-01T00:00:00+00:00",
+    })
+    await db.health_score_snapshots.insert_one({
+        "trust_id": "t_a", "score_value": 91, "calculated_at": "2026-10-13T00:00:00+00:00",
+        "schema_version": 3,
+    })
+    out = await _oq.org_overview(ORG_ID, user=user)
+    assert out["trusts"][0]["health_score"] == 91

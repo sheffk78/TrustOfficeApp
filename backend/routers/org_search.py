@@ -182,12 +182,13 @@ async def org_trusts_search(
             deadline_by_trust[row["_id"]] = row["earliest"]
 
     # 4) latest health snapshot per trust
+    # (schema v3 stores `score_value` with `calculated_at`; legacy rows used `score`)
     health_by_trust: dict = {}
     if ids_now:
         async for row in db.health_score_snapshots.aggregate([
             {"$match": {"trust_id": {"$in": ids_now}}},
-            {"$sort": {"created_at": -1}},
-            {"$group": {"_id": "$trust_id", "score": {"$first": "$score"}}},
+            {"$sort": {"calculated_at": -1, "created_at": -1}},
+            {"$group": {"_id": "$trust_id", "score": {"$first": {"$ifNull": ["$score_value", {"$ifNull": ["$score", "$total_score"]}]}}}},
         ]):
             health_by_trust[row["_id"]] = row["score"]
 

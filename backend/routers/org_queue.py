@@ -103,10 +103,13 @@ async def _overview_rows(tids, level_by_trust, today, week):
     ]):
         upcoming[row["_id"]] = row["earliest"]
     health: dict = {}
+    # Snapshot schema v3 stores the score as `score_value` (with `calculated_at`);
+    # early rows used `score`/`created_at`. Sort on whichever timestamp exists and
+    # read whichever score field exists, so the rollup survives both shapes.
     async for row in db.health_score_snapshots.aggregate([
         {"$match": {"trust_id": {"$in": tids}}},
-        {"$sort": {"created_at": -1}},
-        {"$group": {"_id": "$trust_id", "score": {"$first": "$score"}}},
+        {"$sort": {"calculated_at": -1, "created_at": -1}},
+        {"$group": {"_id": "$trust_id", "score": {"$first": {"$ifNull": ["$score_value", {"$ifNull": ["$score", "$total_score"]}]}}}},
     ]):
         health[row["_id"]] = row["score"]
 

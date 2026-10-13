@@ -464,6 +464,32 @@ describe('OrgConsolePage Phase 2 — firm calendar + automated badge', () => {
   });
 });
 
+describe('OrgConsolePage — date-only deadline rendering', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ selectedTrust: null, setSelectedTrust: jest.fn() });
+  });
+
+  it('renders date-only next_deadline as its own calendar day (no UTC date shift)', async () => {
+    // Regression 2026-10-13: "2026-10-13" rendered as "Oct 12" in US time zones
+    // because bare date strings parse as UTC midnight. The card must show Oct 13.
+    fetchWithAuth.mockImplementation((url) => {
+      if (url === '/orgs') return Promise.resolve({ ok: true, json: async () => [ORG] });
+      if (url.includes('/members')) return Promise.resolve({ ok: true, json: async () => [MEMBER] });
+      if (url.includes('/overview')) return Promise.resolve({ ok: true, json: async () => ({ org_id: 'org_1', portfolio: null, trusts: [] }) });
+      if (url.includes('/org/queue')) return Promise.resolve({ ok: true, json: async () => ({ items: [] }) });
+      if (url.includes('/calendar')) return Promise.resolve({ ok: true, json: async () => ({ weeks: [], counts: { total: 0 } }) });
+      if (url.includes('/trusts')) return Promise.resolve({ ok: true, json: async () => ({
+        trusts: [{ ...TRUST, next_deadline: '2026-10-13' }],
+      }) });
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+    render(<OrgConsolePage />);
+    await waitFor(() => expect(screen.getByText(/Oct 13, 2026/)).toBeInTheDocument());
+    expect(screen.queryByText(/Oct 12, 2026/)).not.toBeInTheDocument();
+  });
+});
+
 describe('OrgConsolePage Phase 3 — defense summary + packet buttons', () => {
   beforeEach(() => {
     jest.clearAllMocks();

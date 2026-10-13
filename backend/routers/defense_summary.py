@@ -50,9 +50,9 @@ async def _trust_for_user(trust_id: str, user: dict) -> dict:
 
 async def _summary_data(trust_id: str) -> dict:
     today = _dates()
-    # health
+    # health (schema v3 stores `score_value` with `calculated_at`; legacy rows used `score`)
     snap = await db.health_score_snapshots.find_one(
-        {"trust_id": trust_id}, sort=[("created_at", -1)]
+        {"trust_id": trust_id}, sort=[("calculated_at", -1), ("created_at", -1)]
     )
     # minutes finalized vs pending (approximation of house status model)
     finalized = None
@@ -89,7 +89,7 @@ async def _summary_data(trust_id: str) -> dict:
     ).sort("due_date", 1).limit(5):
         upcoming.append(t)
     return {
-        "health_score": snap.get("score") if snap else None,
+        "health_score": (snap.get("score_value") if snap.get("score_value") is not None else (snap.get("score") if snap.get("score") is not None else snap.get("total_score"))) if snap else None,
         "health_chips": (snap or {}).get("breakdown") or None,
         "minutes_finalized": finalized or 0,
         "minutes_pending": pending,

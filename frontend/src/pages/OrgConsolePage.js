@@ -31,7 +31,14 @@ import {
 } from 'lucide-react';
 
 const fmtDate = (iso) => {
-  try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+  try {
+    // Date-only strings ("2026-10-13") must not shift through UTC — parse as local.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
   catch { return iso; }
 };
 const fmtRelative = (iso) => {
