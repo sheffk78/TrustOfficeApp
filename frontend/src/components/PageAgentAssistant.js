@@ -334,7 +334,7 @@ export default function PageAgentAssistant({
       )}
 
       {/* Conversation history */}
-      {history.length > 0 && (
+      {history?.length > 0 && (
         <div
           data-testid="page-agent-history"
           style={{
