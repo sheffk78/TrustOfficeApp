@@ -5,13 +5,23 @@ import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import {
   Plus, Search, Tag, Filter, X, Upload,
   ArrowUpDown,
@@ -79,6 +89,7 @@ export default function TransactionLedgerPage() {
 
   // Edit transaction
   const [showEdit, setShowEdit] = useState(false);
+  const [deletingTxn, setDeletingTxn] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -175,7 +186,6 @@ export default function TransactionLedgerPage() {
       showUpgradeModal('delete transactions', 'button_click', 'transaction_ledger_page');
       return;
     }
-    if (!window.confirm('Delete this transaction? The audit trail will be preserved.')) return;
     try {
       const res = await fetchWithAuth(`/transactions/${id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -394,30 +404,26 @@ export default function TransactionLedgerPage() {
       <main className="main-content dot-grid" data-testid="transaction-ledger-page">
         <div className="page-container">
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Transaction Ledger</h1>
-              <p className="page-subtitle">View and manage all trust financial transactions — track income, expenses, and transfers across accounts</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'View and manage all trust financial transactions in one ledger' },
-                  { text: 'Track income, expenses, and transfers across accounts' },
-                  { text: 'Import CSV files and reconcile with bank statements' },
-                ]}
-                taPrompt="Help me understand the Transaction Ledger and how to add a transaction"
-              />
+          <PageHeader
+            title="Transaction Ledger"
+            subtitle="View and manage all trust financial transactions — track income, expenses, and transfers across accounts"
+            actions={<>
               <Button variant="outline" size="sm" className="btn-secondary" onClick={() => { setShowImport(true); setImportStep(1); }} data-testid="import-csv-btn">
-                <Upload className="w-4 h-4 mr-2" /> Import CSV
-              </Button>
-              <Button size="sm" className="btn-primary" onClick={() => setShowCreate(true)} data-testid="add-transaction-btn">
-                <Plus className="w-4 h-4 mr-2" /> Add Transaction
-              </Button>
-            </div>
-          </div>
-
-          {/* Summary Cards */}
+  <Upload className="w-4 h-4 mr-2" /> Import CSV
+</Button>
+<Button size="sm" className="btn-primary" onClick={() => setShowCreate(true)} data-testid="add-transaction-btn">
+  <Plus className="w-4 h-4 mr-2" /> Add Transaction
+</Button>
+            </>}
+            help={{
+              items: [
+                { text: 'View and manage all trust financial transactions in one ledger' },
+                { text: 'Track income, expenses, and transfers across accounts' },
+                { text: 'Import CSV files and reconcile with bank statements' },
+              ],
+              taPrompt: 'Help me understand the Transaction Ledger and how to add a transaction',
+            }}
+          />          {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="border border-border bg-card p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Total Inflows</p>
@@ -509,7 +515,7 @@ export default function TransactionLedgerPage() {
             onToggleSelect={toggleSelect}
             onToggleSelectAll={toggleSelectAll}
             onEdit={openEdit}
-            onDelete={handleDelete}
+            onDelete={setDeletingTxn}
             onLinkMinutes={openLinkMinutes}
             onNavigateToEntities={() => navigate('/structures')}
           />
@@ -589,6 +595,32 @@ export default function TransactionLedgerPage() {
         linking={linking}
         onSubmit={handleLinkMinutes}
       />
+
+      {/* Delete confirmation (AlertDialog per standard — no window.confirm) */}
+      <AlertDialog open={!!deletingTxn} onOpenChange={(open) => !open && setDeletingTxn(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this transaction? The audit trail will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-txn-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="delete-txn-confirm"
+              className="bg-error text-error-foreground hover:bg-error/90"
+              onClick={(e) => {
+                e.preventDefault();
+                setDeletingTxn(null);
+                handleDelete(deletingTxn);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

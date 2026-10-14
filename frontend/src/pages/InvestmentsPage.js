@@ -5,6 +5,16 @@ import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import {
   TrendingUp, Plus, Wallet, Building2, Landmark,
   ArrowUpRight, Coins, Home, Activity, ChevronRight,
@@ -59,6 +69,7 @@ export default function InvestmentsPage({ tab, onTabChange }) {
 
   // Edit investment state
   const [showEdit, setShowEdit] = useState(false);
+  const [deletingInv, setDeletingInv] = useState(null);
   const [editingInv, setEditingInv] = useState(null);
   const [editForm, setEditForm] = useState({
     asset_name: '',
@@ -135,7 +146,6 @@ export default function InvestmentsPage({ tab, onTabChange }) {
       showUpgradeModal('remove investments', 'button_click', 'investments_page');
       return;
     }
-    if (!window.confirm('Remove this investment from the trust? This can be reversed later if needed.')) return;
     try {
       const res = await fetchWithAuth(`/investments/${id}`, {
         method: 'PATCH',
@@ -249,28 +259,24 @@ export default function InvestmentsPage({ tab, onTabChange }) {
           )}
 
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Investment Holdings</h1>
-              <p className="page-subtitle">Manage trust investments, track performance, and document investment decisions for fiduciary compliance</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Manage trust investments and track portfolio performance' },
-                  { text: 'Document investment decisions for fiduciary compliance' },
-                  { text: 'View holdings, returns, and allocation at a glance' },
-                ]}
-                taPrompt="Help me understand the Investment Holdings page and how to add an investment"
-              />
+          <PageHeader
+            title="Investment Holdings"
+            subtitle="Manage trust investments, track performance, and document investment decisions for fiduciary compliance"
+            actions={<>
               <Button onClick={() => setShowAdd(!showAdd)} className="btn-primary">
-                <Plus className="w-4 h-4 mr-2"/>
-                Add Investment
-              </Button>
-            </div>
-          </div>
-
-          {/* Summary Cards */}
+  <Plus className="w-4 h-4 mr-2"/>
+  Add Investment
+</Button>
+            </>}
+            help={{
+              items: [
+                { text: 'Manage trust investments and track portfolio performance' },
+                { text: 'Document investment decisions for fiduciary compliance' },
+                { text: 'View holdings, returns, and allocation at a glance' },
+              ],
+              taPrompt: 'Help me understand the Investment Holdings page and how to add an investment',
+            }}
+          />          {/* Summary Cards */}
           {summary && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <Card className="card-trust"><CardContent className="p-4">
@@ -397,7 +403,7 @@ export default function InvestmentsPage({ tab, onTabChange }) {
                       <Button size="sm" variant="ghost" onClick={() => openEdit(inv)} data-testid={`edit-investment-${inv.investment_id}`}>
                         <Pencil className="w-4 h-4 text-muted-foreground hover:text-navy" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => deleteInvestment(inv.investment_id)} data-testid={`delete-investment-${inv.investment_id}`}>
+                      <Button size="sm" variant="ghost" onClick={() => setDeletingInv(inv.investment_id)} data-testid={`delete-investment-${inv.investment_id}`} aria-label="Remove investment">
                         <Trash2 className="w-4 h-4 text-muted-foreground hover:text-error" />
                       </Button>
                     </div>
@@ -477,6 +483,32 @@ export default function InvestmentsPage({ tab, onTabChange }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation (AlertDialog per standard — no window.confirm) */}
+      <AlertDialog open={!!deletingInv} onOpenChange={(open) => !open && setDeletingInv(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Investment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove this investment from the trust? This can be reversed later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-investment-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="delete-investment-confirm"
+              className="bg-error text-error-foreground hover:bg-error/90"
+              onClick={(e) => {
+                e.preventDefault();
+                setDeletingInv(null);
+                deleteInvestment(deletingInv);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

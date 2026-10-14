@@ -11,11 +11,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { 
   Plus, 
   HeartHandshake,
@@ -91,6 +95,7 @@ export default function BenevolencePage({ tab, onTabChange }) {
   const [editingRecord, setEditingRecord] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   
   // Attach minutes dialog state
   const [attachMinutesDialog, setAttachMinutesDialog] = useState({ open: false, recordId: null });
@@ -391,17 +396,18 @@ export default function BenevolencePage({ tab, onTabChange }) {
   };
 
   // Delete a record (grant or distribution)
-  const handleDeleteClick = async (record) => {
+  const handleDeleteClick = (record) => {
     if (isReadOnly) {
       showUpgradeModal('delete a benevolence record', 'button_click', 'benevolence_page');
       return;
     }
-    const recipient = record.recipient_name || record.beneficiary_name || 'this record';
-    const amount = formatCurrency(record.amount);
-    if (!window.confirm(`Delete the benevolence record for ${recipient} (${amount})? This cannot be undone.`)) {
-      return;
-    }
+    setPendingDelete(record);
+  };
 
+  const confirmDeleteRecord = async () => {
+    const record = pendingDelete;
+    if (!record) return;
+    setPendingDelete(null);
     setDeletingId(record.id);
     try {
       // Grants use /benevolence/{record_id}, distributions use /distributions/{distribution_id}
@@ -497,22 +503,11 @@ export default function BenevolencePage({ tab, onTabChange }) {
             </Tabs>
           )}
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-            <div>
-              <h1 className="page-title">Benevolence Log</h1>
-              <p className="page-subtitle">
-                Manage benevolence requests and charitable distributions — review, approve, and document giving decisions
-              </p>
-            </div>
-            <div className="flex items-center gap-2 mt-4 md:mt-0">
-              <PageHelpButton
-                items={[
-                  { text: 'Manage benevolence requests and charitable distributions' },
-                  { text: 'Review, approve, and document giving decisions' },
-                  { text: 'Track charitable giving against trust purposes' },
-                ]}
-                taPrompt="Walk me through the Benevolence page and how to approve a request"
-              />
+          <PageHeader
+            title="Benevolence Log"
+            subtitle="Manage benevolence requests and charitable distributions — review, approve, and document giving decisions"
+            actions={
+              <>
               <Button
                 variant="outline"
                 onClick={() => navigate('/benevolence/policy')}
@@ -630,8 +625,17 @@ export default function BenevolencePage({ tab, onTabChange }) {
                   </form>
                 </DialogContent>
               </Dialog>
-            </div>
-          </div>
+              </>
+            }
+            help={{
+              items: [
+                { text: 'Manage benevolence requests and charitable distributions' },
+                { text: 'Review, approve, and document giving decisions' },
+                { text: 'Track charitable giving against trust purposes' },
+              ],
+              taPrompt: 'Walk me through the Benevolence page and how to approve a request',
+            }}
+          />
 
           {/* Summary Strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -1021,6 +1025,31 @@ export default function BenevolencePage({ tab, onTabChange }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation (AlertDialog per standard — no window.confirm) */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Benevolence Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? `Delete the benevolence record for ${pendingDelete.recipient_name || pendingDelete.beneficiary_name || 'this record'} (${formatCurrency(pendingDelete.amount)})? This cannot be undone.` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-benevolence-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="delete-benevolence-confirm"
+              className="bg-error text-error-foreground hover:bg-error/90"
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeleteRecord();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

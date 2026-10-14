@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Wallet, 
@@ -358,39 +358,33 @@ export default function CompensationPage() {
       <main className="main-content dot-grid">
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Compensation</h1>
-              <p className="page-subtitle">
-                Set up and manage trustee compensation plans — track payments, document approvals, and maintain compliance
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Set up and manage trustee compensation plans and payment schedules' },
-                  { text: 'Track payments, document approvals, and maintain compliance' },
-                  { text: 'View compensation history per trustee' },
-                ]}
-                taPrompt="Help me understand the Compensation page and how to set up trustee pay"
-              />
+          <PageHeader
+            title="Compensation"
+            subtitle="Set up and manage trustee compensation plans — track payments, document approvals, and maintain compliance"
+            actions={<>
               <Button
-                onClick={() => {
-                  if (isReadOnly) {
-                    showUpgradeModal('record a payment', 'button_click', 'compensation_page');
-                    return;
-                  }
-                  setShowPaymentModal(true);
-                }}
-                className="btn-primary"
-                data-testid="record-payment-btn"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Record Payment
-              </Button>
-            </div>
-          </div>
-
-          {loading ? (
+  onClick={() => {
+    if (isReadOnly) {
+      showUpgradeModal('record a payment', 'button_click', 'compensation_page');
+      return;
+    }
+    setShowPaymentModal(true);
+  }}
+  className="btn-primary"
+  data-testid="record-payment-btn"
+>
+  <Plus className="w-4 h-4 mr-2" /> Record Payment
+</Button>
+            </>}
+            help={{
+              items: [
+                { text: 'Set up and manage trustee compensation plans and payment schedules' },
+                { text: 'Track payments, document approvals, and maintain compliance' },
+                { text: 'View compensation history per trustee' },
+              ],
+              taPrompt: 'Help me understand the Compensation page and how to set up trustee pay',
+            }}
+          />          {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 card-trust">
                 <div className="skeleton h-32 w-full"></div>
@@ -510,9 +504,11 @@ export default function CompensationPage() {
               {/* Additional Plans Section (Advanced) */}
               {(additionalPlans.length > 0 || primaryPlan) && (
                 <div className="card-trust mb-8">
-                  <button 
+                  <Button
+                    variant="ghost"
                     onClick={() => setShowAdvancedPlans(!showAdvancedPlans)}
                     className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                    aria-expanded={showAdvancedPlans}
                   >
                     <div className="flex items-center gap-2">
                       <span className="label-trust">Per-Trustee Compensation Caps (Optional)</span>
@@ -527,7 +523,7 @@ export default function CompensationPage() {
                     ) : (
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     )}
-                  </button>
+                  </Button>
                   
                   {showAdvancedPlans && (
                     <div className="p-4 pt-0 border-t border-border">

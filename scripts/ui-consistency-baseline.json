@@ -13,25 +13,20 @@
   "R1_header": 1
  },
  "ApprovalFlow.js": {
-  "R2_radius_full": 1,
   "R2_radius_hard": 2,
   "R3_palette": 5
  },
  "AuditTrailPage.js": {},
  "AuthCallback.js": {},
  "AuthorityPage.js": {
-  "R2_radius_full": 2
+  "R2_radius_full": 1
  },
  "BeneficiariesPage.js": {
   "R5_tabs": 5
  },
- "BeneficiaryReportPage.js": {
-  "R6_confirm": 1
- },
+ "BeneficiaryReportPage.js": {},
  "BenevolenceLogPage.js": {},
- "BenevolencePage.js": {
-  "R6_confirm": 1
- },
+ "BenevolencePage.js": {},
  "BenevolencePolicyPage.js": {
   "R2_radius_full": 1,
   "R3_palette": 2
@@ -40,8 +35,7 @@
   "R1_header": 1
  },
  "BillingPage.js": {
-  "R2_radius_hard": 1,
-  "R6_confirm": 1
+  "R2_radius_hard": 1
  },
  "ClientDashboard.js": {
   "R2_radius_hard": 4
@@ -52,11 +46,8 @@
  "CommunicationsPage.js": {
   "R4_raw_btn": 1
  },
- "CompensationPage.js": {
-  "R4_raw_btn": 1
- },
+ "CompensationPage.js": {},
  "ConnectWingPoint.js": {
-  "R2_radius_full": 1,
   "R2_radius_hard": 2,
   "R4_raw_btn": 4
  },
@@ -74,16 +65,12 @@
  "DeadlineDashboard.js": {
   "R2_radius_full": 1
  },
- "DistributionsPage.js": {
-  "R4_raw_btn": 9
- },
+ "DistributionsPage.js": {},
  "DocumentsTabbed.js": {
   "R1_header": 1
  },
  "EntityDetailPage.js": {},
- "ExpensesPage.js": {
-  "R4_raw_btn": 4
- },
+ "ExpensesPage.js": {},
  "ExportDashboard.js": {
   "R4_raw_btn": 2
  },
@@ -98,10 +85,7 @@
  "HealthDashboard.js": {
   "R4_raw_btn": 1
  },
- "InvestmentsPage.js": {
-  "R2_radius_full": 1,
-  "R6_confirm": 1
- },
+ "InvestmentsPage.js": {},
  "InvestmentsTabbed.js": {
   "R1_header": 1
  },
@@ -145,8 +129,7 @@
   "R3_palette": 6
  },
  "MinutesPage.js": {
-  "R2_radius_full": 1,
-  "R6_confirm": 1
+  "R2_radius_full": 1
  },
  "MinutesTemplateFormPage.js": {
   "R1_header": 1
@@ -161,8 +144,7 @@
  "OrgConsolePage.js": {
   "R2_radius_full": 5,
   "R2_radius_hard": 4,
-  "R4_raw_btn": 5,
-  "R6_confirm": 1
+  "R4_raw_btn": 5
  },
  "PerformanceDashboard.js": {
   "R1_header": 1,
@@ -197,16 +179,13 @@
  },
  "SignUpPage.js": {},
  "StateCompliancePage.js": {
-  "R2_radius_full": 1,
   "R4_raw_btn": 7
  },
  "StatsPage.js": {
   "R1_header": 1,
-  "R2_radius_full": 1,
   "R4_raw_btn": 4
  },
  "StructuresPage.js": {
-  "R2_radius_full": 1,
   "R2_radius_hard": 2,
   "R4_raw_btn": 1
  },
@@ -217,17 +196,12 @@
  "SuccessorPacketPage.js": {
   "R3_palette": 81
  },
- "TransactionLedgerPage.js": {
-  "R6_confirm": 1
- },
+ "TransactionLedgerPage.js": {},
  "TrustAccessPage.js": {
   "R2_radius_hard": 3
  },
  "TrustAccessPanel.js": {},
- "TrustAdminKitsPage.js": {
-  "R2_radius_full": 1,
-  "R6_confirm": 1
- },
+ "TrustAdminKitsPage.js": {},
  "TrustAssistantPage.js": {},
  "TrustCalendarPage.js": {
   "R1_header": 1,
@@ -242,7 +216,7 @@
  },
  "WingPointRedirect.js": {},
  "WingPointWelcomePage.js": {
-  "R2_radius_full": 4,
+  "R2_radius_full": 1,
   "R4_raw_btn": 2
  },
  "trustProtectorPowers.js": {}

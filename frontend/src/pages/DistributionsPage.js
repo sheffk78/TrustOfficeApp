@@ -14,7 +14,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -623,20 +623,10 @@ the user that they must review and submit the form themselves.
 
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Distributions</h1>
-              <p className="page-subtitle">Record and manage trust distributions to beneficiaries — document amounts, purposes, and approvals for fiduciary compliance</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Record and manage all distributions to trust beneficiaries' },
-                  { text: 'Track distribution amounts, purposes, and approval status' },
-                  { text: 'Send beneficiary notices and attach supporting minutes' },
-                ]}
-                taPrompt="Walk me through the Distributions page and how to record a distribution"
-              />
+          <PageHeader
+            title="Distributions"
+            subtitle="Record and manage trust distributions to beneficiaries — document amounts, purposes, and approvals for fiduciary compliance"
+            actions={<>
               <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
               <DialogTrigger asChild>
                 <Button className="btn-primary" data-testid="add-distribution-btn">
@@ -681,12 +671,12 @@ the user that they must review and submit the form themselves.
                           step="0.01"
                           value={formData.amount}
                           onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); if (formErrors.amount) setFormErrors({ ...formErrors, amount: undefined }); }}
-                          className={`pl-10 input-trust ${formErrors.amount ? 'border-red-500' : ''}`}
+                          className={`pl-10 input-trust ${formErrors.amount ? 'border-error' : ''}`}
                           placeholder="0.00"
                           data-testid="dist-amount-input"
                         />
                       </div>
-                      {formErrors.amount && <p className="text-xs text-red-500 mt-1">{formErrors.amount}</p>}
+                      {formErrors.amount && <p className="text-xs text-error mt-1">{formErrors.amount}</p>}
                     </div>
                   </div>
 
@@ -695,7 +685,7 @@ the user that they must review and submit the form themselves.
                     <Input
                       value={formData.beneficiary}
                       onChange={(e) => { setFormData({ ...formData, beneficiary: e.target.value }); if (formErrors.beneficiary) setFormErrors({ ...formErrors, beneficiary: undefined }); }}
-                      className={`mt-1 input-trust ${formErrors.beneficiary ? 'border-red-500' : ''}`}
+                      className={`mt-1 input-trust ${formErrors.beneficiary ? 'border-error' : ''}`}
                       placeholder="Beneficiary name"
                       data-testid="dist-beneficiary-input"
                     />
@@ -709,7 +699,7 @@ the user that they must review and submit the form themselves.
                         <span>✓</span> Verified beneficiary
                       </p>
                     )}
-                    {formErrors.beneficiary && <p className="text-xs text-red-500 mt-1">{formErrors.beneficiary}</p>}
+                    {formErrors.beneficiary && <p className="text-xs text-error mt-1">{formErrors.beneficiary}</p>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -735,7 +725,7 @@ the user that they must review and submit the form themselves.
                         value={formData.category} 
                         onValueChange={(value) => { setFormData({ ...formData, category: value }); if (formErrors.category) setFormErrors({ ...formErrors, category: undefined }); }}
                       >
-                        <SelectTrigger className={`mt-1 input-trust ${formErrors.category ? 'border-red-500' : ''}`} data-testid="dist-category-select">
+                        <SelectTrigger className={`mt-1 input-trust ${formErrors.category ? 'border-error' : ''}`} data-testid="dist-category-select">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -838,23 +828,23 @@ the user that they must review and submit the form themselves.
                           <Input
                             value={formData.benevolence_recipient_name}
                             onChange={(e) => { setFormData({ ...formData, benevolence_recipient_name: e.target.value }); if (formErrors.benevolence_recipient_name) setFormErrors({ ...formErrors, benevolence_recipient_name: undefined }); }}
-                            className={`mt-1 input-trust ${formErrors.benevolence_recipient_name ? 'border-red-500' : ''}`}
+                            className={`mt-1 input-trust ${formErrors.benevolence_recipient_name ? 'border-error' : ''}`}
                             placeholder="Organization or individual receiving benevolence"
                             data-testid="benevolence-recipient-input"
                           />
-                          {formErrors.benevolence_recipient_name && <p className="text-xs text-red-500 mt-1">{formErrors.benevolence_recipient_name}</p>}
+                          {formErrors.benevolence_recipient_name && <p className="text-xs text-error mt-1">{formErrors.benevolence_recipient_name}</p>}
                         </div>
                         <div>
                           <Label className="label-trust">Need Description *</Label>
                           <Textarea
                             value={formData.benevolence_need_description}
                             onChange={(e) => { setFormData({ ...formData, benevolence_need_description: e.target.value }); if (formErrors.benevolence_need_description) setFormErrors({ ...formErrors, benevolence_need_description: undefined }); }}
-                            className={`mt-1 input-trust ${formErrors.benevolence_need_description ? 'border-red-500' : ''}`}
+                            className={`mt-1 input-trust ${formErrors.benevolence_need_description ? 'border-error' : ''}`}
                             placeholder="Describe the charitable purpose or need being addressed..."
                             rows={2}
                             data-testid="benevolence-need-input"
                           />
-                          {formErrors.benevolence_need_description && <p className="text-xs text-red-500 mt-1">{formErrors.benevolence_need_description}</p>}
+                          {formErrors.benevolence_need_description && <p className="text-xs text-error mt-1">{formErrors.benevolence_need_description}</p>}
                         </div>
                         <div>
                           <Label className="label-trust">Benevolence Notes (Optional)</Label>
@@ -908,8 +898,8 @@ the user that they must review and submit the form themselves.
                 </div>
               </DialogContent>
             </Dialog>
-            </div>
-          </div>
+            </>}
+          />
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -942,18 +932,20 @@ the user that they must review and submit the form themselves.
               </div>
               <div className="flex flex-wrap gap-2">
                 {['all', 'approved', 'review', 'declined'].map((status) => (
-                  <button
+                  <Button
                     key={status}
+                    variant="outline"
+                    size="sm"
                     onClick={() => setFilterStatus(status)}
                     className={`px-4 py-2 font-mono text-xs uppercase tracking-widest border ${
-                      filterStatus === status 
-                        ? 'bg-navy text-white border-navy' 
+                      filterStatus === status
+                        ? 'bg-navy text-white border-navy hover:bg-navy hover:text-white'
                         : 'bg-white text-navy border-navy/20 hover:border-navy'
                     }`}
                     data-testid={`filter-${status}`}
                   >
                     {status === 'all' ? 'All' : status}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -1021,9 +1013,9 @@ the user that they must review and submit the form themselves.
                         ) : (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="p-1 hover:bg-navy/10 dark:hover:bg-white/10" data-testid={`minutes-menu-${dist.distribution_id}`}>
+                              <Button variant="ghost" size="icon" className="p-1" data-testid={`minutes-menu-${dist.distribution_id}`} aria-label="Minutes actions">
                                 <MoreVertical className="w-4 h-4 text-navy/60 dark:text-white/60" />
-                              </button>
+                              </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setAttachMinutesDialog({ open: true, recordId: dist.distribution_id })}>
@@ -1040,7 +1032,9 @@ the user that they must review and submit the form themselves.
                         )}
                       </td>
                       <td className="text-center">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleSendNotice(dist)}
                           disabled={sendingNotice[dist.distribution_id] || sendNoticeResult[dist.distribution_id] === 'sent'}
                           className={`p-1 transition-colors ${
@@ -1058,38 +1052,44 @@ the user that they must review and submit the form themselves.
                           ) : (
                             <Send className="w-4 h-4" />
                           )}
-                        </button>
+                        </Button>
                       </td>
                       <td className="text-center">
                         <div className="flex justify-center items-center gap-1.5">
                           {status === 'review' && (
                             <>
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleUpdateStatus(dist.distribution_id, 'approved')}
                                 className="p-1 hover:bg-success/10 text-success"
                                 title="Approve"
                                 data-testid={`approve-${dist.distribution_id}`}
                               >
                                 <Check className="w-4 h-4" />
-                              </button>
-                              <button
+                              </Button>
+                                <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleUpdateStatus(dist.distribution_id, 'declined')}
                                 className="p-1 hover:bg-error/10 text-error"
                                 title="Decline"
                                 data-testid={`decline-${dist.distribution_id}`}
                               >
                                 <X className="w-4 h-4" />
-                              </button>
+                              </Button>
                             </>
                           )}
                           {status !== 'review' && (
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleUpdateStatus(dist.distribution_id, 'review')}
                               className="p-1 hover:bg-warning/10 text-warning"
                               title="Set to Review"
                             >
                               <Clock className="w-4 h-4" />
-                            </button>
+                            </Button>
                           )}
                           <Link
                             to={`/trust-assistant?prompt=${encodeURIComponent(`Draft meeting minutes documenting the $${dist.amount} distribution to ${dist.beneficiary_name || dist.beneficiary || 'the beneficiary'} on ${formatDate(dist.date)}.`)}`}
@@ -1100,14 +1100,16 @@ the user that they must review and submit the form themselves.
                             <Bot className="w-3.5 h-3.5" />
                             <span className="hidden lg:inline">Draft Minutes</span>
                           </Link>
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDeleteClick(dist)}
                             className="p-1 hover:bg-error/10 text-error"
                             title="Delete distribution"
                             data-testid={`delete-${dist.distribution_id}`}
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -1140,13 +1142,14 @@ the user that they must review and submit the form themselves.
           <div className="bg-white p-6 w-full max-w-md corner-mark">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-serif text-xl text-navy">Approve Distribution</h2>
-              <button 
-                onClick={() => setApprovalModal(null)} 
+              <Button variant="ghost" size="sm"
+                onClick={() => setApprovalModal(null)}
                 className="text-navy hover:text-navy/70"
                 data-testid="close-approval-modal"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             {/* Distribution Summary */}
@@ -1240,13 +1243,14 @@ the user that they must review and submit the form themselves.
           <div className="bg-white p-6 w-full max-w-md corner-mark">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-serif text-xl text-navy">Delete Distribution</h2>
-              <button
+              <Button variant="ghost" size="sm"
                 onClick={() => setDeleteConfirm(null)}
                 className="text-navy hover:text-navy/70"
                 data-testid="close-delete-modal"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
             <div className="p-4 bg-error/5 border border-error/10 mb-6">
               <div className="grid grid-cols-2 gap-4 text-sm">

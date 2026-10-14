@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth, API } from '@/utils/api';
@@ -194,21 +194,11 @@ export default function ExpensesPage() {
       <main className="main-content">
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Expenses</h1>
-              <p className="page-subtitle">Track and manage trust expenses — record payments, categorize spending, and maintain accurate financial records</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Track and manage trust-related expenses and payments' },
-                  { text: 'Categorize spending and maintain accurate financial records' },
-                  { text: 'Attach receipts and documentation to each expense' },
-                ]}
-                taPrompt="Help me understand the Expenses page and how to add an expense"
-              />
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
+          <PageHeader
+            title="Expenses"
+            subtitle="Track and manage trust expenses — record payments, categorize spending, and maintain accurate financial records"
+            actions={
+<Dialog open={dialogOpen} onOpenChange={(open) => {
               if (open && isReadOnly) {
                 showUpgradeModal('add expenses', 'button_click', 'expenses_page');
                 return;
@@ -334,8 +324,16 @@ export default function ExpensesPage() {
                 </div>
               </DialogContent>
             </Dialog>
-            </div>
-          </div>
+            }
+            help={{
+              items: [
+                { text: 'Track and manage trust-related expenses and payments' },
+                { text: 'Categorize spending and maintain accurate financial records' },
+                { text: 'Attach receipts and documentation to each expense' },
+              ],
+              taPrompt: 'Help me understand the Expenses page and how to add an expense',
+            }}
+          />
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -368,18 +366,20 @@ export default function ExpensesPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {['all', 'approved', 'review', 'rejected'].map((status) => (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     key={status}
                     onClick={() => setFilterStatus(status)}
                     className={`px-4 py-2 font-mono text-xs uppercase tracking-widest border ${
-                      filterStatus === status 
+                      filterStatus === status
                         ? 'bg-navy text-white border-navy' 
                         : 'bg-white text-navy border-navy/20 hover:border-navy'
                     }`}
                     data-testid={`filter-${status}`}
                   >
                     {status === 'all' ? 'All' : status}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -432,32 +432,38 @@ export default function ExpensesPage() {
                       <td className="text-center">
                         {expense.status === 'review' && (
                           <div className="flex justify-center gap-2">
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleUpdateStatus(expense.expense_id, 'approved')}
                               className="p-1 hover:bg-success/10 text-success"
                               title="Approve"
                               data-testid={`approve-${expense.expense_id}`}
                             >
                               <Check className="w-4 h-4" />
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleUpdateStatus(expense.expense_id, 'rejected')}
                               className="p-1 hover:bg-error/10 text-error"
                               title="Decline"
                               data-testid={`decline-${expense.expense_id}`}
                             >
                               <X className="w-4 h-4" />
-                            </button>
+                            </Button>
                           </div>
                         )}
                         {expense.status !== 'review' && (
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleUpdateStatus(expense.expense_id, 'review')}
                             className="p-1 hover:bg-warning/10 text-warning"
                             title="Set to Review"
                           >
                             <Clock className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
                       </td>
                     </tr>

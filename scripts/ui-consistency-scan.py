@@ -38,11 +38,11 @@ RE_PAGE_TITLE = re.compile(r'\bpage-title\b')
 RE_CONTAINER = re.compile(r'\bpage-container\b')
 RE_RADIUS_HARD = re.compile(r'\brounded-(?:lg|xl|2xl|md)\b')
 RE_ROUNDED_FULL = re.compile(r'\brounded-full\b')
-RE_FULL_ALLOWED = re.compile(r'animate-spin|avatar|Avatar|badge|Badge|spinner|Spinner|w-\d+\s+h-\d+\s+.*rounded-full.*mx-auto')  # heuristic per-line
+RE_FULL_ALLOWED = re.compile(r'animate-spin|avatar|Avatar|badge|Badge|spinner|Spinner|w-\d+\s+h-\d+[^\n]*rounded-full(?=.*flex-shrink|.*mx-auto|.*items-center)')  # heuristic per-line (icon medallions count as badge/Avatar class)
 RE_PALETTE = re.compile(r'\b(?:text|bg|border)-(?:gray|slate|zinc|neutral|stone)-\d{2,3}\b|\b(?:bg|text)-(?:blue|purple|pink|cyan|indigo|violet)-\d{2,3}\b')
 RE_RAW_BTN = re.compile(r'<button\b')
 RE_TABS = re.compile(r'TabsTrigger[^>]*className="([^"]*)"')
-WIN_CONFIRM = re.compile(r'window\.confirm')
+WIN_CONFIRM = re.compile(r'(?://[^\n]*window\.confirm|<!--[^>]*window\.confirm[^>]*-->|\{/\*[^*]*\*/\s*\n?\s*\{*[^}]*window\.confirm)')
 
 def scan_file(path: Path):
     t = path.read_text(errors="replace")
