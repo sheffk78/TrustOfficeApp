@@ -156,7 +156,7 @@ function ClassMemberRow({ member, onRename, onStatusChange }) {
       {/* Status-change panel: the API requires a reason (1-1000 chars). Inline
           field, empty by default, submit disabled until non-empty. */}
       {statusOpen && (
-        <div className="w-full mt-2 p-3 bg-muted/30 border border-border rounded" data-testid={`member-status-panel-${member.class_member_id}`}>
+        <div className="w-full mt-2 p-3 bg-muted/30 border border-border " data-testid={`member-status-panel-${member.class_member_id}`}>
           <p className="font-mono text-xs uppercase tracking-widest text-navy mb-2">
             {statusLabels[nextStatus]}
           </p>
@@ -274,7 +274,7 @@ function ClassMemberPanel({ cb, membersState, onLoadMembers, onAddMember, onRena
             <span
               data-testid={`sum-check-${cb.class_beneficiary_id}`}
               title={`Member shares total ${formatSharePct(sumOfShares)} vs pool ${formatSharePct(cb.percentage)}`}
-              className="text-xs text-error dark:text-error"
+              className="text-xs font-mono text-error dark:text-error"
             >
               Shares ({formatSharePct(sumOfShares)}) don't add up to the pool ({formatSharePct(cb.percentage)})
             </span>
@@ -307,7 +307,7 @@ function ClassMemberPanel({ cb, membersState, onLoadMembers, onAddMember, onRena
 
       {/* Add member */}
       {showAddRow ? (
-        <div className="mt-2 p-3 bg-muted/30 border border-border rounded" data-testid={`add-member-row-${cb.class_beneficiary_id}`}>
+        <div className="mt-2 p-3 bg-muted/30 border border-border" data-testid={`add-member-row-${cb.class_beneficiary_id}`}>
           <div className="flex flex-col md:flex-row md:items-end gap-2">
             <div className="flex-1">
               <Label className="label-trust">Name *</Label>
@@ -449,10 +449,12 @@ export function ClassBeneficiariesTab({
               <div key={cb.class_beneficiary_id} className="p-4 hover:bg-muted/20 transition-colors">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-4 min-w-0">
-                    <button
-                      type="button"
-                      className="flex items-center gap-4 text-left min-w-0 flex-1"
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="flex items-center gap-4 text-left min-w-0 flex-1 cursor-pointer"
                       onClick={() => toggleClass(cb.class_beneficiary_id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleClass(cb.class_beneficiary_id); } }}
                       data-testid={`class-toggle-${cb.class_beneficiary_id}`}
                       aria-expanded={expandedIds.has(cb.class_beneficiary_id)}
                     >
@@ -485,7 +487,7 @@ export function ClassBeneficiariesTab({
                       <ChevronDown
                         className={`w-4 h-4 flex-shrink-0 text-muted-foreground transition-transform ${expandedIds.has(cb.class_beneficiary_id) ? 'rotate-180' : ''}`}
                       />
-                    </button>
+                    </div>
                   </div>
                   <Button
                     variant="ghost"

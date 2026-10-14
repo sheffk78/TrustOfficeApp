@@ -38,7 +38,7 @@ export function TreeNode({ entity, level, visited, getChildren, getEntityColor, 
           : formatRelationshipType(relationship.relationship_type);
         return (
           <div key={relationship.relationship_id}>
-            <div className={`ml-4 flex items-center gap-2 py-1 text-sm ${isTrustToTrustEdge ? 'text-purple-600' : 'text-muted-foreground'}`}>
+            <div className={`ml-4 flex items-center gap-2 py-1 text-sm ${isTrustToTrustEdge ? 'text-gold' : 'text-muted-foreground'}`}>
               {isTrustToTrustEdge ? (
                 <GitBranch className="w-3 h-3" />
               ) : (

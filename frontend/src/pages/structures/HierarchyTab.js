@@ -53,7 +53,7 @@ const GroupedByTrustTree = ({
       const entityCount = countEntitiesByTrust(trustId);
       const isCollapsed = collapsedTrustGroups[trustId];
       return (
-        <div key={trustId} className="border border-navy/10 rounded-lg overflow-hidden">
+        <div key={trustId} className="border border-navy/10 overflow-hidden">
           <div
             className="flex items-center gap-2 px-4 py-3 bg-navy/5 cursor-pointer hover:bg-navy/10 transition-colors"
             onClick={() => toggleTrustGroup(trustId)}
@@ -89,7 +89,7 @@ const GroupedByTrustTree = ({
 /**
  * Relationships table (right column of hierarchy tab).
  */
-const RelationshipsTable = ({ relationships, getEntityById, onAddRelationship, entities }) => {
+const RelationshipsTable = ({ relationships, getEntityById, onAddRelationship, onDeleteRelationship, entities }) => {
   if (relationships.length === 0) {
     return (
       <div className="text-center py-8">
@@ -109,7 +109,7 @@ const RelationshipsTable = ({ relationships, getEntityById, onAddRelationship, e
           getEntityById={getEntityById}
           getEntityColor={getEntityColor}
           getEntityIcon={getEntityIcon}
-          onDelete={() => onAddRelationship(rel.relationship_id)}
+          onDelete={() => onDeleteRelationship(rel.relationship_id)}
         />
       ))}
     </div>
@@ -120,6 +120,7 @@ const RelationshipsTable = ({ relationships, getEntityById, onAddRelationship, e
  * Hierarchy tab content for StructuresPage.
  */
 export const HierarchyTab = ({
+  navigate,
   loading,
   entities,
   relationships,
@@ -167,7 +168,7 @@ export const HierarchyTab = ({
   return (
     <div className="space-y-6">
       {/* Structural Map */}
-      <div className="card-trust">
+      <div className="card-trust corner-mark">
         <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
           <GitBranch className="w-5 h-5" /> Structural Map
         </h2>
@@ -204,6 +205,7 @@ export const HierarchyTab = ({
             relationships={relationships}
             getEntityById={getEntityById}
             onAddRelationship={onAddRelationship}
+            onDeleteRelationship={onDeleteRelationship}
             entities={entities}
           />
         </div>

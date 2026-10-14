@@ -1,5 +1,5 @@
 import { Button, Input, PageHelpButton } from '@/utils/sharedImports';
-import { Building2, Plus, Layers, Search, Loader2 } from 'lucide-react';
+import { Building2, Search } from 'lucide-react';
 import { EntityCard } from './EntityCard';
 import { getEntityIcon } from './TreeNode';
 import { getEntityColor, filterEntitiesBySearch } from './helpers';

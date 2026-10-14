@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Sidebar } from '@/components/Sidebar';
-import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { 
   Shield,
@@ -23,7 +21,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import EducationalPanel from '@/components/EducationalPanel';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -146,35 +144,30 @@ export default function GovernancePage() {
 
   return (
     <div data-testid="governance-page">
-      <div className="page-container">
-        {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Trust Health</h1>
-              <p className="page-subtitle">
-                Assess trust health across 8 criteria — track defensibility, compliance, and overall governance quality
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Assess trust health across 8 criteria including defensibility and compliance' },
-                  { text: 'Track your trust governance quality score over time' },
-                  { text: 'Identify areas that need attention to improve your trust health' },
-                ]}
-                taPrompt="Walk me through the Trust Health page and how to interpret my scores"
-              />
-              <Button 
-                onClick={loadGovernanceData}
-                variant="outline"
-                className="btn-secondary"
-                data-testid="refresh-score-btn"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-          </div>
+        {/* Page Header (shared component) */}
+        <PageHeader
+          title="Trust Health"
+          subtitle="Assess trust health across 8 criteria — track defensibility, compliance, and overall governance quality"
+          actions={
+            <Button
+              onClick={loadGovernanceData}
+              variant="outline"
+              className="btn-secondary"
+              data-testid="refresh-score-btn"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          }
+          help={{
+            items: [
+              { text: 'Assess trust health across 8 criteria including defensibility and compliance' },
+              { text: 'Track your trust governance quality score over time' },
+              { text: 'Identify areas that need attention to improve your trust health' },
+            ],
+            taPrompt: 'Walk me through the Trust Health page and how to interpret my scores',
+          }}
+        />
 
           {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -693,7 +686,6 @@ export default function GovernancePage() {
               </div>
             </>
           )}
-      </div>
     </div>
   );
 }

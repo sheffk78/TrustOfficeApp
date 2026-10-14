@@ -141,8 +141,7 @@ export const useStructuresMutations = ({ selectedTrust, trusts, viewMode, entiti
     }
   };
 
-  const handleDeleteRelationship = async (relationshipId) => {
-    if (!confirm('Delete this relationship?')) return;
+  const deleteRelationshipRequest = async (relationshipId) => {
     try {
       const response = await fetchWithAuth(`/entity-relationships/${relationshipId}`, {
         method: 'DELETE',
@@ -187,7 +186,7 @@ export const useStructuresMutations = ({ selectedTrust, trusts, viewMode, entiti
     // handlers
     handleCreateEntity,
     handleCreateRelationship,
-    handleDeleteRelationship,
+    deleteRelationshipRequest,
     openEntityModal,
     openRelationshipModal,
   };

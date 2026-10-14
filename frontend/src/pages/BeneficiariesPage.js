@@ -6,7 +6,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import {
   Users, PieChart, Award, Settings, ArrowRightLeft, UsersRound,
 } from 'lucide-react';
@@ -133,49 +133,47 @@ export default function BeneficiariesPage() {
       <Sidebar />
       <main className="main-content dot-grid mobile-layout-offset">
         <div className="page-container">
-          {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Beneficiaries</h1>
-              <p className="page-subtitle">Manage trust beneficiaries, ownership interests, and class designations — add, update, or remove beneficiaries with proper documentation</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Manage trust beneficiaries, ownership interests, and class designations' },
-                  { text: 'Add, update, or remove beneficiaries with proper documentation' },
-                  { text: 'View beneficiary certificates and allocation percentages' },
-                ]}
-                taPrompt="Help me understand the Beneficiaries page and how to add a beneficiary"
-              />
+          {/* Header (shared component) */}
+          <PageHeader
+            title="Beneficiaries"
+            subtitle="Manage trust beneficiaries, ownership interests, and class designations — add, update, or remove beneficiaries with proper documentation"
+            actions={
               <Button variant="outline" onClick={settings.handleOpenSettingsModal} data-testid="settings-btn">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Button>
-            </div>
-          </div>
+            }
+            help={{
+              items: [
+                { text: 'Manage trust beneficiaries, ownership interests, and class designations' },
+                { text: 'Add, update, or remove beneficiaries with proper documentation' },
+                { text: 'View beneficiary certificates and allocation percentages' },
+              ],
+              taPrompt: 'Help me understand the Beneficiaries page and how to add a beneficiary',
+            }}
+          />
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-6 bg-muted/50 flex w-full gap-1 overflow-x-auto whitespace-nowrap">
-              <TabsTrigger value="overview" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-overview">
-                <PieChart className="w-4 h-4 mr-2" />
+              <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
+                <PieChart className="w-4 h-4" />
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="beneficiaries" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-beneficiaries">
-                <Users className="w-4 h-4 mr-2" />
+              <TabsTrigger value="beneficiaries" className="flex items-center gap-2" data-testid="tab-beneficiaries">
+                <Users className="w-4 h-4" />
                 Beneficiaries
               </TabsTrigger>
-              <TabsTrigger value="certificates" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-certificates">
-                <Award className="w-4 h-4 mr-2" />
+              <TabsTrigger value="certificates" className="flex items-center gap-2" data-testid="tab-certificates">
+                <Award className="w-4 h-4" />
                 Ownership Shares
               </TabsTrigger>
-              <TabsTrigger value="transfers" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-transfers">
-                <ArrowRightLeft className="w-4 h-4 mr-2" />
+              <TabsTrigger value="transfers" className="flex items-center gap-2" data-testid="tab-transfers">
+                <ArrowRightLeft className="w-4 h-4" />
                 Transfer History
               </TabsTrigger>
-              <TabsTrigger value="class" className="data-[state=active]:bg-navy data-[state=active]:text-white" data-testid="tab-class">
-                <UsersRound className="w-4 h-4 mr-2" />
+              <TabsTrigger value="class" className="flex items-center gap-2" data-testid="tab-class">
+                <UsersRound className="w-4 h-4" />
                 Class Beneficiaries
               </TabsTrigger>
             </TabsList>

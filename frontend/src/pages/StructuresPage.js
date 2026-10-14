@@ -2,11 +2,14 @@ import { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useAuth, Sidebar, MobileBottomNav, Button, Tabs, TabsContent, TabsList, TabsTrigger,
-  PageHelpButton, fetchWithAuth, toast,
+  fetchWithAuth, toast,
 } from '@/utils/sharedImports';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { SeparationAlertsPanel } from '@/components/SeparationAlertsPanel';
 import {
-  Building2, Plus, GitBranch, ShieldAlert, Loader2, FileDown, Layers,
+  Building2, Plus, GitBranch, ShieldAlert, FileDown, Layers,
 } from 'lucide-react';
 
 import { SeparationTab } from './structures/SeparationTab';
@@ -33,6 +36,7 @@ export default function StructuresPage() {
 
   const activeTab = searchParams.get('tab') || 'entities';
   const [viewMode, setViewMode] = useState('per-trust');
+  const [pendingDeleteRel, setPendingDeleteRel] = useState(null);
 
   // ─── Data loading + audit report + tab change (custom hook) ──────────
   const {
@@ -132,44 +136,47 @@ export default function StructuresPage() {
   };
   const tabAction = tabActionConfig[activeTab];
 
+  // ─── Relationship delete: open AlertDialog, confirm runs DELETE ────
+  const confirmDeleteRel = async () => {
+    if (!pendingDeleteRel) return;
+    const id = pendingDeleteRel;
+    setPendingDeleteRel(null);
+    await mut.deleteRelationshipRequest(id);
+  };
+
   return (
     <div className="main-layout" data-testid="structures-page">
       <Sidebar />
       <main className="main-content dot-grid">
         <div className="page-container">
-          {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Trust & Entities</h1>
-              <p className="page-subtitle">
-                Manage trust structures, entities, and relationships — define the organizational framework of your trust
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Manage trust structures, entities, and their relationships' },
-                  { text: 'Define the organizational framework of your trust' },
-                  { text: 'Add entities like LLCs, partnerships, or other trusts' },
-                ]}
-                taPrompt="Help me understand the Structures page and how to add an entity"
-              />
-            </div>
-          </div>
+          {/* Page Header (shared component) */}
+          <PageHeader
+            title="Trust & Entities"
+            subtitle="Manage trust structures, entities, and relationships — define the organizational framework of your trust"
+            help={{
+              items: [
+                { text: 'Manage trust structures, entities, and their relationships' },
+                { text: 'Define the organizational framework of your trust' },
+                { text: 'Add entities like LLCs, partnerships, or other trusts' },
+              ],
+              taPrompt: 'Help me understand the Structures page and how to add an entity',
+            }}
+          />
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 mb-6 p-1 bg-muted rounded-lg w-fit" data-testid="view-mode-toggle">
+          <div className="flex items-center gap-1 mb-6 p-1 bg-muted w-fit" data-testid="view-mode-toggle">
             {VIEW_MODE_OPTIONS.map(opt => (
-              <button
+              <Button
                 key={opt.mode}
+                variant={viewMode === opt.mode ? 'secondary' : 'ghost'}
                 onClick={() => handleViewModeChange(opt.mode)}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === opt.mode ? 'bg-white text-navy shadow-sm' : 'text-muted-foreground hover:text-navy'
+                className={`px-4 py-1.5 h-auto text-sm font-medium transition-colors ${
+                  viewMode === opt.mode ? 'bg-white text-navy' : 'text-muted-foreground hover:text-navy'
                 }`}
               >
                 {opt.hasIcon && <Layers className="w-3.5 h-3.5" />}
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -177,20 +184,20 @@ export default function StructuresPage() {
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <div className="flex items-center justify-between mb-6">
               <TabsList className="grid w-full max-w-md grid-cols-3">
-                <TabsTrigger value="entities" data-testid="tab-entities">
-                  <Building2 className="w-4 h-4 mr-2" /> Entities
+                <TabsTrigger value="entities" data-testid="tab-entities" className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4" /> Entities
                 </TabsTrigger>
-                <TabsTrigger value="hierarchy" data-testid="tab-hierarchy">
-                  <GitBranch className="w-4 h-4 mr-2" /> Hierarchy
+                <TabsTrigger value="hierarchy" data-testid="tab-hierarchy" className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4" /> Hierarchy
                 </TabsTrigger>
                 <TabsTrigger
                   value="separation"
                   data-testid="tab-separation"
-                  className={`relative ${viewMode === 'all-trusts' ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                  className="flex items-center gap-2"
                   disabled={viewMode === 'all-trusts'}
                   title={viewMode === 'all-trusts' ? 'Select a specific trust to view separation analysis' : ''}
                 >
-                  <ShieldAlert className="w-4 h-4 mr-2" /> Separation
+                  <ShieldAlert className="w-4 h-4" /> Separation
                   {viewMode === 'all-trusts' && (
                     <span className="ml-1 text-[10px] text-muted-foreground">(per-trust only)</span>
                   )}
@@ -204,7 +211,7 @@ export default function StructuresPage() {
 
               {tabAction && (
                 <Button onClick={tabAction.onClick} className="btn-primary" disabled={tabAction.disabled} data-testid={tabAction.testId}>
-                  {tabAction.loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <tabAction.icon className="w-4 h-4 mr-2" />}
+                  {tabAction.loading ? <Spinner size={16} className="mr-2" /> : <tabAction.icon className="w-4 h-4 mr-2" />}
                   {tabAction.loading ? tabAction.loadingLabel : tabAction.label}
                 </Button>
               )}
@@ -230,6 +237,7 @@ export default function StructuresPage() {
             {/* ── Hierarchy Tab ── */}
             <TabsContent value="hierarchy">
               <HierarchyTab
+                  navigate={navigate}
                 loading={loading}
                 entities={entities}
                 relationships={relationships}
@@ -243,7 +251,7 @@ export default function StructuresPage() {
                 toggleTrustGroup={mut.toggleTrustGroup}
                 structuralMapEntities={structuralMapEntities}
                 getEntityById={getEntityById}
-                onDeleteRelationship={mut.handleDeleteRelationship}
+                onDeleteRelationship={(id) => setPendingDeleteRel(id)}
                 onAddRelationship={mut.openRelationshipModal}
               />
             </TabsContent>
@@ -258,7 +266,7 @@ export default function StructuresPage() {
                 getEntityIcon={getEntityIcon}
               />
               {separationData && separationData.entities.length > 0 && (
-                <div className="rounded border border-border bg-card p-4 mt-6">
+                <div className="border border-border bg-card p-4 mt-6">
                   <SeparationAlertsPanel />
                 </div>
               )}
@@ -299,6 +307,31 @@ export default function StructuresPage() {
         onSubmit={mut.handleCreateRelationship}
         formLoading={mut.formLoading}
       />
+
+        {/* Delete relationship confirmation (AlertDialog per standard — no confirm()) */}
+        <AlertDialog open={!!pendingDeleteRel} onOpenChange={(open) => !open && setPendingDeleteRel(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Relationship</AlertDialogTitle>
+              <AlertDialogDescription>
+                Delete this entity relationship? This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="delete-relationship-cancel">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                data-testid="delete-relationship-confirm"
+                className="bg-error text-error-foreground hover:bg-error/90"
+                onClick={(e) => {
+                  e.preventDefault();
+                  confirmDeleteRel();
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

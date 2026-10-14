@@ -1,6 +1,7 @@
 import { ChevronRight, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EntityCard } from './EntityCard';
+import Spinner from '@/components/Spinner';
 
 const SEP_OVERVIEW_STATS = [
   { key: 'entities', label: 'Entities', getVal: d => d.entities.length },
@@ -53,7 +54,7 @@ export function SeparationTab({ separationData, sepLoading, navigate, getEntityC
   if (sepLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <span className="w-6 h-6 animate-spin text-muted-foreground">⟳</span>
+        <Spinner size={24} label="Loading separation data" />
       </div>
     );
   }
@@ -78,7 +79,7 @@ export function SeparationTab({ separationData, sepLoading, navigate, getEntityC
       {/* Overview Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {SEP_OVERVIEW_STATS.map(stat => (
-          <div key={stat.key} className="rounded border border-border bg-card p-4">
+          <div key={stat.key} className="border border-border bg-card p-4">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{stat.label}</p>
             <p className={`text-2xl font-semibold ${stat.getClass ? stat.getClass(separationData) : 'text-foreground'}`}>
               {stat.getVal(separationData)}
@@ -95,7 +96,7 @@ export function SeparationTab({ separationData, sepLoading, navigate, getEntityC
             <div
               key={ent.entity_id}
               onClick={() => navigate(`/entities/${ent.entity_id}`)}
-              className="rounded border border-border bg-card p-4 hover:border-navy/40 cursor-pointer transition-all group"
+              className="border border-border bg-card p-4 hover:border-navy/40 cursor-pointer transition-all group"
               data-testid={`sep-entity-card-${ent.entity_id}`}
             >
               <div className="flex items-start justify-between mb-3">
@@ -127,7 +128,7 @@ export function SeparationTab({ separationData, sepLoading, navigate, getEntityC
       {separationData.inter_entity_flows.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Inter-Entity Transfer Flows</h3>
-          <div className="rounded border border-border bg-card overflow-hidden">
+          <div className="border border-border bg-card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">

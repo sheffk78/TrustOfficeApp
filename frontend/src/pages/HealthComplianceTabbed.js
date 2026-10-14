@@ -11,6 +11,7 @@ import GovernancePage from '@/pages/GovernancePage';
 import RiskDashboardPage from '@/pages/RiskDashboardPage';
 import StateCompliancePage from '@/pages/StateCompliancePage';
 import { HeartPulse, Activity, MapPin } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
 
 export default function HealthComplianceTabbed() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,8 +24,20 @@ export default function HealthComplianceTabbed() {
   return (
     <div className="main-layout">
       <Sidebar />
-      <div className="main-content dot-dot">
+      <div className="main-content dot-grid">
         <div className="page-container">
+          <PageHeader
+            title="Governance"
+            subtitle="Monitor trust health, compliance risk, and state-by-state requirements"
+            help={{
+              items: [
+                { text: 'Overview tracks your trust health score across 8 criteria' },
+                { text: 'Risk lists open compliance items that need action' },
+                { text: 'State shows filing requirements for your trust\'s governing state' },
+              ],
+              taPrompt: 'Walk me through the Governance pages and what each tab shows',
+            }}
+          />
             <Tabs value={tab} onValueChange={handleTabChange}>
               <TabsList className="mb-6">
                 <TabsTrigger value="overview" className="flex items-center gap-2">

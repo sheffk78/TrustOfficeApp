@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Spinner from '@/components/Spinner';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -20,7 +21,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   FileSpreadsheet,
-  Loader2
+  
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -31,6 +32,7 @@ export default function EntityDetailPage() {
   const navigate = useNavigate();
   const { selectedTrust } = useAuth();
   const [entity, setEntity] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({});
@@ -95,10 +97,7 @@ export default function EntityDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this entity? This action cannot be undone.')) {
-      return;
-    }
+  const performDelete = async () => {
     try {
       const response = await fetchWithAuth(`/entities/${entityId}`, {
         method: 'DELETE'
@@ -149,6 +148,7 @@ export default function EntityDetailPage() {
   }
 
   return (
+    <>
     <div className="main-layout" data-testid="entity-detail-page">
       <Sidebar />
       <main className="main-content dot-grid">
@@ -183,7 +183,7 @@ export default function EntityDetailPage() {
                 taPrompt="Help me understand the Entity Detail page"
               />
               <Button 
-                onClick={handleDelete}
+                onClick={() => setPendingDelete(true)}
                 variant="outline"
                 className="text-error border-error hover:bg-error/10"
               >
@@ -384,7 +384,7 @@ export default function EntityDetailPage() {
                 </Button>
               </div>
               {txnLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                <div className="flex justify-center py-8"><Spinner /></div>
               ) : entityTxns.length === 0 ? (
                 <div className="text-center py-8">
                   <FileSpreadsheet className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -416,7 +416,7 @@ export default function EntityDetailPage() {
                             </span>
                           </td>
                           <td className="py-2">
-                            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-navy/5 text-navy">
+                            <span className="inline-block px-2 py-0.5 text-xs font-mono font-medium bg-navy/5 text-navy">
                               {t.governance_classification}
                             </span>
                           </td>
@@ -438,5 +438,31 @@ export default function EntityDetailPage() {
       </main>
       <MobileBottomNav />
     </div>
+    {/* Delete confirmation (AlertDialog per standard — no confirm()) */}
+    <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Entity</AlertDialogTitle>
+          <AlertDialogDescription>
+            Delete this entity? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="entity-delete-cancel">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            data-testid="entity-delete-confirm"
+            className="bg-error text-error-foreground hover:bg-error/90"
+            onClick={(e) => {
+              e.preventDefault();
+              setPendingDelete(null);
+              performDelete();
+            }}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

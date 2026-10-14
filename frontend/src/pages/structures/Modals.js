@@ -1,4 +1,3 @@
-import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ENTITY_TYPES, RELATIONSHIP_TYPES } from './constants';
 import { formatEIN } from '@/utils/formatters';
+import Spinner from '@/components/Spinner';
 
 /**
  * Normalise a trust's `trustees` value into a display string.
@@ -180,7 +180,7 @@ export function EntityModal({ show, onClose, newEntity, setNewEntity, entityModa
         <DialogFooter>
           <Button variant="outline" onClick={() => onClose(false)} className="btn-secondary">Cancel</Button>
           <Button onClick={onSubmit} disabled={formLoading} className="btn-primary" data-testid="submit-entity-btn">
-            {formLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            {formLoading && <Spinner size={16} className="mr-2" />}
             Create Entity
           </Button>
         </DialogFooter>
@@ -238,13 +238,13 @@ export function RelationshipModal({
         <div className="space-y-4 py-4">
           {/* Trust-to-Trust toggle */}
           {viewMode === 'all-trusts' && (
-            <div className="border border-purple-200 bg-purple-50/50 p-3" data-testid="trust-to-trust-toggle-section">
+            <div className="border border-gold/30 bg-gold/10 p-3" data-testid="trust-to-trust-toggle-section">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isTrustToTrust}
                   onChange={(e) => handleTrustToTrustToggle(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600"
+                  className="w-4 h-4 accent-navy"
                   data-testid="trust-to-trust-checkbox"
                 />
                 <span className="text-sm font-medium text-navy">Trust-to-Trust Relationship</span>
@@ -276,7 +276,7 @@ export function RelationshipModal({
           )}
 
           {viewMode === 'all-trusts' && isTrustToTrust && (
-            <p className="text-xs text-purple-600 font-medium">
+            <p className="text-xs text-gold font-medium">
               Trust-to-Trust mode: showing all trust-type entities across all trusts
             </p>
           )}
@@ -348,7 +348,7 @@ export function RelationshipModal({
         <DialogFooter>
           <Button variant="outline" onClick={() => onClose(false)} className="btn-secondary">Cancel</Button>
           <Button onClick={onSubmit} disabled={formLoading} className="btn-primary" data-testid="submit-relationship-btn">
-            {formLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            {formLoading && <Spinner size={16} className="mr-2" />}
             Add Relationship
           </Button>
         </DialogFooter>

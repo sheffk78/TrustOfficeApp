@@ -37,9 +37,12 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
 
   return (
     <div key={key} data-testid={`beneficiary-row-${index}`}>
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpandedHolder(isExpanded ? null : key)}
-        className="w-full p-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedHolder(isExpanded ? null : key); } }}
+        className="w-full p-4 flex items-center justify-between hover:bg-muted/20 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-navy/10 dark:bg-gold/10 flex items-center justify-center font-serif text-navy dark:text-gold">
@@ -54,15 +57,17 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
                   .slice()
                   .sort((a, b) => new Date(b.issue_date) - new Date(a.issue_date))[0];
                 return (
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => { e.stopPropagation(); handleViewPDF(latestCert); }}
-                    className="inline-flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-gold hover:bg-gold/10 transition-colors"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-gold hover:bg-gold/10"
                     title={`View certificate PDF for ${ben.holder_name}`}
+                    aria-label={`View certificate PDF for ${ben.holder_name}`}
                     data-testid={`holder-pdf-${index}`}
                   >
                     <FileText className="w-4 h-4" />
-                  </button>
+                  </Button>
                 );
               })()}
               {ben.holder_type && ben.holder_type !== 'individual' && (
@@ -93,7 +98,7 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
           </div>
           {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
         </div>
-      </button>
+      </div>
 
       {isExpanded && (
         <div className="bg-muted/30 p-4 border-t border-border">
@@ -120,12 +125,12 @@ function HolderRow({ ben, index, expandedHolder, setExpandedHolder, openEditModa
                     <span className="font-mono text-sm text-navy dark:text-gold">{cert.certificate_number}</span>
                     <span className="text-sm text-muted-foreground">{certAlloc.primary} ({certAlloc.secondary})</span>
                     {cert.status && cert.status !== 'active' && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted text-muted-foreground rounded">
+                      <span className="px-1.5 py-0.5 rounded-full font-mono text-xs uppercase tracking-wider bg-navy/10 text-navy dark:text-gold">
                         {cert.status}
                       </span>
                     )}
                     {cert.version && cert.version > 1 && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-mono bg-navy/5 text-muted-foreground rounded">
+                      <span className="px-1.5 py-0.5 rounded-full font-mono text-xs uppercase tracking-wider bg-navy/10 text-navy dark:text-gold">
                         v{cert.version}
                       </span>
                     )}
@@ -395,27 +400,27 @@ export function OverviewTab({
       <div className="mt-8 border-t border-border pt-6">
         <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Understanding Trust Allocations</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="p-3 bg-muted/30 border border-border rounded">
+          <div className="p-3 bg-muted/30 border border-border">
             <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.beneficiaryTypes.title}</p>
             <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.beneficiaryTypes.content}</p>
           </div>
-          <div className="p-3 bg-muted/30 border border-border rounded">
+          <div className="p-3 bg-muted/30 border border-border">
             <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.whatAreUnits.title}</p>
             <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.whatAreUnits.content}</p>
           </div>
-          <div className="p-3 bg-muted/30 border border-border rounded">
+          <div className="p-3 bg-muted/30 border border-border">
             <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.unitsVsPercentage.title}</p>
             <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.unitsVsPercentage.content}</p>
           </div>
-          <div className="p-3 bg-muted/30 border border-border rounded">
+          <div className="p-3 bg-muted/30 border border-border">
             <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.allocationModes.title}</p>
             <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.allocationModes.content}</p>
           </div>
-          <div className="p-3 bg-muted/30 border border-border rounded">
+          <div className="p-3 bg-muted/30 border border-border">
             <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.classBeneficiaries.title}</p>
             <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.classBeneficiaries.content}</p>
           </div>
-          <div className="p-3 bg-muted/30 border border-border rounded">
+          <div className="p-3 bg-muted/30 border border-border">
             <p className="font-medium text-navy dark:text-foreground mb-1">{EDUCATION_SECTIONS.distributionConventions.title}</p>
             <p className="text-muted-foreground text-xs whitespace-pre-line">{EDUCATION_SECTIONS.distributionConventions.content}</p>
           </div>

@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
@@ -25,7 +26,9 @@ export default function BeneficiaryReportPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+    const [pendingDelete, setPendingDelete] = useState(null);
+  
+const [deletingId, setDeletingId] = useState(null);
 
   const loadReports = useCallback(async () => {
     if (!selectedTrust) {
@@ -104,10 +107,7 @@ export default function BeneficiaryReportPage() {
     }
   };
 
-  const handleDelete = async (report) => {
-    if (!window.confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
-      return;
-    }
+  const performDelete = async (report) => {
     setDeletingId(report.report_id);
     try {
       const res = await fetchWithAuth(`/beneficiary-reports/${report.report_id}`, {
@@ -131,6 +131,7 @@ export default function BeneficiaryReportPage() {
   };
 
   return (
+    <>
     <div className="main-layout" data-testid="beneficiary-report-page">
       <Sidebar />
       <main className="main-content dot-grid">
@@ -241,7 +242,7 @@ export default function BeneficiaryReportPage() {
                         Download
                       </Button>
                       <Button
-                        onClick={() => handleDelete(report)}
+                        onClick={() => setPendingDelete(report)}
                         size="sm"
                         variant="outline"
                         className="btn-secondary text-error border-error/20 hover:bg-error/10"
@@ -265,5 +266,35 @@ export default function BeneficiaryReportPage() {
       </main>
       <MobileBottomNav />
     </div>
+    {/* Delete confirmation (AlertDialog per standard — no confirm()) */}
+    <AlertDialog
+      open={!!pendingDelete}
+      onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Report</AlertDialogTitle>
+          <AlertDialogDescription>
+            Delete this report? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="report-delete-cancel">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            data-testid="report-delete-confirm"
+            className="bg-error text-error-foreground hover:bg-error/90"
+            onClick={(e) => {
+              e.preventDefault();
+              const target = pendingDelete;
+              setPendingDelete(null);
+              if (target) performDelete(target);
+            }}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

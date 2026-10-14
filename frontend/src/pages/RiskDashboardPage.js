@@ -108,7 +108,7 @@ export default function RiskDashboardPage() {
     return (
       <>
         <div className="page-container">
-          <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
+          <div className="card-trust border border-border p-12 flex flex-col items-center justify-center">
             <Shield className="w-12 h-12 text-muted-foreground/60 mb-3"/>
             <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
             <p className="text-sm text-muted-foreground">Choose a trust to view the Risk Dashboard.</p>
@@ -151,7 +151,7 @@ export default function RiskDashboardPage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-16 card-trust border border-border rounded animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-16 card-trust border border-border animate-pulse"/>)}
             </div>
           ) : (
             <>
@@ -216,15 +216,15 @@ export default function RiskDashboardPage() {
                   <h2 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Structure Risk Factors</h2>
 
                   {/* Entity Structure */}
-                  <div className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + (structureData.entityCount === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
-                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + (structureData.entityCount === 0 ? "bg-destructive/10" : "bg-navy/5")}>
+                  <div className={"flex items-start gap-3 card-trust border border-border p-4 " + (structureData.entityCount === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
+                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 " + (structureData.entityCount === 0 ? "bg-destructive/10" : "bg-navy/5")}>
                       <Building2 className={"w-4 h-4 " + (structureData.entityCount === 0 ? "text-destructive" : "text-navy")} />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-navy text-sm">Entity Structure: {structureData.entityCount} entit{structureData.entityCount === 1 ? 'y' : 'ies'}</h3>
                         {structureData.entityCount === 0 && (
-                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 bg-destructive/10 text-destructive">
                             Risk
                           </span>
                         )}
@@ -238,15 +238,15 @@ export default function RiskDashboardPage() {
                   </div>
 
                   {/* Beneficiaries */}
-                  <div className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + (structureData.beneficiaryCount === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
-                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + (structureData.beneficiaryCount === 0 ? "bg-destructive/10" : "bg-navy/5")}>
+                  <div className={"flex items-start gap-3 card-trust border border-border p-4 " + (structureData.beneficiaryCount === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
+                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 " + (structureData.beneficiaryCount === 0 ? "bg-destructive/10" : "bg-navy/5")}>
                       <Users className={"w-4 h-4 " + (structureData.beneficiaryCount === 0 ? "text-destructive" : "text-navy")} />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-navy text-sm">Beneficiaries: {structureData.beneficiaryCount} named</h3>
                         {structureData.beneficiaryCount === 0 && (
-                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 bg-destructive/10 text-destructive">
                             Risk
                           </span>
                         )}
@@ -260,8 +260,8 @@ export default function RiskDashboardPage() {
                   </div>
 
                   {/* Schedule A Assets */}
-                  <div className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + (structureData.scheduleATotal === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
-                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + (structureData.scheduleATotal === 0 ? "bg-destructive/10" : "bg-navy/5")}>
+                  <div className={"flex items-start gap-3 card-trust border border-border p-4 " + (structureData.scheduleATotal === 0 ? "bg-destructive/5 border-destructive/20" : "bg-subtle-bg border-border")}>
+                    <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 " + (structureData.scheduleATotal === 0 ? "bg-destructive/10" : "bg-navy/5")}>
                       <DollarSign className={"w-4 h-4 " + (structureData.scheduleATotal === 0 ? "text-destructive" : "text-navy")} />
                     </div>
                     <div className="flex-1">
@@ -270,7 +270,7 @@ export default function RiskDashboardPage() {
                           Schedule A: ${structureData.scheduleATotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} total assets
                         </h3>
                         {structureData.scheduleATotal === 0 && (
-                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                          <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 bg-destructive/10 text-destructive">
                             Risk
                           </span>
                         )}
@@ -288,23 +288,24 @@ export default function RiskDashboardPage() {
               {/* Filters */}
               <div className="flex gap-2 mb-4">
                 {['high', 'medium', 'low'].map((sev) => (
-                  <button
+                  <Button
                     key={sev}
+                    variant="outline"
                     onClick={() => setFilterSeverity(filterSeverity === sev ? '' : sev)}
-                    className={"px-3 py-1.5 text-xs font-mono uppercase rounded border transition-colors " + (filterSeverity === sev ? SEVERITY_STYLES[sev].badge : 'border-border text-muted-foreground hover:border-navy/30')}
+                    className={"px-3 py-1.5 h-auto text-xs font-mono uppercase rounded-none border transition-colors " + (filterSeverity === sev ? SEVERITY_STYLES[sev].badge : 'border-border text-muted-foreground hover:border-navy/30')}
                   >
                     {sev}
-                  </button>
+                  </Button>
                 ))}
                 {(filterSeverity || filterModule) && (
-                  <button onClick={() => { setFilterSeverity(''); setFilterModule(''); }} className="px-3 py-1.5 text-xs text-muted-foreground hover:text-navy">Clear</button>
+                  <Button variant="ghost" onClick={() => { setFilterSeverity(''); setFilterModule(''); }} className="px-3 py-1.5 h-auto text-xs text-muted-foreground hover:text-navy">Clear</Button>
                 )}
               </div>
 
               {/* Risk List */}
               <div className="space-y-3">
                 {filteredRisks().length === 0 && (data?.risk_count || 0) === 0 ? (
-                  <div className="bg-success/5 border border-success/20 p-12 text-center rounded">
+                  <div className="bg-success/5 border border-success/20 p-12 text-center">
                     <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-3"/>
                     <p className="text-lg font-semibold text-success">All Clear</p>
                     <p className="text-sm text-success">No risk items detected. Your trust governance is in good shape.</p>
@@ -316,14 +317,14 @@ export default function RiskDashboardPage() {
                     const style = SEVERITY_STYLES[r.severity] || SEVERITY_STYLES.low;
                     const Icon = r.severity === 'high' ? AlertOctagon : r.severity === 'medium' ? AlertTriangle : AlertCircle;
                     return (
-                      <div key={i} className={"flex items-start gap-3 card-trust border border-border rounded p-4 " + style.border}>
-                        <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 rounded " + style.bg}>
+                      <div key={i} className={"flex items-start gap-3 card-trust border border-border p-4 " + style.border}>
+                        <div className={"w-9 h-9 flex items-center justify-center flex-shrink-0 " + style.bg}>
                           <Icon className={"w-4 h-4 " + style.icon} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold text-navy text-sm">{r.title}</h3>
-                            <span className={"font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded " + style.badge}>
+                            <span className={"font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 " + style.badge}>
                               {style.label}
                             </span>
                           </div>

@@ -5,6 +5,7 @@ import {
   Award, Plus, ArrowRightLeft, MoreVertical, FileText, Pencil, XCircle,
   AlertCircle, Settings,
 } from 'lucide-react';
+import Spinner from '@/components/Spinner';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
@@ -40,12 +41,12 @@ function CertRow({ cert, summary, handleViewPDF, openEditModal, setTransferForm,
               {cert.status}
             </span>
             {cert.version && cert.version > 1 && (
-              <span className="px-1.5 py-0.5 text-[10px] font-mono bg-navy/5 text-muted-foreground rounded">
+              <span className="px-1.5 py-0.5 rounded-full font-mono text-xs uppercase tracking-wider bg-navy/10 text-navy dark:text-gold">
                 v{cert.version}
               </span>
             )}
             {cert.supersedes_certificate_id && (
-              <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted text-muted-foreground rounded" title={`Replaces certificate ${cert.supersedes_certificate_id}`}>
+              <span className="px-1.5 py-0.5 rounded-full font-mono text-xs uppercase tracking-wider bg-navy/10 text-navy dark:text-gold" title={`Replaces certificate ${cert.supersedes_certificate_id}`}>
                 replaces v{cert.version - 1}
               </span>
             )}
@@ -185,7 +186,7 @@ export function CertificatesTab({
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
+            <Spinner size={32} label="Loading ownership shares" className="mx-auto mb-4" />
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
           </div>
         ) : filteredCertificates.length === 0 ? (

@@ -4,11 +4,12 @@ import { Users, Plus, Pencil, AlertCircle, Settings, Info } from 'lucide-react';
 import { extractRelationship } from './constants';
 import { EDUCATION_SECTIONS } from './constants';
 import { formatAllocation } from './hooks';
+import Spinner from '@/components/Spinner';
 
 // ========== EDUCATION BANNER COMPONENT ==========
 function EducationBanner({ title, content }) {
   return (
-    <div className="mb-4 p-3 bg-muted/30 border border-border rounded-md text-sm text-muted-foreground">
+    <div className="mb-4 p-3 bg-muted/30 border border-border text-sm text-muted-foreground">
       <p className="font-mono text-[10px] uppercase tracking-widest text-navy mb-2">
         <Info className="w-3.5 h-3.5 inline mr-1" />
         {title}
@@ -86,7 +87,7 @@ export function BeneficiaryListTab({
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="w-8 h-8 border-2 border-navy dark:border-gold border-t-transparent animate-spin mx-auto mb-4"></div>
+            <Spinner size={32} label="Loading beneficiaries" className="mx-auto mb-4" />
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading...</p>
           </div>
         ) : !overviewData?.beneficiaries?.length ? (

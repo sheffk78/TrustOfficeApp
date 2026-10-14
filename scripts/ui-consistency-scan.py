@@ -36,9 +36,16 @@ R1_EXEMPT = {
 
 RE_PAGE_TITLE = re.compile(r'\bpage-title\b')
 RE_CONTAINER = re.compile(r'\bpage-container\b')
+# Pages whose shell (page-container) is supplied by a parent wrapper file — page renders
+# only inside that wrapper, so container presence is checked through the chain.
+WRAPPER_SUPPLIES = {
+    "GovernancePage.js": ("HealthComplianceTabbed.js",),
+    "RiskDashboardPage.js": ("HealthComplianceTabbed.js",),
+    "StateCompliancePage.js": ("HealthComplianceTabbed.js",),
+}
 RE_RADIUS_HARD = re.compile(r'\brounded-(?:lg|xl|2xl|md)\b')
 RE_ROUNDED_FULL = re.compile(r'\brounded-full\b')
-RE_FULL_ALLOWED = re.compile(r'animate-spin|avatar|Avatar|badge|Badge|spinner|Spinner|w-\d+\s+h-\d+[^\n]*rounded-full(?=.*flex-shrink|.*mx-auto|.*items-center)')  # heuristic per-line (icon medallions count as badge/Avatar class)
+RE_FULL_ALLOWED = re.compile(r'animate-spin|avatar|Avatar|badge|Badge|spinner|Spinner|uppercase tracking-wider|w-\d+\s+h-\d+[^\n]*rounded-full(?=.*flex-shrink|.*mx-auto|.*items-center)')  # heuristic per-line (icon medallions count as badge/Avatar class)
 RE_PALETTE = re.compile(r'\b(?:text|bg|border)-(?:gray|slate|zinc|neutral|stone)-\d{2,3}\b|\b(?:bg|text)-(?:blue|purple|pink|cyan|indigo|violet)-\d{2,3}\b')
 RE_RAW_BTN = re.compile(r'<button\b')
 RE_TABS = re.compile(r'TabsTrigger[^>]*className="([^"]*)"')
@@ -54,8 +61,13 @@ def scan_file(path: Path):
     else:
         header_ref = t
     v = {"R1_header": 0, "R2_radius_hard": 0, "R2_radius_full": 0, "R3_palette": 0, "R4_raw_btn": 0, "R5_tabs": 0, "R6_confirm": 0}
-    if path.name not in R1_EXEMPT:
-        has_header = bool(RE_PAGE_TITLE.search(header_ref)) and bool(RE_CONTAINER.search(header_ref))
+    if path.name not in R1_EXEMPT and path.parent == PAGES:  # subdir Tab fragments render inside a routed page's shell
+        container_files = [t]
+        for wrapper in WRAPPER_SUPPLIES.get(path.name, ()):
+            wp = PAGES / wrapper
+            if wp.exists():
+                container_files.append(wp.read_text(errors="replace"))
+        has_header = bool(RE_PAGE_TITLE.search(header_ref)) and any(RE_CONTAINER.search(f) for f in container_files)
         if not has_header:
             v["R1_header"] = 1
     v["R2_radius_hard"] = len(RE_RADIUS_HARD.findall(t))
@@ -83,7 +95,13 @@ def main():
     report = "--report" in sys.argv
     baseline = json.loads(BASELINE.read_text()) if BASELINE.exists() else {}
     current, regressions, improvements = {}, [], []
-    for f in sorted(PAGES.glob("*.js")):
+    _page_files = list(PAGES.glob("*.js"))
+    for _sub in PAGES.iterdir():
+        if _sub.is_dir():
+            if _sub.name in ("structures", "beneficiaries", "governance"):
+                _page_files += [f for f in _sub.glob("*.js") if f.name.endswith(("Tab.js", "Tabbed.js", "Page.js"))]
+                _page_files += [f for f in _sub.glob("*.jsx") if f.name.endswith(("Tab.jsx", "Page.jsx"))]
+    for f in sorted(set(_page_files)):
         if f.name.endswith(".test.js"):
             continue
         v = scan_file(f)

@@ -110,9 +110,9 @@ function DeadlineRow({ label, lastSent, nextDue, onMarkSent }) {
           <span className="text-muted-foreground/70">Not scheduled</span>
         )}
         {lastSent && (
-          <p className="text-xs text-muted-foreground/70">Last: {new Date(lastSent).toLocaleDateString()}</p>
+          <p className="text-xs font-mono text-muted-foreground/70">Last: {new Date(lastSent).toLocaleDateString()}</p>
         )}
-        <button onClick={onMarkSent} className="text-xs text-gold hover:underline ml-2">Mark as sent</button>
+        <Button variant="ghost" onClick={onMarkSent} className="text-xs text-gold hover:underline h-auto p-0 ml-2">Mark as sent</Button>
       </div>
     </div>
   );
@@ -376,7 +376,7 @@ export default function StateCompliancePage() {
     return (
       <>
         <div className="page-container">
-          <div className="card-trust border border-border p-12 flex flex-col items-center justify-center rounded">
+          <div className="card-trust border border-border p-12 flex flex-col items-center justify-center">
             <MapPin className="w-12 h-12 text-muted-foreground/60 mb-3"/>
             <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
             <p className="text-sm text-muted-foreground">Choose a trust to view state compliance requirements.</p>
@@ -419,7 +419,7 @@ export default function StateCompliancePage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-24 card-trust border border-border rounded animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="h-24 card-trust border border-border animate-pulse"/>)}
             </div>
           ) : !stateData?.state_code ? (
             <Card className="border border-border">
@@ -527,15 +527,15 @@ export default function StateCompliancePage() {
                             {generatingNotice ? 'Generating…' : 'Generate Beneficiary Notice'}
                           </Button>
                           {noticeResult?.minutesId && (
-                            <div className="flex items-center justify-between gap-2 p-2 bg-success/5 border border-success/20 rounded">
+                            <div className="flex items-center justify-between gap-2 p-2 bg-success/5 border border-success/20">
                               <span className="text-xs text-success flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 Notice recorded — last sent updated
                               </span>
-                              <button onClick={downloadNoticePdf} className="text-xs text-gold hover:underline flex items-center gap-1">
+                              <Button variant="ghost" onClick={downloadNoticePdf} className="text-xs text-gold hover:underline h-auto p-0 flex items-center gap-1">
                                 <Download className="w-3 h-3" />
                                 Download PDF
-                              </button>
+                              </Button>
                             </div>
                           )}
                           <Button
@@ -548,7 +548,7 @@ export default function StateCompliancePage() {
                             {generatingAccounting ? 'Generating…' : 'Generate Annual Accounting'}
                           </Button>
                           {accountingResult?.downloadUrl && (
-                            <div className="flex items-center justify-between gap-2 p-2 bg-success/5 border border-success/20 rounded">
+                            <div className="flex items-center justify-between gap-2 p-2 bg-success/5 border border-success/20">
                               <span className="text-xs text-success flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 Accounting recorded — last sent updated
@@ -572,17 +572,17 @@ export default function StateCompliancePage() {
                           <p className="text-xs text-muted-foreground">No documents logged yet. Generate a notice or accounting to start tracking.</p>
                         )}
                         {deliveryLog.map((entry) => (
-                          <div key={entry.doc_id} className="flex items-center justify-between gap-2 p-2 bg-muted/30 border border-border rounded text-xs">
+                          <div key={entry.doc_id} className="flex items-center justify-between gap-2 p-2 bg-muted/30 border border-border text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="font-medium text-navy truncate">{entry.kind === 'accounting' ? 'Annual Accounting' : 'Beneficiary Notice'}</span>
                               <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${entry.delivered_at ? 'bg-success' : entry.sent_at ? 'bg-gold' : 'bg-muted-foreground/40'}`} />
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {!entry.sent_at && (
-                                <button onClick={() => markDocumentSent(entry.doc_id)} className="text-gold hover:underline whitespace-nowrap">Mark sent</button>
+                                <Button variant="ghost" onClick={() => markDocumentSent(entry.doc_id)} className="text-gold hover:underline h-auto p-0 whitespace-nowrap">Mark sent</Button>
                               )}
                               {!entry.delivered_at && entry.sent_at && (
-                                <button onClick={() => markDocumentDelivered(entry.doc_id)} className="text-gold hover:underline whitespace-nowrap">Mark delivered</button>
+                                <Button variant="ghost" onClick={() => markDocumentDelivered(entry.doc_id)} className="text-gold hover:underline h-auto p-0 whitespace-nowrap">Mark delivered</Button>
                               )}
                               {entry.delivered_at && (
                                 <span className="text-success whitespace-nowrap">Delivered</span>
@@ -607,7 +607,7 @@ export default function StateCompliancePage() {
                 <CardContent className="p-6 pt-0">
                   {requirements.length === 0 ? (
                     coverage === 'uncovered' ? (
-                      <div className="flex items-center gap-3 p-4 bg-info/5 border border-info/20 rounded">
+                      <div className="flex items-center gap-3 p-4 bg-info/5 border border-info/20">
                         <InfoTooltip text="The Uniform Trust Code is a model law that standardizes trust rules." />
                         <p className="text-sm text-info">
                           We don't have {profile?.state_name || stateData?.state_code} requirements in our library yet.
@@ -615,7 +615,7 @@ export default function StateCompliancePage() {
                         </p>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3 p-4 bg-success/5 border border-success/20 rounded">
+                      <div className="flex items-center gap-3 p-4 bg-success/5 border border-success/20">
                         <CheckCircle2 className="w-5 h-5 text-success"/>
                         <p className="text-sm text-success">All compliance requirements are satisfied for {profile?.state_name}.</p>
                       </div>
@@ -626,8 +626,8 @@ export default function StateCompliancePage() {
                         const Icon = CATEGORY_ICONS[req.category] || Shield;
                         return (
                           <div key={i}>
-                            <div className="flex gap-4 p-4 card-trust border border-border rounded">
-                            <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 rounded ${
+                            <div className="flex gap-4 p-4 card-trust border border-border">
+                            <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${
                               req.severity === 'high' ? 'bg-destructive/10 text-destructive' :
                               req.severity === 'medium' ? 'bg-warning/10 text-warning' :
                               'bg-subtle-bg text-muted-foreground'
@@ -640,7 +640,7 @@ export default function StateCompliancePage() {
                                 {JARGON_TOOLTIPS[req.category] && (
                                   <InfoTooltip text={JARGON_TOOLTIPS[req.category]} />
                                 )}
-                                <span className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${SEVERITY_STYLES[req.severity]}`}>
+                                <span className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 border ${SEVERITY_STYLES[req.severity]}`}>
                                   {req.severity}
                                 </span>
                               </div>
@@ -653,20 +653,21 @@ export default function StateCompliancePage() {
                                 {req.action}
                               </p>
                               {deepGuide && (
-                                <button
+                                <Button
+                                  variant="ghost"
                                   onClick={() => toggleGuidance(req, i)}
-                                  className="mt-2 text-xs text-gold hover:underline flex items-center gap-1"
+                                  className="mt-2 text-xs text-gold hover:underline h-auto p-0 flex items-center gap-1"
                                   data-testid={`guidance-toggle-${i}`}
                                   aria-expanded={guidanceExpanded === i}
                                 >
                                   <HelpCircle className="w-3 h-3"/>
                                   {guidanceExpanded === i ? 'Hide state guidance' : 'State guidance'}
-                                </button>
+                                </Button>
                               )}
                             </div>
                           </div>
                           {guidanceExpanded === i && (
-                            <div className="mt-2 ml-14 p-4 border border-border rounded bg-subtle-bg" data-testid={`guidance-section-${i}`}>
+                            <div className="mt-2 ml-14 p-4 border border-border bg-subtle-bg" data-testid={`guidance-section-${i}`}>
                               {guidanceLoading && (
                                 <p className="text-xs text-muted-foreground">Loading guidance…</p>
                               )}
@@ -677,13 +678,14 @@ export default function StateCompliancePage() {
                                       {guidanceSectionContent}
                                     </ReactMarkdown>
                                   </div>
-                                  <button
+                                  <Button
+                                    variant="ghost"
                                     onClick={() => { setGuideExpanded(true); setGuidanceExpanded(null); }}
-                                    className="text-gold hover:underline text-xs mt-2"
+                                    className="text-gold hover:underline h-auto p-0 text-xs mt-2"
                                     data-testid={`guidance-full-guide-${i}`}
                                   >
                                     Read full guide
-                                  </button>
+                                  </Button>
                                 </div>
                               )}
                               {!guidanceLoading && !guidanceSectionContent && (
@@ -725,13 +727,14 @@ export default function StateCompliancePage() {
                       </p>
                     )}
                     {guideExpanded && (
-                      <div className="p-6 md:p-8 prose prose-navy max-w-none border border-border rounded mb-4">
+                      <div className="p-6 md:p-8 prose prose-navy max-w-none border border-border mb-4">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {guideMarkdown ?? deepGuide.markdown ?? ''}
                         </ReactMarkdown>
                       </div>
                     )}
-                    <button
+                    <Button
+                      variant="ghost"
                       onClick={async () => {
                         const next = !guideExpanded;
                         setGuideExpanded(next);
@@ -749,13 +752,13 @@ export default function StateCompliancePage() {
                           }
                         }
                       }}
-                      className="text-xs text-gold hover:underline flex items-center gap-1"
+                      className="text-xs text-gold hover:underline h-auto p-0 flex items-center gap-1"
                       data-testid="deep-dive-toggle"
                       aria-expanded={guideExpanded}
                     >
                       {guideExpanded ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
                       {guideExpanded ? 'Show less' : 'Read the full guide'}
-                    </button>
+                    </Button>
                   </CardContent>
                 </Card>
               )}

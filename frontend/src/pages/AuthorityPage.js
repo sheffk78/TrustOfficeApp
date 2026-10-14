@@ -16,7 +16,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
 
 const ROLE_COLORS = {
   Trustee: { bg: 'bg-navy/5', text: 'text-navy', border: 'border-navy/20' },
@@ -158,7 +159,7 @@ export default function AuthorityPage() {
         <Sidebar />
         <main className="main-content mobile-layout-offset">
           <div className="page-container flex items-center justify-center py-20">
-            <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+            <Spinner />
           </div>
         </main>
         <MobileBottomNav />
@@ -188,41 +189,41 @@ export default function AuthorityPage() {
     <div className="main-layout">
       <Sidebar />
       <main className="main-content mobile-layout-offset">
-        <div className="page-container max-w-6xl mx-auto space-y-6">
+        <div className="page-container space-y-6">
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Legal Powers</h1>
-              <p className="page-subtitle">View trustee authorities, signing powers, and delegation structure as defined in your trust agreement</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <Button variant="outline" size="sm" onClick={() => window.location.assign('/trust-roles')}>
-                <Users className="w-4 h-4 mr-1" /> Edit Trust Roles
-              </Button>
-              <PageHelpButton
-                items={[
-                  { text: 'View who has authority to act on behalf of the trust' },
-                  { text: 'See authority levels (full, limited, none) for each role' },
-                  { text: 'Click any person card to see their authority clause reference' },
-                ]}
-                taPrompt="Help me understand the Authority Management page"
-                contextAlerts={people.length === 0 ? [
-                  { text: 'No authority records found. Add trustees in Entity Management to see authority relationships.', prompt: 'I need to set up authority records for my trust. Where do I start?' }
-                ] : []}
-              />
-              <Button variant="outline" size="sm" onClick={loadData}>
-                <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Legal Powers"
+            subtitle="View trustee authorities, signing powers, and delegation structure as defined in your trust agreement"
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={() => window.location.assign('/trust-roles')}>
+                  <Users className="w-4 h-4 mr-1" /> Edit Trust Roles
+                </Button>
+                <Button variant="outline" size="sm" onClick={loadData}>
+                  <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+                </Button>
+              </>
+            }
+            help={{
+              items: [
+                { text: 'View who has authority to act on behalf of the trust' },
+                { text: 'See authority levels (full, limited, none) for each role' },
+                { text: 'Click any person card to see their authority clause reference' },
+              ],
+              taPrompt: 'Help me understand the Authority Management page',
+              contextAlerts: people.length === 0 ? [
+                { text: 'No authority records found. Add trustees in Entity Management to see authority relationships.', prompt: 'I need to set up authority records for my trust. Where do I start?' }
+              ] : [],
+            }}
+          />
 
           {/* Authority Clause */}
           {trustData?.authority_clause && (
-            <div className="card-trust">
+            <div className="card-trust corner-mark">
               <h2 className="font-serif text-lg text-navy mb-3 flex items-center gap-2">
                 <FileText className="w-5 h-5" /> Governing Authority Clause
               </h2>
-              <div className="bg-subtle-bg rounded p-4 text-sm leading-relaxed border border-border">
+              <div className="bg-subtle-bg p-4 text-sm leading-relaxed border border-border">
                 {trustData.authority_clause}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
@@ -251,17 +252,21 @@ export default function AuthorityPage() {
                 return (
                   <div
                     key={`${person.name}-${person.role}-${idx}`}
-                    className={`card-trust cursor-pointer transition-all hover:shadow-md ${isSelected ? 'ring-2 ring-navy' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    className={`card-trust corner-mark cursor-pointer transition-all ${isSelected ? 'ring-2 ring-navy' : ''}`}
                     onClick={() => setSelectedEntity(isSelected ? null : idx)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedEntity(isSelected ? null : idx); } }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-full ${roleColor.bg} ${roleColor.border} border flex items-center justify-center`}>
+                        <div className={`w-8 h-8 ${roleColor.bg} ${roleColor.border} border flex items-center justify-center`}>
                           <UserCheck className={`w-4 h-4 ${roleColor.text}`} />
                         </div>
                         <div>
                           <p className="font-semibold text-navy text-sm">{person.name}</p>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${roleColor.bg} ${roleColor.text} ${roleColor.border} border`}>
+                          <span className={`text-xs font-mono uppercase tracking-wider px-2 py-0.5 ${roleColor.bg} ${roleColor.text} ${roleColor.border} border`}>
                             {person.role}
                           </span>
                         </div>
@@ -283,7 +288,7 @@ export default function AuthorityPage() {
                       {person.authorityClause && isSelected && (
                         <div className="mt-3 pt-3 border-t border-border/50">
                           <p className="text-muted-foreground mb-1">Authority Reference</p>
-                          <p className="text-navy text-xs leading-relaxed bg-subtle-bg rounded p-2">
+                          <p className="text-navy text-xs leading-relaxed bg-subtle-bg p-2">
                             {person.authorityClause}
                           </p>
                         </div>
@@ -305,7 +310,7 @@ export default function AuthorityPage() {
 
           {/* Authority by Entity */}
           {entities.length > 0 && (
-            <div className="card-trust">
+            <div className="card-trust corner-mark">
               <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
                 <Clock className="w-5 h-5" /> Authority by Entity
               </h2>
@@ -335,7 +340,7 @@ export default function AuthorityPage() {
                             {allPeople.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {allPeople.map((name, i) => (
-                                  <span key={i} className="text-xs bg-subtle-bg px-1.5 py-0.5 rounded">
+                                  <span key={i} className="text-xs bg-subtle-bg px-1.5 py-0.5">
                                     {name}
                                   </span>
                                 ))}
@@ -362,21 +367,21 @@ export default function AuthorityPage() {
 
           {/* Relationships */}
           {relationships.length > 0 && (
-            <div className="card-trust">
+            <div className="card-trust corner-mark">
               <h2 className="font-serif text-lg text-navy mb-4 flex items-center gap-2">
                 <ChevronRight className="w-5 h-5" /> Authority Relationships
               </h2>
               <div className="space-y-2">
                 {relationships.map((rel, idx) => (
-                  <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-subtle-bg rounded text-sm">
-                    <span className="font-medium text-navy">{rel.parent_entity_id}</span>
+                  <div key={idx} className="flex items-center gap-3 py-2 px-3 bg-subtle-bg text-sm">
+                    <span className="font-mono font-medium text-navy">{rel.parent_entity_id}</span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs bg-navy/10 text-navy px-2 py-0.5 rounded font-medium">
+                    <span className="text-xs font-mono bg-navy/10 text-navy px-2 py-0.5 font-medium">
                       {typeof rel.relationship_type === 'string' ? rel.relationship_type.replace(/_/g, ' ') : String(rel.relationship_type || '')}
                       {rel.ownership_percentage && ` (${rel.ownership_percentage}%)`}
                     </span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium text-navy">{rel.child_entity_id}</span>
+                    <span className="font-mono font-medium text-navy">{rel.child_entity_id}</span>
                   </div>
                 ))}
               </div>
