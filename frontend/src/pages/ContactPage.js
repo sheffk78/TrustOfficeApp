@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
-import { 
+import {
   Send, 
   CheckCircle, 
   ArrowLeft, 
@@ -14,9 +14,9 @@ import {
   Building2,
   User,
   MessageSquare,
-  Loader2,
   ExternalLink
 } from 'lucide-react';
+import Spinner from '../components/Spinner';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -110,12 +110,12 @@ export default function ContactPage() {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="bg-white border border-navy/10 rounded p-8 text-center shadow-sm">
-            <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="card-trust corner-mark text-center">
+            <div className="w-16 h-16 bg-success/10 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-success" />
             </div>
             
-            <h1 className="font-serif text-2xl text-navy mb-3">Message Sent!</h1>
+            <h1 className="page-title mb-3">Message Sent!</h1>
             <p className="text-muted-foreground mb-6">
               Thank you for reaching out. We've received your message and will get back to you within 1-2 business days.
             </p>
@@ -184,10 +184,11 @@ export default function ContactPage() {
           </a>
 
           {/* Contact Form Card */}
-          <div className="bg-white border border-navy/10 rounded shadow-sm">
+          <div className="card-trust corner-mark">
             <div className="p-6 border-b border-navy/10">
-              <h1 className="font-serif text-2xl text-navy mb-2">Contact Us</h1>
-              <p className="text-muted-foreground">
+              <h1 className="page-title">Contact Us</h1>
+              <p className="page-subtitle mb-3">We reply within 1–2 business days</p>
+                <p className="text-muted-foreground">
                 Have questions about TrustOffice? We'd love to hear from you. Fill out the form below and our team will get back to you within 1-2 business days.
               </p>
             </div>
@@ -197,7 +198,7 @@ export default function ContactPage() {
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2">
                   <User className="w-4 h-4 text-muted-foreground" />
-                  Name <span className="text-red-500">*</span>
+                  Name <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -205,11 +206,11 @@ export default function ContactPage() {
                   placeholder="Your full name"
                   value={formData.name}
                   onChange={handleChange('name')}
-                  className={errors.name ? 'border-red-500' : ''}
+                  className={errors.name ? 'border-error' : ''}
                   data-testid="contact-name"
                 />
                 {errors.name && (
-                  <p className="text-sm text-red-500">{errors.name}</p>
+                  <p className="text-sm text-error">{errors.name}</p>
                 )}
               </div>
 
@@ -217,7 +218,7 @@ export default function ContactPage() {
               <div className="space-y-2">
                 <Label htmlFor="email" className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
-                  Email <span className="text-red-500">*</span>
+                  Email <span className="text-error">*</span>
                 </Label>
                 <Input
                   id="email"
@@ -225,11 +226,11 @@ export default function ContactPage() {
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={handleChange('email')}
-                  className={errors.email ? 'border-red-500' : ''}
+                  className={errors.email ? 'border-error' : ''}
                   data-testid="contact-email"
                 />
                 {errors.email && (
-                  <p className="text-sm text-red-500">{errors.email}</p>
+                  <p className="text-sm text-error">{errors.email}</p>
                 )}
               </div>
 
@@ -253,18 +254,18 @@ export default function ContactPage() {
               <div className="space-y-2">
                 <Label htmlFor="message" className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                  Message <span className="text-red-500">*</span>
+                  Message <span className="text-error">*</span>
                 </Label>
                 <Textarea
                   id="message"
                   placeholder="How can we help you?"
                   value={formData.message}
                   onChange={handleChange('message')}
-                  className={`min-h-[150px] resize-none ${errors.message ? 'border-red-500' : ''}`}
+                  className={`min-h-[150px] resize-none ${errors.message ? 'border-error' : ''}`}
                   data-testid="contact-message"
                 />
                 {errors.message && (
-                  <p className="text-sm text-red-500">{errors.message}</p>
+                  <p className="text-sm text-error">{errors.message}</p>
                 )}
               </div>
 
@@ -277,7 +278,7 @@ export default function ContactPage() {
               >
                 {loading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size={16} className="mr-2 inline-block align-middle" />
                     Sending...
                   </>
                 ) : (

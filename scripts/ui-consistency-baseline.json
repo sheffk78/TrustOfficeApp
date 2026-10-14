@@ -1,0 +1,256 @@
+{
+ "AcceptInvitePage.js": {
+  "R3_palette": 12,
+  "R4_raw_btn": 1
+ },
+ "AdminPage.js": {
+  "R1_header": 1,
+  "R2_radius_full": 1,
+  "R3_palette": 2,
+  "R5_tabs": 1
+ },
+ "AffiliatePage.js": {
+  "R1_header": 1,
+  "R2_radius_full": 1,
+  "R3_palette": 6
+ },
+ "ApprovalFlow.js": {
+  "R2_radius_full": 1,
+  "R2_radius_hard": 2,
+  "R3_palette": 5
+ },
+ "AuditTrailPage.js": {},
+ "AuthCallback.js": {},
+ "AuthorityPage.js": {
+  "R2_radius_full": 2
+ },
+ "BeneficiariesPage.js": {
+  "R5_tabs": 5
+ },
+ "BeneficiaryReportPage.js": {
+  "R6_confirm": 1
+ },
+ "BenevolenceLogPage.js": {},
+ "BenevolencePage.js": {
+  "R6_confirm": 1
+ },
+ "BenevolencePolicyPage.js": {
+  "R2_radius_full": 1,
+  "R3_palette": 2
+ },
+ "BenevolenceTabbed.js": {
+  "R1_header": 1
+ },
+ "BillingPage.js": {
+  "R2_radius_hard": 1,
+  "R6_confirm": 1
+ },
+ "ClientDashboard.js": {
+  "R2_radius_hard": 4
+ },
+ "ClientsListPage.js": {
+  "R2_radius_hard": 1
+ },
+ "CommunicationsPage.js": {
+  "R4_raw_btn": 1
+ },
+ "CompensationPage.js": {
+  "R4_raw_btn": 1
+ },
+ "ConnectWingPoint.js": {
+  "R2_radius_full": 1,
+  "R2_radius_hard": 2,
+  "R4_raw_btn": 4
+ },
+ "ContactPage.js": {
+  "R1_header": 1
+ },
+ "CoursePage.js": {
+  "R3_palette": 5
+ },
+ "CreateMinutesPage.js": {
+  "R1_header": 1,
+  "R4_raw_btn": 4
+ },
+ "DashboardPage.js": {},
+ "DeadlineDashboard.js": {
+  "R2_radius_full": 1
+ },
+ "DistributionsPage.js": {
+  "R4_raw_btn": 9
+ },
+ "DocumentsTabbed.js": {
+  "R1_header": 1
+ },
+ "EntityDetailPage.js": {},
+ "ExpensesPage.js": {
+  "R4_raw_btn": 4
+ },
+ "ExportDashboard.js": {
+  "R4_raw_btn": 2
+ },
+ "ExternalRedirect.js": {},
+ "ForgotPasswordPage.js": {
+  "R4_raw_btn": 1
+ },
+ "GovernancePage.js": {},
+ "HealthComplianceTabbed.js": {
+  "R1_header": 1
+ },
+ "HealthDashboard.js": {
+  "R4_raw_btn": 1
+ },
+ "InvestmentsPage.js": {
+  "R2_radius_full": 1,
+  "R6_confirm": 1
+ },
+ "InvestmentsTabbed.js": {
+  "R1_header": 1
+ },
+ "KnowledgeAdmin.js": {
+  "R1_header": 1
+ },
+ "KnowledgeArticleDetail.js": {
+  "R1_header": 1
+ },
+ "KnowledgeBasePage.js": {
+  "R1_header": 1
+ },
+ "LeadsAccessPage.js": {
+  "R1_header": 1
+ },
+ "LoginPage.js": {
+  "R2_radius_hard": 2,
+  "R4_raw_btn": 2
+ },
+ "MeetingAgenda.js": {
+  "R2_radius_hard": 4,
+  "R3_palette": 10,
+  "R4_raw_btn": 4
+ },
+ "MeetingHistory.js": {
+  "R2_radius_hard": 1,
+  "R3_palette": 11
+ },
+ "MessagingPage.js": {
+  "R2_radius_hard": 7,
+  "R3_palette": 2,
+  "R4_raw_btn": 5
+ },
+ "MinutesDetailPage.js": {
+  "R1_header": 1,
+  "R2_radius_full": 4,
+  "R4_raw_btn": 1
+ },
+ "MinutesEditor.js": {
+  "R2_radius_hard": 7,
+  "R3_palette": 6
+ },
+ "MinutesPage.js": {
+  "R2_radius_full": 1,
+  "R4_raw_btn": 2,
+  "R6_confirm": 1
+ },
+ "MinutesTemplateFormPage.js": {
+  "R1_header": 1
+ },
+ "MinutesTemplatesPage.js": {
+  "R1_header": 1,
+  "R2_radius_full": 1,
+  "R4_raw_btn": 1
+ },
+ "NotFoundPage.js": {},
+ "OnboardingPage.js": {},
+ "OrgConsolePage.js": {
+  "R2_radius_full": 5,
+  "R2_radius_hard": 4,
+  "R4_raw_btn": 5,
+  "R6_confirm": 1
+ },
+ "PerformanceDashboard.js": {
+  "R1_header": 1,
+  "R2_radius_full": 1,
+  "R2_radius_hard": 9,
+  "R3_palette": 4,
+  "R4_raw_btn": 1
+ },
+ "PostCheckoutPage.js": {
+  "R2_radius_hard": 1
+ },
+ "PricingPage.js": {
+  "R1_header": 1,
+  "R2_radius_full": 16,
+  "R2_radius_hard": 6,
+  "R4_raw_btn": 8
+ },
+ "PrintableBinderPage.js": {
+  "R1_header": 1,
+  "R2_radius_hard": 3,
+  "R3_palette": 216
+ },
+ "ResetPasswordPage.js": {
+  "R4_raw_btn": 1
+ },
+ "RiskDashboardPage.js": {
+  "R4_raw_btn": 2
+ },
+ "ScheduleAPage.js": {
+  "R4_raw_btn": 1
+ },
+ "SettingsPage.js": {
+  "R2_radius_full": 2,
+  "R3_palette": 7,
+  "R4_raw_btn": 4
+ },
+ "SignUpPage.js": {},
+ "StateCompliancePage.js": {
+  "R2_radius_full": 1,
+  "R4_raw_btn": 7
+ },
+ "StatsPage.js": {
+  "R1_header": 1,
+  "R2_radius_full": 1,
+  "R4_raw_btn": 4
+ },
+ "StructuresPage.js": {
+  "R2_radius_full": 1,
+  "R2_radius_hard": 2,
+  "R4_raw_btn": 1
+ },
+ "SuccessorAccessPage.js": {
+  "R1_header": 1,
+  "R3_palette": 34
+ },
+ "SuccessorPacketPage.js": {
+  "R3_palette": 81
+ },
+ "TransactionLedgerPage.js": {
+  "R6_confirm": 1
+ },
+ "TrustAccessPage.js": {
+  "R2_radius_hard": 3
+ },
+ "TrustAccessPanel.js": {},
+ "TrustAdminKitsPage.js": {
+  "R2_radius_full": 1,
+  "R6_confirm": 1
+ },
+ "TrustAssistantPage.js": {},
+ "TrustCalendarPage.js": {
+  "R1_header": 1,
+  "R4_raw_btn": 1
+ },
+ "TrustPartyManager.js": {
+  "R1_header": 1
+ },
+ "VaultPage.js": {
+  "R1_header": 1,
+  "R2_radius_hard": 1
+ },
+ "WingPointRedirect.js": {},
+ "WingPointWelcomePage.js": {
+  "R2_radius_full": 4,
+  "R4_raw_btn": 2
+ },
+ "trustProtectorPowers.js": {}
+}

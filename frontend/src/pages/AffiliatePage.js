@@ -76,7 +76,7 @@ export default function AffiliatePage() {
       <header className="bg-navy text-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gold rounded flex items-center justify-center">
+            <div className="w-8 h-8 bg-gold flex items-center justify-center">
               <span className="text-navy font-bold text-sm">TO</span>
             </div>
             <span className="font-serif text-xl">TrustOffice</span>
@@ -92,11 +92,11 @@ export default function AffiliatePage() {
       {/* Hero Section */}
       <section id="main-content" className="bg-navy text-white py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="inline-flex items-center gap-2 bg-gold/20 text-gold px-4 py-2 rounded-full mb-6">
+          <div className="inline-flex items-center gap-2 bg-gold/20 text-gold px-4 py-2 text-xs font-mono uppercase tracking-wider mb-6">
             <Gift className="w-4 h-4" />
             <span className="text-sm font-medium">Partner Program</span>
           </div>
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl mb-6">
+          <h1 className="font-serif text-4xl md:text-5xl mb-6">
             Earn Money Promoting<br />
             <span className="text-gold">TrustOffice</span>
           </h1>
@@ -108,7 +108,7 @@ export default function AffiliatePage() {
             href="https://trustoffice.partneroapp.com/program" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-gold text-navy px-8 py-4 rounded font-semibold text-lg hover:bg-gold/90 transition-colors"
+            className="btn-gold inline-flex items-center gap-2 px-8 py-4 text-base"
             data-testid="affiliate-signup-hero-btn"
           >
             Become an Affiliate
@@ -131,9 +131,9 @@ export default function AffiliatePage() {
             {benefits.map((benefit, index) => (
               <div 
                 key={index} 
-                className="bg-white dark:bg-slate-900 p-6 rounded border border-slate-200 dark:border-slate-800 hover:shadow-lg transition-shadow"
+                className="card-trust corner-mark p-6"
               >
-                <div className="w-12 h-12 bg-navy/10 rounded flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-navy/10 flex items-center justify-center mb-4">
                   <benefit.icon className="w-6 h-6 text-navy" />
                 </div>
                 <h3 className="font-semibold text-navy text-lg mb-2">{benefit.title}</h3>
@@ -145,7 +145,7 @@ export default function AffiliatePage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 px-4 bg-slate-50 dark:bg-slate-900/50">
+      <section className="py-20 px-4 bg-navy/5">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="font-serif text-3xl md:text-4xl text-navy mb-4">How It Works</h2>
@@ -155,7 +155,7 @@ export default function AffiliatePage() {
           <div className="grid md:grid-cols-3 gap-8">
             {steps.map((step, index) => (
               <div key={index} className="text-center">
-                <div className="w-16 h-16 bg-navy text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                <div className="w-16 h-16 bg-navy text-white flex items-center justify-center font-mono text-2xl font-bold mx-auto mb-4">
                   {step.number}
                 </div>
                 <h3 className="font-semibold text-navy text-xl mb-2">{step.title}</h3>
@@ -195,7 +195,7 @@ export default function AffiliatePage() {
                 href="https://trustoffice.partneroapp.com/program" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-gold text-navy px-6 py-3 rounded font-semibold hover:bg-gold/90 transition-colors"
+                className="btn-gold inline-flex items-center gap-2 px-6 py-3"
                 data-testid="affiliate-signup-card-btn"
               >
                 Get Started
@@ -219,7 +219,7 @@ export default function AffiliatePage() {
             href="https://trustoffice.partneroapp.com/program" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-gold text-navy px-8 py-4 rounded font-semibold text-lg hover:bg-gold/90 transition-colors"
+            className="btn-gold inline-flex items-center gap-2 px-8 py-4 text-base"
             data-testid="affiliate-signup-cta-btn"
           >
             Join the Affiliate Program
@@ -232,10 +232,10 @@ export default function AffiliatePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-white py-8 px-4">
+      <footer className="bg-navy text-white py-8 px-4">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gold rounded flex items-center justify-center">
+            <div className="w-8 h-8 bg-gold flex items-center justify-center">
               <span className="text-navy font-bold text-sm">TO</span>
             </div>
             <span className="font-serif">TrustOffice</span>

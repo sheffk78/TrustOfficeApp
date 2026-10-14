@@ -321,14 +321,14 @@ export default function PricingPage() {
 
       {/* Hero */}
       <section id="main-content" className="py-16 px-8 text-center">
-        <h1 className="font-serif text-4xl md:text-5xl text-navy mb-4">
+        <h1 className="page-title mb-4">
           Trust Governance Made Simple
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
           The workspace for trustees who take their duties seriously.
         </p>
         {couponApplied && (
-          <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium">
+          <div className="inline-block bg-gold/20 text-navy px-4 py-2 text-xs font-mono uppercase tracking-wider">
             Coupon "{couponCode}" will be applied at checkout
           </div>
         )}
@@ -337,14 +337,14 @@ export default function PricingPage() {
       {/* WingPoint Welcome Banner (only when ?wp=1) */}
       {isWingPointFlow && (
         <section className="pb-6 px-8" data-testid="wp-welcome-banner">
-          <div className="max-w-3xl mx-auto bg-subtle-bg border border-border rounded-lg p-8 text-center">
+          <div className="max-w-3xl mx-auto bg-subtle-bg border border-border p-8 text-center">
             <h2 className="font-serif text-3xl text-navy mb-4" data-testid="wp-banner-headline">
               Your trust is ready. Activate it with your exclusive WingPoint plan.
             </h2>
             <p className="text-base text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
               You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. As a WingPoint customer, you get unlimited trusts at a special rate not available to the public.
             </p>
-            <div className="inline-block bg-gold/10 text-navy px-5 py-3 rounded-full text-sm font-medium mb-3">
+            <div className="inline-block bg-gold/10 text-navy px-5 py-3 text-xs font-mono uppercase tracking-wider mb-3">
               Unlimited trusts from $99/mo (annual) or $119/mo (monthly). WingPoint exclusive.
             </div>
             <p className="text-sm text-success mt-2 font-medium">
@@ -364,7 +364,7 @@ export default function PricingPage() {
               <div className="grid md:grid-cols-2 gap-8 items-stretch">
                 {/* Card 1: Trustee Plan — $99/mo, or $79/mo with annual (1 trust) */}
                 <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-bold uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     1 Trust
                   </div>
                   <div className="text-center mt-4 flex-1 flex flex-col">
@@ -375,18 +375,20 @@ export default function PricingPage() {
 
                     {/* Monthly/Annual toggle */}
                     <div className="flex justify-center mb-4">
-                      <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                      <div className="inline-flex items-center bg-subtle-bg border border-border p-1">
                         <button
                           type="button"
                           onClick={() => setTrusteePeriod('monthly')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${trusteePeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                          aria-pressed={trusteePeriod === 'monthly'}
+                          className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${trusteePeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Monthly
                         </button>
                         <button
                           type="button"
                           onClick={() => setTrusteePeriod('annual')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${trusteePeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+                          aria-pressed={trusteePeriod === 'annual'}
+                          className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${trusteePeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Annual <span className="ml-1 text-success">Save 20%</span>
                         </button>
@@ -397,7 +399,7 @@ export default function PricingPage() {
                     {trusteePeriod === 'monthly' ? (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-serif text-5xl text-navy">${TIERS.find(t => t.id === 'trustee').monthly}</span>
+                          <span className="font-mono text-5xl text-navy">${TIERS.find(t => t.id === 'trustee').monthly}</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
@@ -405,7 +407,7 @@ export default function PricingPage() {
                     ) : (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-serif text-5xl text-navy">${(TIERS.find(t => t.id === 'trustee').annual / 12).toFixed(2).replace(/\.00$/, '')}</span>
+                          <span className="font-mono text-5xl text-navy">${(TIERS.find(t => t.id === 'trustee').annual / 12).toFixed(2).replace(/\.00$/, '')}</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-success font-medium mb-1">Save 20% with annual (${TIERS.find(t => t.id === 'trustee').monthly * 12 - TIERS.find(t => t.id === 'trustee').annual}/yr)</p>
@@ -413,7 +415,7 @@ export default function PricingPage() {
                       </>
                     )}
 
-                    <div className="inline-block bg-subtle-bg border border-border text-navy px-4 py-2 rounded-full text-sm font-medium mb-6 self-center">
+                    <div className="inline-block bg-subtle-bg border border-border text-navy px-4 py-2 text-xs font-mono uppercase tracking-wider mb-6 self-center">
                       1 trust &middot; all governance tools
                     </div>
                   </div>
@@ -430,7 +432,7 @@ export default function PricingPage() {
 
                 {/* Card 2: WingPoint — $119/mo or $99/mo (unlimited trusts) */}
                 <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible flex flex-col">
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     WingPoint Exclusive
                   </div>
                   <div className="text-center mt-4 flex-1 flex flex-col">
@@ -441,18 +443,20 @@ export default function PricingPage() {
 
                     {/* Monthly/Annual toggle */}
                     <div className="flex justify-center mb-4">
-                      <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
+                      <div className="inline-flex items-center bg-subtle-bg border border-border p-1">
                         <button
                           type="button"
                           onClick={() => setWingPointPeriod('monthly')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'monthly' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
+                          aria-pressed={wingPointPeriod === 'monthly'}
+                          className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${wingPointPeriod === 'monthly' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Monthly
                         </button>
                         <button
                           type="button"
                           onClick={() => setWingPointPeriod('annual')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
+                          aria-pressed={wingPointPeriod === 'annual'}
+                          className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Annual <span className="ml-1 text-success">save $240/yr</span>
                         </button>
@@ -463,7 +467,7 @@ export default function PricingPage() {
                     {wingPointPeriod === 'monthly' ? (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-serif text-5xl text-navy">$119</span>
+                          <span className="font-mono text-5xl text-navy">$119</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
@@ -471,7 +475,7 @@ export default function PricingPage() {
                     ) : (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-serif text-5xl text-navy">$99</span>
+                          <span className="font-mono text-5xl text-navy">$99</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
@@ -479,7 +483,7 @@ export default function PricingPage() {
                     )}
 
                     {/* Savings callout — makes it clear this is the best deal */}
-                    <div className="bg-navy/5 border border-navy/10 rounded-lg p-4 mb-4 text-left">
+                    <div className="bg-navy/5 border border-navy/10 p-4 mb-4 text-left">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">Public Advisor plan</span>
                         <span className="text-sm font-mono text-muted-foreground line-through">${wingPointPeriod === 'monthly' ? '499/mo' : '4,788/yr'}</span>
@@ -494,7 +498,7 @@ export default function PricingPage() {
                       </div>
                     </div>
 
-                    <div className="inline-block bg-gold/20 text-navy px-4 py-2 rounded-full text-sm font-medium mb-6 self-center">
+                    <div className="inline-block bg-gold/20 text-navy px-4 py-2 text-xs font-mono uppercase tracking-wider mb-6 self-center">
                       Unlimited trusts &middot; {wingPointPeriod === 'annual' ? 'annual' : 'monthly'}
                     </div>
                   </div>
@@ -520,18 +524,18 @@ export default function PricingPage() {
 
               {/* "See other plans" link so users can still scroll to Estate/Advisor */}
               <div className="text-center mt-2">
-                <button
-                  type="button"
+                <Button
+                  variant="link"
                   onClick={() => {
                     if (pricingTiersRef.current) {
                       pricingTiersRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
                   }}
-                  className="text-sm text-navy hover:underline font-medium"
+                  className="h-auto p-0 text-sm text-navy font-medium"
                   data-testid="wp-see-other-plans-link"
                 >
                   See other plans
-                </button>
+                </Button>
               </div>
             </div>
           </section>
@@ -541,11 +545,12 @@ export default function PricingPage() {
       {/* Billing Period Toggle (Monthly / Annual) */}
       <section className="pb-6 px-8">
         <div className="max-w-4xl mx-auto flex flex-col items-center">
-          <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1" data-testid="billing-period-toggle">
+          <div className="inline-flex items-center bg-subtle-bg border border-border p-1" data-testid="billing-period-toggle">
             <button
               type="button"
               onClick={() => setBillingPeriod('monthly')}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${billingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+              aria-pressed={billingPeriod === 'monthly'}
+              className={`px-5 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${billingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
               data-testid="billing-period-monthly"
             >
               Monthly
@@ -553,7 +558,8 @@ export default function PricingPage() {
             <button
               type="button"
               onClick={() => setBillingPeriod('annual')}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${billingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+              aria-pressed={billingPeriod === 'annual'}
+              className={`px-5 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${billingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
               data-testid="billing-period-annual"
             >
               Annual
@@ -577,7 +583,7 @@ export default function PricingPage() {
                 data-testid={`tier-card-${tier.id}`}
               >
                 {isPopular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md whitespace-nowrap z-10">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-bold uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     Most Popular
                   </div>
                 )}
@@ -585,7 +591,7 @@ export default function PricingPage() {
                   <h2 className="font-serif text-2xl text-navy mb-2">{tier.name}</h2>
                   <p className="text-sm text-muted-foreground mb-3">{tier.tagline}</p>
                   <div className="flex items-baseline justify-center gap-1">
-                    <span className="font-serif text-5xl text-navy">${amount}</span>
+                    <span className="font-mono text-5xl text-navy">${amount}</span>
                     <span className="text-muted-foreground">{unit}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">
@@ -628,7 +634,7 @@ export default function PricingPage() {
       <section className="pb-12 px-8">
         <div className="max-w-6xl mx-auto">
           <div
-            className="p-4 border border-navy/15 bg-navy/5 rounded-lg"
+            className="p-4 border border-navy/15 bg-navy/5"
             data-testid="records-repository-note"
           >
             <p className="text-sm text-muted-foreground">
@@ -774,22 +780,23 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSu
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/60 p-4" data-testid="guest-checkout-modal">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
-        <button
+      <div className="bg-white shadow-2xl max-w-md w-full p-6 relative">
+        <Button
+          variant="ghost"
           onClick={onClose}
-          className="absolute top-3 right-3 text-muted-foreground hover:text-navy"
+          className="absolute top-2 right-2 h-8 w-8 p-0 text-muted-foreground hover:text-navy"
           aria-label="Close"
           data-testid="guest-checkout-close"
         >
           ✕
-        </button>
-        <h2 className="text-xl font-semibold text-navy">Subscribe to {planLabel}</h2>
+        </Button>
+        <h2 className="font-serif text-2xl text-navy">Subscribe to {planLabel}</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Enter your details and you'll be taken to secure Stripe checkout. Your account is created the moment your payment completes.
         </p>
         <form onSubmit={handleSubmit} className="mt-4 space-y-3" data-testid="guest-checkout-form">
           {error && (
-            <div className="p-3 bg-error/10 border border-error/20 rounded text-sm text-error" data-testid="guest-checkout-error">
+            <div className="p-3 bg-error/10 border border-error/20 text-sm text-error" data-testid="guest-checkout-error">
               {error}
             </div>
           )}
@@ -800,7 +807,7 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSu
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+              className="w-full border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
               placeholder="Jane Smith"
               autoComplete="name"
               data-testid="guest-checkout-name"
@@ -813,7 +820,7 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSu
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
+              className="w-full border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30"
               placeholder="jane@example.com"
               autoComplete="email"
               data-testid="guest-checkout-email"
@@ -822,7 +829,7 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSu
           <Button
             type="submit"
             disabled={submitting}
-            className="w-full bg-navy hover:bg-navy/90 text-white"
+            className="w-full btn-primary"
             data-testid="guest-checkout-submit"
           >
             {submitting ? 'Starting checkout…' : `Continue to ${planLabel} checkout`}
