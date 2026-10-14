@@ -46,9 +46,16 @@ WIN_CONFIRM = re.compile(r'window\.confirm')
 
 def scan_file(path: Path):
     t = path.read_text(errors="replace")
+    # Resolve PageHeader usage: pages wired to the shared component carry the
+    # header classes inside PageHeader.js, not the page file itself.
+    uses_pageheader = bool(re.search(r"\bfrom\s+'@/components/PageHeader'", t))
+    if uses_pageheader:
+        header_ref = t + "\n" + (ROOT / "frontend" / "src" / "components" / "PageHeader.js").read_text(errors="replace")
+    else:
+        header_ref = t
     v = {"R1_header": 0, "R2_radius_hard": 0, "R2_radius_full": 0, "R3_palette": 0, "R4_raw_btn": 0, "R5_tabs": 0, "R6_confirm": 0}
     if path.name not in R1_EXEMPT:
-        has_header = bool(RE_PAGE_TITLE.search(t)) and bool(RE_CONTAINER.search(t))
+        has_header = bool(RE_PAGE_TITLE.search(header_ref)) and bool(RE_CONTAINER.search(header_ref))
         if not has_header:
             v["R1_header"] = 1
     v["R2_radius_hard"] = len(RE_RADIUS_HARD.findall(t))

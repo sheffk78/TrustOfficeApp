@@ -3,7 +3,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Button } from '@/components/ui/button';
 import { FileText, ArrowRight } from 'lucide-react';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { TrustManager } from '@/components/TrustManager';
 import BankingSummaryCard from '@/components/BankingSummaryCard';
 import SpendingThresholdCard from '@/components/SpendingThresholdCard';
@@ -184,25 +184,23 @@ export default function DashboardPage() {
             dismissWpWelcome={dismissWpWelcome}
           />
 
-          {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Dashboard</h1>
-              <p className="page-subtitle">
-                {orgView
-                ? `${clientName || 'The client'}'s workspace — trust administration at a glance for ${selectedTrust?.name || orgView.trust_name || 'their trust'}`
-                : <>Trust administration at a glance — view key metrics, upcoming deadlines, and quick actions for {selectedTrust?.name || 'your trust'}</>}
-              </p>
-            </div>
-            <PageHelpButton
-              items={[
+          {/* Page Header (shared component) */}
+          <PageHeader
+            title="Dashboard"
+            subtitle={
+              orgView
+              ? `${clientName || 'The client'}'s workspace — trust administration at a glance for ${selectedTrust?.name || orgView.trust_name || 'their trust'}`
+              : <>Trust administration at a glance — view key metrics, upcoming deadlines, and quick actions for {selectedTrust?.name || 'your trust'}</>
+            }
+            help={{
+              items: [
                 { text: "View your trust's key metrics at a glance — defensibility score, upcoming deadlines, and recent activity" },
                 { text: 'Use Quick Actions to jump to common tasks like recording a distribution or adding an asset' },
                 { text: 'Complete your onboarding checklist to set up your trust profile' },
-              ]}
-              taPrompt="Walk me through the Dashboard page and what I should do first"
-            />
-          </div>
+              ],
+              taPrompt: 'Walk me through the Dashboard page and what I should do first',
+            }}
+          />
 
           {/* Trust Manager Section — shown when user has 2+ trusts.
               NEVER during an org-view session (council R3, 2026-10-09): inside a

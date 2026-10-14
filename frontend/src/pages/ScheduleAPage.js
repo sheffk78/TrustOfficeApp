@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { 
   Plus, 
   Home,
@@ -461,36 +461,29 @@ export default function ScheduleAPage() {
         
         <div className="page-container">
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Trust Assets</h1>
-              <p className="page-subtitle">Manage trust assets and corpus — add, update, or dispose of trust property with proper documentation</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Manage trust assets and corpus — the initial and current property of the trust' },
-                  { text: 'Add, update, or dispose of trust assets with proper documentation' },
-                  { text: 'Track asset values, dates, and disposition history' },
-                ]}
-                taPrompt="Walk me through the Trust Assets page and how to add an asset"
-              />
-              <Button
-                variant="outline"
-                onClick={() => navigate('/minutes/template/acceptance_of_property?from=schedule-a')}
-                data-testid="create-resolution-btn"
-                className="btn-gold"
-              >
-                <Gavel className="w-4 h-4 mr-2" />
-                Create Resolution
-              </Button>
-              <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-                <DialogTrigger asChild>
-                  <Button className="btn-primary" data-testid="add-asset-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Asset
-                  </Button>
-                </DialogTrigger>
+          {/* Page Header (shared component) — actions include a Dialog, so it
+              rides in the slot as a fragment (Dialog state stays page-level) */}
+          <PageHeader
+            title="Trust Assets"
+            subtitle="Manage trust assets and corpus — add, update, or dispose of trust property with proper documentation"
+            actions={
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/minutes/template/acceptance_of_property?from=schedule-a')}
+                  data-testid="create-resolution-btn"
+                  className="btn-gold"
+                >
+                  <Gavel className="w-4 h-4 mr-2" />
+                  Create Resolution
+                </Button>
+                <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+                  <DialogTrigger asChild>
+                    <Button className="btn-primary" data-testid="add-asset-btn">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Asset
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-lg">
                   <DialogHeader>
                     <DialogTitle className="font-serif text-xl text-navy">
@@ -612,11 +605,12 @@ export default function ScheduleAPage() {
                     </div>
                   </form>
                 </DialogContent>
-              </Dialog>
-            </div>
-          </div>
+                </Dialog>
+                </>
+                }
+                />
 
-          {/* Resolution suggestion banner — shown after a direct asset add */}
+                {/* Resolution suggestion banner — shown after a direct asset add */}
           {showResolutionPrompt && (
             <div className="card-trust p-4 mb-6 border-gold/30" data-testid="resolution-prompt-banner">
               <div className="flex items-start gap-3">
@@ -650,13 +644,16 @@ export default function ScheduleAPage() {
                     </Button>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowResolutionPrompt(false)}
                   className="text-muted-foreground hover:text-navy flex-shrink-0"
                   aria-label="Dismiss"
+                  data-testid="resolution-prompt-dismiss"
                 >
                   <X className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -11,6 +11,17 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { fetchWithAuth } from '@/utils/api';
+import Spinner from '@/components/Spinner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   Plus, 
   FileText,
@@ -20,7 +31,6 @@ import {
   ChevronRight,
   ChevronDown,
   Eye,
-  Loader2,
   Pencil,
   Trash2
 } from 'lucide-react';
@@ -61,6 +71,7 @@ export default function MinutesPage() {
   // Drafts state
   const [drafts, setDrafts] = useState([]);
   const [draftsOpen, setDraftsOpen] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null); // minutes_id pending confirmation
   const [draftsLoading, setDraftsLoading] = useState(false);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
@@ -141,11 +152,11 @@ export default function MinutesPage() {
   };
 
   const handleDeleteMinutes = async (minutesId) => {
-    if (!window.confirm('Delete this draft? This cannot be undone.')) return;
     try {
       const response = await fetchWithAuth(`/minutes/${minutesId}`, { method: 'DELETE' });
       if (response.ok) {
         toast.success('Minutes deleted.');
+        setDeleteTarget(null);
         loadMinutes(debouncedSearch);
       } else {
         const errBody = await response.json().catch(() => ({}));
@@ -225,20 +236,11 @@ export default function MinutesPage() {
         
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Minutes & Decisions</h1>
-              <p className="page-subtitle">Create, review, and manage trust meeting minutes — document decisions, track approvals, and maintain a complete fiduciary record</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Create, review, and manage trust meeting minutes for all your trust decisions' },
-                  { text: 'Filter by type, date, or search to find specific minutes quickly' },
-                  { text: 'Use the Trust Assistant to draft minutes from a natural language description' },
-                ]}
-                taPrompt="Help me understand the Minutes page and how to create trust meeting minutes"
-              />
+          {/* Page Header (shared component) */}
+          <PageHeader
+            title="Minutes & Decisions"
+            subtitle="Create, review, and manage trust meeting minutes — document decisions, track approvals, and maintain a complete fiduciary record"
+            actions={
               <Button
                 onClick={handleCreateMinutes}
                 className={`btn-primary ${isReadOnly ? 'opacity-60' : ''}`}
@@ -247,14 +249,24 @@ export default function MinutesPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Create Minutes
               </Button>
-            </div>
-          </div>
+            }
+            help={{
+              items: [
+                { text: 'Create, review, and manage trust meeting minutes for all your trust decisions' },
+                { text: 'Filter by type, date, or search to find specific minutes quickly' },
+                { text: 'Use the Trust Assistant to draft minutes from a natural language description' },
+              ],
+              taPrompt: 'Help me understand the Minutes page and how to create trust meeting minutes',
+            }}
+          />
 
           {/* Drafts Section */}
           {drafts.length > 0 && (
             <div className="card-trust mb-6">
+              {/* Collapsible header row — a selectable card control, not an action button:
+                  exempt from the no-raw-button rule (card-selectors pattern). */}
               <button
-                className="flex items-center justify-between w-full text-left"
+                className="card flex items-center justify-between w-full text-left"
                 onClick={() => setDraftsOpen(!draftsOpen)}
                 data-testid="drafts-toggle"
               >
@@ -364,18 +376,18 @@ export default function MinutesPage() {
             </div>
             <div className="flex gap-2 mt-3">
               {['all', 'meeting', 'decision', 'distribution_approval'].map((type) => (
-                  <button
+                  <Button
                     key={type}
                     onClick={() => setFilterType(type)}
                     className={`px-4 py-2 font-mono text-xs uppercase tracking-widest border ${
-                      filterType === type 
-                        ? 'bg-navy text-white border-navy' 
+                      filterType === type
+                        ? 'bg-navy text-white border-navy'
                         : 'bg-white text-navy border-navy/20 hover:border-navy'
                     }`}
                     data-testid={`filter-${type}`}
                   >
                     {type === 'all' ? 'All' : getEntryTypeLabel(type)}
-                  </button>
+                  </Button>
                 ))}
               </div>
           </div>
@@ -464,7 +476,7 @@ export default function MinutesPage() {
                               variant="ghost"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteMinutes(entry.minutes_id);
+                                setDeleteTarget(entry.minutes_id);
                               }}
                               className="text-error hover:bg-error/10 text-xs"
                               data-testid={`delete-${entry.minutes_id}`}
@@ -484,7 +496,7 @@ export default function MinutesPage() {
                             data-testid={`view-pdf-${entry.minutes_id}`}
                           >
                             {pdfLoadingId === entry.minutes_id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Spinner size={16} label="Generating PDF" />
                             ) : (
                               <>
                                 <Eye className="w-4 h-4 mr-1" />
@@ -530,6 +542,31 @@ export default function MinutesPage() {
         title="Minutes PDF Preview"
         filename={pdfPreview?.filename || 'minutes.pdf'}
       />
+
+      {/* Delete confirmation (AlertDialog per standard — no window.confirm) */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Draft Minutes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this draft? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-minutes-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="delete-minutes-confirm"
+              className="bg-error text-error-foreground hover:bg-error/90"
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteMinutes(deleteTarget);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
