@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import Spinner from '@/components/Spinner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import PageHeader from '@/components/PageHeader';
 import { Switch } from '@/components/ui/switch';
@@ -1042,11 +1043,12 @@ the user that they must review and submit the form themselves.
                               ? 'text-gold'
                               : 'text-navy/60 hover:text-navy hover:bg-navy/10'
                           }`}
+                          aria-label={sendNoticeResult[dist.distribution_id] === 'sent' ? 'Notice sent' : 'Send distribution notice to beneficiary'}
                           title={sendNoticeResult[dist.distribution_id] === 'sent' ? 'Notice sent' : 'Send distribution notice to beneficiary'}
                           data-testid={`send-notice-${dist.distribution_id}`}
                         >
                           {sendingNotice[dist.distribution_id] ? (
-                            <div className="w-4 h-4 border-2 border-navy/30 border-t-navy animate-spin" />
+                            <Spinner size={16} label="Sending notice" />
                           ) : sendNoticeResult[dist.distribution_id] === 'sent' ? (
                             <Mail className="w-4 h-4" />
                           ) : (
@@ -1064,6 +1066,7 @@ the user that they must review and submit the form themselves.
                                 onClick={() => handleUpdateStatus(dist.distribution_id, 'approved')}
                                 className="p-1 hover:bg-success/10 text-success"
                                 title="Approve"
+                                aria-label="Approve distribution"
                                 data-testid={`approve-${dist.distribution_id}`}
                               >
                                 <Check className="w-4 h-4" />
@@ -1074,6 +1077,7 @@ the user that they must review and submit the form themselves.
                                 onClick={() => handleUpdateStatus(dist.distribution_id, 'declined')}
                                 className="p-1 hover:bg-error/10 text-error"
                                 title="Decline"
+                                aria-label="Decline distribution"
                                 data-testid={`decline-${dist.distribution_id}`}
                               >
                                 <X className="w-4 h-4" />
@@ -1087,6 +1091,7 @@ the user that they must review and submit the form themselves.
                               onClick={() => handleUpdateStatus(dist.distribution_id, 'review')}
                               className="p-1 hover:bg-warning/10 text-warning"
                               title="Set to Review"
+                              aria-label="Set distribution to review"
                             >
                               <Clock className="w-4 h-4" />
                             </Button>
@@ -1106,6 +1111,7 @@ the user that they must review and submit the form themselves.
                             onClick={() => handleDeleteClick(dist)}
                             className="p-1 hover:bg-error/10 text-error"
                             title="Delete distribution"
+                            aria-label="Delete distribution"
                             data-testid={`delete-${dist.distribution_id}`}
                           >
                             <Trash2 className="w-4 h-4" />

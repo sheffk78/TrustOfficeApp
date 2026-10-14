@@ -27,9 +27,10 @@ import PageHeader from '@/components/PageHeader';
 import {
   TrendingUp, Plus, Wallet, Building2, Landmark,
   ArrowUpRight, Coins, Home, Activity, ChevronRight,
-  Trash2, Pencil, Loader2, BarChart3
+  Trash2, Pencil, BarChart3
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Spinner from '@/components/Spinner';
 
 const ASSET_TYPE_ICONS = {
   stock: TrendingUp,
@@ -336,13 +337,13 @@ export default function InvestmentsPage({ tab, onTabChange }) {
                 <h3 className="font-semibold text-navy mb-3">Record New Investment</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                   <Input placeholder="Asset name (e.g. Apple, S&P 500 ETF)" value={form.asset_name} onChange={e => setForm({ ...form, asset_name: e.target.value })} />
-                  <select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} className="input-trust">
+                  <select value={form.asset_type} onChange={e => setForm({ ...form, asset_type: e.target.value })} className="input-trust" aria-label="Asset type">
                     {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <Input type="number" placeholder="Cost basis ($)" value={form.cost_basis} onChange={e => setForm({ ...form, cost_basis: e.target.value })} />
                   <Input type="number" placeholder="Current value ($)" value={form.current_value} onChange={e => setForm({ ...form, current_value: e.target.value })} />
                   <Input placeholder="Quantity" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
-                  <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="input-trust">
+                  <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="input-trust" aria-label="Unit">
                     <option value="shares">Shares</option>
                     <option value="units">Units</option>
                     <option value="coins">Coins</option>
@@ -431,7 +432,7 @@ export default function InvestmentsPage({ tab, onTabChange }) {
             </div>
             <div>
               <label className="label-trust">Asset Type</label>
-              <select value={editForm.asset_type} onChange={e => setEditForm({ ...editForm, asset_type: e.target.value })} className="input-trust w-full">
+              <select value={editForm.asset_type} onChange={e => setEditForm({ ...editForm, asset_type: e.target.value })} className="input-trust w-full" aria-label="Asset type">
                 {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
@@ -451,7 +452,7 @@ export default function InvestmentsPage({ tab, onTabChange }) {
             </div>
             <div>
               <label className="label-trust">Unit</label>
-              <select value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} className="input-trust w-full">
+              <select value={editForm.unit} onChange={e => setEditForm({ ...editForm, unit: e.target.value })} className="input-trust w-full" aria-label="Unit">
                 <option value="shares">Shares</option>
                 <option value="units">Units</option>
                 <option value="coins">Coins</option>
@@ -477,7 +478,7 @@ export default function InvestmentsPage({ tab, onTabChange }) {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowEdit(false)} className="btn-secondary flex-1">Cancel</Button>
               <Button onClick={handleEditSave} disabled={savingEdit} className="btn-primary flex-1" data-testid="edit-inv-submit">
-                {savingEdit ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Changes'}
+                {savingEdit ? <><Spinner size={16} className="mr-2" /> Saving...</> : 'Save Changes'}
               </Button>
             </div>
           </div>

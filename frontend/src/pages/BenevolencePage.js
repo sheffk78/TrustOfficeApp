@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import Spinner from '@/components/Spinner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -34,7 +35,6 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Loader2,
   Filter,
   X,
   MoreVertical,
@@ -618,7 +618,7 @@ export default function BenevolencePage({ tab, onTabChange }) {
                         Cancel
                       </Button>
                       <Button type="submit" disabled={formLoading} className="btn-primary" data-testid="submit-grant-btn">
-                        {formLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                        {formLoading ? <Spinner size={16} className="mr-2" /> : null}
                         Record Grant
                       </Button>
                     </DialogFooter>
@@ -768,7 +768,7 @@ export default function BenevolencePage({ tab, onTabChange }) {
 
             {loading ? (
               <div className="p-8 text-center">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-navy" />
+                <Spinner size={32} label="Loading benevolence data" className="mx-auto mb-4" />
                 <p className="label-trust">Loading benevolence records...</p>
               </div>
             ) : filteredRecords.length === 0 ? (
@@ -854,7 +854,7 @@ export default function BenevolencePage({ tab, onTabChange }) {
                             title="Delete record"
                           >
                             {deletingId === record.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Spinner size={16} />
                             ) : (
                               <Trash2 className="w-4 h-4" />
                             )}
@@ -1018,7 +1018,7 @@ export default function BenevolencePage({ tab, onTabChange }) {
                 Cancel
               </Button>
               <Button type="submit" disabled={formLoading} className="btn-primary" data-testid="submit-edit-btn">
-                {formLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {formLoading ? <Spinner size={16} className="mr-2" /> : null}
                 Save Changes
               </Button>
             </DialogFooter>
