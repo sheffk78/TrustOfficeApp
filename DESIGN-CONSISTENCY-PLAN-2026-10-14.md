@@ -70,6 +70,7 @@ Pages are audited **individually**, grouped into waves by page type so similar f
 12. Mobile: reachable via bottom nav, no overlap with nav, forms scroll clean; focus-visible + aria-labels on nav/icon buttons
 
 ### Step 3 — Verification (multi-perspective, per AGENTS.md)
+- **Jeff review packet (standing directive 2026-10-14, msg 1559987891785044152):** every change batch ends with a visual packet before it counts as done — numbered BEFORE/AFTER PNGs (desktop + mobile 390px), copied to `~/Documents/Deliverables/` (Finder-revealed) with a copy in `qa-reports/`, attached in Discord, plus click-through URLs while the dev server is up. No wave closes without Jeff able to see the pages.
 - **Dev:** ratchet gate green, `craco test` suites pass, no console errors on page load
 - **Human/desktop:** screenshot review of every page after its wave — before/after pairs
 - **Mobile:** 390px captures per page; tap-path check of primary actions
