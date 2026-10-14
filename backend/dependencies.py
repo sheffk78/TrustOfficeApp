@@ -418,6 +418,10 @@ class Feature:
     # CLIENT_VIEW ("client_view") RETIRED 2026-09-23 per TRUST-PARTY-ACCESS-DESIGN §6:
     # dead flag removed; advisor read access is enforced through trust-party
     # grants (level=viewer) behind TOGGLE_TRUST_PARTIES instead.
+    # CLIENT_ACCESS Grants re-introduced 2026-10-14 (Jeff decision): the
+    # org-grant feature (TrustAccessPage -> /trusts/{id}/org-grants) is an
+    # Estate/Advisor capability. Trustee keeps self-serve records only.
+    CLIENT_ACCESS_GRANTS = "client_access_grants"
     WHITE_LABEL_BINDER = "white_label"    # White-label PDF binder export
     MULTI_SIGNATURE = "multi_signature"   # Multi-signature approvals
 
@@ -457,6 +461,9 @@ PLAN_FEATURES = {
         Feature.TRUST_UNITS,
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
+        # Grandfathered parity: legacy monthly bills at estate-equivalent
+        # rates; keep parity with estate features (2026-10-14 re-tier).
+        Feature.CLIENT_ACCESS_GRANTS,
     },
     "annual": {
         # Same as monthly (legacy)
@@ -472,6 +479,7 @@ PLAN_FEATURES = {
         Feature.TRUST_UNITS,
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
+        Feature.CLIENT_ACCESS_GRANTS,
     },
     # New 3-tier system
     "trustee": {
@@ -501,6 +509,7 @@ PLAN_FEATURES = {
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
         Feature.MULTIPLE_TRUSTS,
+        Feature.CLIENT_ACCESS_GRANTS,
     },
     "advisor": {
         # Everything in estate + advisor-exclusive features
@@ -515,6 +524,7 @@ PLAN_FEATURES = {
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
         Feature.MULTIPLE_TRUSTS,
+        Feature.CLIENT_ACCESS_GRANTS,
         Feature.WHITE_LABEL_BINDER,
         Feature.MULTI_SIGNATURE,
     },
@@ -531,6 +541,7 @@ PLAN_FEATURES = {
         Feature.GOVERNANCE_HISTORY,
         Feature.ADVANCED_TEMPLATES,
         Feature.MULTIPLE_TRUSTS,
+        Feature.CLIENT_ACCESS_GRANTS,
     },
     "forever_free": {
         # Free tier — core trust management, up to 10 trusts.
@@ -1511,6 +1522,10 @@ async def require_org_grant(
     min_level = min_level or _GrantLevel.viewer
     if not _toggle_institution():
         return user  # D8 short-circuit: byte-identical legacy behavior
+    # NOTE: deliberately NO plan gate here. require_org_grant runs on ~19 owner
+    # write paths (distributions, minutes, schedule-a, successor, kits) where a
+    # Trustee-plan owner passes as "owner". The Estate/Advisor tier gate lives
+    # on grant CREATION only (orgs.grant_trust_access) — see _ensure_client_access_plan.
     trust = await db.trusts.find_one({"trust_id": trust_id})
     if trust and trust.get("user_id") == user["user_id"]:
         return user  # owner always passes

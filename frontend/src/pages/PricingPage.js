@@ -63,8 +63,7 @@ const TIERS = [
       'PDF export with watermark control',
       'Defensibility scoring',
       'Email notifications',
-      'Benevolence mode for charitable trusts',
-      'Client Access: grant your professional view access on your terms — time-boxed, revocable anytime'
+      'Benevolence mode for charitable trusts'
     ]
   },
   {
@@ -122,7 +121,7 @@ const COMPARISON_ROWS = [
   { label: 'Benevolence mode for charitable trusts', trustee: true, estate: true, advisor: true },
   { label: 'Multi-trust dashboard', trustee: false, estate: true, advisor: true },
   { label: 'Recurring task automation', trustee: false, estate: true, advisor: true },
-  { label: 'Client Access (grant view access on your terms, revocable anytime)', trustee: true, estate: true, advisor: true },
+  { label: 'Client Access (grant view access to your fiduciary organization, revocable anytime)', trustee: false, estate: true, advisor: true },
   { label: 'Org Console (all client trusts in one view)', trustee: false, estate: false, advisor: true },
   { label: 'Priority email support', trustee: false, estate: false, advisor: true },
 ];

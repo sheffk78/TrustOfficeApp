@@ -972,6 +972,16 @@ class TestFixPassDBAttribution:
         assert "attribution" not in doc  # additive-only: field absent, not empty
 
 
+async def _seed_plan(user, plan_type="estate", status="active"):
+    """Seed an active subscription for a user (plan gate needs a real doc)."""
+    await db.subscriptions.replace_one(
+        {"user_id": user["user_id"]},
+        {"subscription_id": f"sub_{user['user_id']}", "user_id": user["user_id"],
+         "plan_type": plan_type, "status": status, "created_at": _now(), "updated_at": _now()},
+        upsert=True,
+    )
+
+
 # ======================================================================
 # D4 hardening (2026-09-24): grant-create FK validation
 # ======================================================================
@@ -982,6 +992,7 @@ class TestGrantCreateFKValidation:
         """POST /trusts/{tid}/org-grants with a nonexistent org_id → 422 org_not_found."""
         os.environ["TOGGLE_INSTITUTION"] = "1"
         owner = await _seed_user("fkv_owner@example.com", "Owner")
+        await _seed_plan(owner)  # Estate plan: passes the client-access tier gate
         trust = await _seed_trust(owner)
         from routers.orgs import grant_trust_access
         from models import TrustGrantCreate, GrantLevel
@@ -1004,6 +1015,7 @@ class TestGrantCreateFKValidation:
         """POST with real org but bogus member_id → 422 member_not_in_org."""
         os.environ["TOGGLE_INSTITUTION"] = "1"
         owner = await _seed_user("fkv_owner2@example.com", "Owner")
+        await _seed_plan(owner)  # Estate plan: passes the client-access tier gate
         trust = await _seed_trust(owner)
         org_id = "org_fkv1"
         await db.orgs.insert_one({"org_id": org_id, "name": "FKV Org", "owner_user_id": owner["user_id"], "created_at": _now()})
@@ -1030,6 +1042,7 @@ class TestGrantCreateFKValidation:
         """POST with real org + active member → grant created with clean FKs."""
         os.environ["TOGGLE_INSTITUTION"] = "1"
         owner = await _seed_user("fkv_owner3@example.com", "Owner")
+        await _seed_plan(owner)  # Estate plan: passes the client-access tier gate
         trust = await _seed_trust(owner)
         org_id = "org_fkv2"
         mem_id = "mem_fkv2"
@@ -1054,6 +1067,132 @@ class TestGrantCreateFKValidation:
         assert grant.org_id == org_id
         assert grant.member_id == mem_id
         assert grant.status == "active"
+
+
+# ======================================================================
+# Client Access tier gate (2026-10-14 Jeff re-tier decision):
+# grants are Estate/Advisor; Trustee + free get 402 plan_upgrade_required.
+# Revoke/list stay ungated (safety valve + read-only convenience).
+# ======================================================================
+
+class TestClientAccessTierGate:
+    @pytest.mark.asyncio
+    async def test_trustee_plan_grant_rejected_402(self, seeded_db):
+        """Trustee-plan owner (not an org member anywhere) granting → 402 plan_upgrade_required."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("tier_trustee@example.com", "TOwner")
+        await _seed_plan(owner, plan_type="trustee")
+        trust = await _seed_trust(owner)
+        # Owner is deliberately NOT an org member — bare trustee account.
+        org_id, mem_id = "org_tier1", "mem_tier1"
+        await db.orgs.insert_one({"org_id": org_id, "name": "Org t1", "owner_user_id": "someone_else", "created_at": _now()})
+        await db.org_members.insert_one({
+            "member_id": mem_id, "org_id": org_id, "user_id": "someone_else",
+            "email": "someone_else@example.com", "name": "Other",
+            "role": "owner", "status": "active",
+            "invited_at": _now(), "invited_by": "someone_else", "joined_at": _now(),
+        })
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        from fastapi import HTTPException
+        body = TrustGrantCreate(
+            org_id=org_id, member_id=mem_id, level=GrantLevel.viewer,
+            expires_at=_future(30), attested_delegation=True, attestation_ref="tier-1",
+        )
+        with pytest.raises(HTTPException) as exc:
+            await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert exc.value.status_code == 402
+        assert exc.value.detail["code"] == "plan_upgrade_required"
+        # Nothing written
+        assert await db.trust_grants.count_documents({"trust_id": trust["trust_id"]}) == 0
+
+    @pytest.mark.asyncio
+    async def test_estate_plan_grant_allowed(self, seeded_db):
+        """Estate-plan owner granting → grant created."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("tier_estate@example.com", "EOwner")
+        await _seed_plan(owner, plan_type="estate")
+        trust = await _seed_trust(owner)
+        org_id, mem_id = "org_tier2", "mem_tier2"
+        await _seed_org_with_member(owner, org_id, mem_id)
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        body = TrustGrantCreate(
+            org_id=org_id, member_id=mem_id, level=GrantLevel.viewer,
+            expires_at=_future(30), attested_delegation=True, attestation_ref="tier-2",
+        )
+        grant = await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert grant.status == "active"
+
+    @pytest.mark.asyncio
+    async def test_no_plan_owner_rejected_402(self, seeded_db):
+        """Owner with no subscription doc (defensive fallback) → 402."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("tier_noplan@example.com", "NOwner")
+        trust = await _seed_trust(owner)
+        # Owner is deliberately NOT an org member — bare account with no plan.
+        org_id, mem_id = "org_tier3", "mem_tier3"
+        await db.orgs.insert_one({"org_id": org_id, "name": "Org t3", "owner_user_id": "someone_else3", "created_at": _now()})
+        await db.org_members.insert_one({
+            "member_id": mem_id, "org_id": org_id, "user_id": "someone_else3",
+            "email": "someone_else3@example.com", "name": "Other",
+            "role": "owner", "status": "active",
+            "invited_at": _now(), "invited_by": "someone_else3", "joined_at": _now(),
+        })
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        from fastapi import HTTPException
+        body = TrustGrantCreate(
+            org_id=org_id, member_id=mem_id, level=GrantLevel.viewer,
+            expires_at=_future(30), attested_delegation=True, attestation_ref="tier-3",
+        )
+        with pytest.raises(HTTPException) as exc:
+            await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert exc.value.status_code == 402
+
+    @pytest.mark.asyncio
+    async def test_org_member_owner_bypasses_plan_gate(self, seeded_db):
+        """Granted-side org member passes the tier gate even on a bare plan."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("tier_member@example.com", "MOwner")
+        trust = await _seed_trust(owner)  # no subscription doc
+        org_id, mem_id = "org_tier4", "mem_tier4"
+        await db.orgs.insert_one({"org_id": org_id, "name": "Org t4", "owner_user_id": owner["user_id"], "created_at": _now()})
+        await db.org_members.insert_one({
+            "member_id": mem_id, "org_id": org_id, "user_id": owner["user_id"],
+            "email": owner["email"], "name": owner["name"],
+            "role": "owner", "status": "active",
+            "invited_at": _now(), "invited_by": owner["user_id"], "joined_at": _now(),
+        })
+        from routers.orgs import grant_trust_access
+        from models import TrustGrantCreate, GrantLevel
+        body = TrustGrantCreate(
+            org_id=org_id, member_id=mem_id, level=GrantLevel.viewer,
+            expires_at=_future(30), attested_delegation=True, attestation_ref="tier-4",
+        )
+        grant = await grant_trust_access(trust["trust_id"], body, user=owner)
+        assert grant.status == "active"
+
+    @pytest.mark.asyncio
+    async def test_trustee_owner_can_revoke_grant(self, seeded_db):
+        """Safety valve: even a gate-failing plan can REVOKE existing grants."""
+        os.environ["TOGGLE_INSTITUTION"] = "1"
+        owner = await _seed_user("tier_revoke@example.com", "ROwner")
+        trust = await _seed_trust(owner)
+        org_id, mem_id = "org_tier5", "mem_tier5"
+        await _seed_org_with_member(owner, org_id, mem_id)
+        grant_doc = {
+            "grant_id": "grant_tier5", "trust_id": trust["trust_id"],
+            "org_id": org_id, "member_id": mem_id, "level": "viewer",
+            "status": "active", "granted_by": owner["user_id"], "granted_at": _now(),
+            "expires_at": _future(30), "attestation_ref": "tier-5",
+            "client_notified_at": None, "revoked_at": None, "revoke_reason": None,
+            "revoke_token": "tok5", "revoke_token_expires_at": _future(30),
+        }
+        await db.trust_grants.insert_one(grant_doc)
+        from routers.orgs import revoke_trust_grant
+        result = await revoke_trust_grant(trust["trust_id"], "grant_tier5", user=owner)
+        assert result is not None
 
 
 async def _seed_org_with_member(owner, org_id, mem_id, role="owner"):

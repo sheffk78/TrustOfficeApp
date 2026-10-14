@@ -83,7 +83,7 @@ export const UpgradeModal = ({
   const features = [
     'Unlimited minutes and distributions',
     'Governance health tracking',
-    'Client Access: grant view access on your terms — time-boxed, revocable anytime',
+    'Client Access: grant view access to your fiduciary organization — time-boxed, revocable anytime',
     'PDF exports and reports',
     'All document templates',
     'Priority email support'

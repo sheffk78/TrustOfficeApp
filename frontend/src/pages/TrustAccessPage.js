@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { fetchWithAuth } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
+import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { showError, humanizeErrorCode } from '@/utils/errors';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -31,7 +32,8 @@ const fmtDate = (iso) => {
 };
 
 export default function TrustAccessPage() {
-  const { selectedTrust, trusts } = useAuth();
+  const { selectedTrust, trusts, subscription, user } = useAuth();
+  const { showUpgradeModal } = useUpgradeModal();
   const [loading, setLoading] = useState(true);
   const [orgs, setOrgs] = useState([]);
   const [grants, setGrants] = useState([]);
@@ -47,6 +49,17 @@ export default function TrustAccessPage() {
 
   const trustId = selectedTrust?.trust_id;
   const isOwner = Boolean(selectedTrust);
+
+  // Plan gate (2026-10-14 Jeff re-tier decision): Client Access grants are an
+  // Estate/Advisor capability — not Trustee, not free. Server enforces the
+  // same rule with 402; this renders a clean upgrade screen instead of a
+  // dead-end page. Admins and granted-side org members always pass.
+  const normalizeTier = (planType) => (planType === 'monthly' || planType === 'annual' ? 'trustee' : planType);
+  const planTier = normalizeTier(subscription?.plan_type);
+  const planAllowsClientAccess = ['estate', 'advisor', 'wingpoint'].includes(planTier);
+  const planGateResolved = !subscription || ['estate', 'advisor', 'wingpoint', 'trustee', 'free', 'forever_free', 'trial', 'none'].includes(planTier);
+  const isAdmin = user?.is_admin || user?.email?.toLowerCase() === 'contact@trustoffice.app';
+  const showPlanUpgrade = !subscription?.is_read_only && planGateResolved && !isAdmin && !planAllowsClientAccess;
 
   const load = useCallback(async () => {
     if (!trustId) { setLoading(false); return; }
@@ -143,6 +156,39 @@ export default function TrustAccessPage() {
       setRevoking(null);
     }
   };
+
+  if (showPlanUpgrade) {
+    return (
+      <div className="main-layout" data-testid="trust-access-page">
+        <Sidebar />
+        <main className="main-content dot-grid">
+          <div className="page-container">
+            <div className="page-header">
+              <div>
+                <h1 className="page-title">Trust Access</h1>
+                <p className="page-subtitle">Part of the Estate and Advisor plans.</p>
+              </div>
+            </div>
+            <div className="card-trust mt-4 py-10 text-center" data-testid="trust-access-plan-upgrade">
+              <KeyRound className="w-10 h-10 text-navy/30 mx-auto mb-3" />
+              <h2 className="font-serif text-xl text-navy mb-2">Client Access is an Estate &amp; Advisor feature</h2>
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Grant your fiduciary organization time-boxed, revocable access to this trust —
+                with an audit trail and email notices. Available on the Estate and Advisor plans.
+              </p>
+              <Button
+                className="btn-primary inline-block"
+                data-testid="trust-access-upgrade-btn"
+                onClick={() => showUpgradeModal('use Client Access', 'plan_gate', 'trust_access_page')}
+              >
+                View upgrade options
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!trustId) {
     return (

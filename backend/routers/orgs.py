@@ -16,7 +16,31 @@ from database import db
 from dependencies import (
     get_current_user, _toggle_institution, _level_rank,
     require_org_grant, _active_member_ids,
+    check_feature_access, Feature,
 )
+
+
+async def _ensure_client_access_plan(user: dict):
+    """Plan gate for org-grant endpoints (2026-10-14 Jeff re-tier decision).
+
+    Client Access grants are Estate/Advisor/WingPoint/legacy-parity features.
+    Admins and org members (acting from the granted side) always pass.
+    Raises 402 plan_upgrade_required for trustee/free plans.
+    """
+    if user.get("is_admin"):
+        return
+    if await _active_member_ids(user):
+        return  # granted-side member path
+    if not await check_feature_access(user["user_id"], Feature.CLIENT_ACCESS_GRANTS):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "plan_upgrade_required",
+                "feature": "client_access_grants",
+                "message": "Client Access is available on the Estate and Advisor plans.",
+                "upgrade_url": "/settings/billing",
+            },
+        )
 from services.security_events import record_security_event
 from models import (
     OrgCreate, OrgResponse, OrgMemberRole, OrgMember,
@@ -375,6 +399,7 @@ async def grant_trust_access(
     """Grant org member access to a trust. Trust owner only (D4). Requires attestation (D6). Fires notice email (D7)."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    await _ensure_client_access_plan(user)
     trust = await db.trusts.find_one({"trust_id": trust_id})
     if not trust or trust.get("user_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail={"code": "owner_only"})
@@ -483,6 +508,8 @@ async def revoke_trust_grant(
     """Revoke a grant. Owner or the granted member themselves."""
     if not _toggle_institution():
         raise HTTPException(status_code=404, detail={"code": "feature_disabled"})
+    # Deliberately NO plan gate on revoke (or list): revocation is the safety
+    # valve — a downgraded Trustee must always be able to pull access back.
     grant = await db.trust_grants.find_one({"grant_id": grant_id, "trust_id": trust_id})
     if not grant:
         raise HTTPException(status_code=404, detail="Grant not found")

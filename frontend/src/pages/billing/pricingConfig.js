@@ -15,7 +15,6 @@ export const TIERS = [
       '1 trust record',
       'Governance health tracking',
       'Minutes & distribution management',
-      'Client Access: grant your professional view access on your terms — time-boxed, revocable anytime',
       'PDF generation',
       'CSV data export',
       'Priority support'
@@ -36,7 +35,7 @@ export const TIERS = [
       'Multi-trust dashboard',
       'Recurring task automation',
       'Minutes & distribution management',
-      'Client Access: grant your professional view access on your terms — time-boxed, revocable anytime',
+      'Client Access: grant view access to your fiduciary organization — time-boxed, revocable anytime',
       'PDF generation & CSV export'
     ]
   },
