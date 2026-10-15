@@ -31,8 +31,10 @@ R1_EXEMPT = {
     "ResetPasswordPage.js", "AcceptInvitePage.js", "AuthCallback.js",
     "PostCheckoutPage.js", "NotFoundPage.js", "OnboardingPage.js",
     "ExternalRedirect.js", "WingPointRedirect.js", "WingPointWelcomePage.js",
-    "ConnectWingPoint.js", "TrustAccessPanel.js", "trustProtectorPowers.js",
+    "ConnectWingPoint.js", "trustProtectorPowers.js",
     "SuccessorAccessPage.js",  # public token-gated route — centered layout intentional (Wave 4 audit F14)
+    "TrustAccessPanel.js",     # Wave 5: 12-line superseded stub, zero imports anywhere — unreachable
+    # (TrustAccessPage.js REMOVED from exemption in Wave 5 — logged-in shell route, migrated to PageHeader)
 }
 
 RE_PAGE_TITLE = re.compile(r'\bpage-title\b')

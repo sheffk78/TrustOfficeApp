@@ -17,6 +17,7 @@ import { fetchWithAuth } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { showError, humanizeErrorCode } from '@/utils/errors';
+import PageHeader from '@/components/PageHeader';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Shield, KeyRound, Trash2, RefreshCw, Calendar } from 'lucide-react';
@@ -163,12 +164,10 @@ export default function TrustAccessPage() {
         <Sidebar />
         <main className="main-content dot-grid">
           <div className="page-container">
-            <div className="page-header">
-              <div>
-                <h1 className="page-title">Trust Access</h1>
-                <p className="page-subtitle">Part of the Estate and Advisor plans.</p>
-              </div>
-            </div>
+            <PageHeader
+              title="Trust Access"
+              subtitle="Part of the Estate and Advisor plans."
+            />
             <div className="card-trust mt-4 py-10 text-center" data-testid="trust-access-plan-upgrade">
               <KeyRound className="w-10 h-10 text-navy/30 mx-auto mb-3" />
               <h2 className="font-serif text-xl text-navy mb-2">Client Access is an Estate &amp; Advisor feature</h2>
@@ -226,22 +225,28 @@ export default function TrustAccessPage() {
       <Sidebar />
       <main className="main-content dot-grid">
         <div className="page-container">
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Trust Access</h1>
-              <p className="page-subtitle">
-                Control which fiduciaries can act on <strong>{selectedTrust?.name || selectedTrust?.trust_name || 'this trust'}</strong> — and take access back any time.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="btn-secondary" onClick={load} data-testid="refresh-btn">
-                <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-              </Button>
-              <Button className="btn-primary" onClick={() => setGrantOpen(true)} data-testid="grant-access-btn">
-                <KeyRound className="w-4 h-4 mr-2" /> Grant Access
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Trust Access"
+            subtitle={`Control which fiduciaries can act on ${selectedTrust?.name || selectedTrust?.trust_name || 'this trust'} — and take access back any time.`}
+            help={{
+              items: [
+                { text: 'Grant your fiduciary organization scoped, time-boxed access to this trust' },
+                { text: 'Pick the access level — view-only or prepare-minutes — and choose who receives it' },
+                { text: 'Every grant is logged, notices you by email, and can be revoked instantly' },
+              ],
+              taPrompt: 'Help me understand Trust Access and client portals',
+            }}
+            actions={
+              <div className="flex gap-3">
+                <Button variant="outline" className="btn-secondary" onClick={load} data-testid="refresh-btn">
+                  <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+                </Button>
+                <Button className="btn-primary" onClick={() => setGrantOpen(true)} data-testid="grant-access-btn">
+                  <KeyRound className="w-4 h-4 mr-2" /> Grant Access
+                </Button>
+              </div>
+            }
+          />
 
           <Card className="card-trust mb-6">
             <CardContent className="pt-6">
@@ -343,7 +348,7 @@ export default function TrustAccessPage() {
               <Label htmlFor="grant-member">Which team member gets access</Label>
               <select
                 id="grant-member"
-                className="w-full mt-2 p-2 rounded-md border border-border bg-background text-sm"
+                className="input-trust w-full mt-2 p-2 text-sm"
                 value={memberIdInput}
                 onChange={e => setMemberIdInput(e.target.value)}
                 data-testid="member-select"
@@ -364,7 +369,7 @@ export default function TrustAccessPage() {
               <Label className="text-sm text-navy">Access level</Label>
               <div className="grid grid-cols-1 gap-2 mt-2">
                 {LEVELS.map(l => (
-                  <label key={l.id} className={`flex items-start gap-2 p-3 rounded-md border cursor-pointer ${level === l.id ? 'border-primary bg-accent/40' : 'border-border'}`}>
+                  <label key={l.id} className={`flex items-start gap-2 p-3 border cursor-pointer ${level === l.id ? 'border-primary bg-accent/40' : 'border-border'}`}>
                     <input type="radio" name="level" value={l.id} checked={level === l.id} onChange={() => setLevel(l.id)} className="mt-1" data-testid={`level-${l.id}`} />
                     <span>
                       <span className="text-sm font-medium text-navy">{l.label}</span>
@@ -377,7 +382,7 @@ export default function TrustAccessPage() {
             <div>
               <Label className="text-sm text-navy">Expires after</Label>
               <select
-                className="w-full mt-2 p-2 rounded-md border border-border bg-background text-sm"
+                className="input-trust w-full mt-2 p-2 text-sm"
                 value={months} onChange={e => setMonths(e.target.value)} data-testid="expiry-select"
               >
                 <option value="1">1 month</option>

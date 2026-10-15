@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth, API } from '@/utils/api';
 import {
@@ -13,7 +14,6 @@ import {
   Clock,
   BookOpen,
   FileText,
-  Loader2,
   Sparkles,
 } from 'lucide-react';
 
@@ -76,22 +76,28 @@ export default function CoursePage() {
 
   if (loading) {
     return (
-      <div className="flex">
+      <div className="main-layout">
         <Sidebar />
-        <main className="flex-1 flex items-center justify-center min-h-screen lg:ml-64 pt-16 lg:pt-0">
-          <Loader2 className="w-8 h-8 animate-spin text-navy" />
+        <main className="main-content dot-grid mobile-layout-offset">
+          <div className="page-container flex items-center justify-center py-20">
+            <Spinner label="Loading course" />
+          </div>
         </main>
+        <MobileBottomNav />
       </div>
     );
   }
 
   if (!curriculum) {
     return (
-      <div className="flex">
+      <div className="main-layout">
         <Sidebar />
-        <main className="flex-1 flex items-center justify-center min-h-screen lg:ml-64 pt-16 lg:pt-0">
-          <p className="text-muted-foreground">Unable to load course. Please try again later.</p>
+        <main className="main-content dot-grid mobile-layout-offset">
+          <div className="page-container flex items-center justify-center py-20">
+            <p className="text-muted-foreground">Unable to load course. Please try again later.</p>
+          </div>
         </main>
+        <MobileBottomNav />
       </div>
     );
   }
@@ -100,28 +106,23 @@ export default function CoursePage() {
   const completedLessons = lessons.filter((l) => canAccessLesson(l)).length;
 
   return (
-    <div className="flex">
+    <div className="main-layout">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0">
-        <div className="main-content dot-grid mobile-layout-offset">
-          <div className="page-container">
-            {/* Page Header */}
-            <div className="page-header flex items-center justify-between">
-              <div>
-                <h1 className="page-title">{course}</h1>
-                <p className="page-subtitle">{tagline}</p>
-              </div>
-              <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-                <PageHelpButton
-                  items={[
-                    { text: `${course} — a guided video course for trustees (${lessons.length} lessons)` },
-                    { text: `Watch lessons in order; ${free_lessons.length} are free and the rest unlock with a subscription` },
-                    { text: 'Each lesson includes a downloadable PDF worksheet where noted' },
-                  ]}
-                  taPrompt={`Walk me through the ${course} course page and how to watch the lessons`}
-                />
-              </div>
-            </div>
+      <main className="main-content dot-grid mobile-layout-offset">
+        <div className="page-container">
+          {/* Page Header */}
+          <PageHeader
+            title={course}
+            subtitle={tagline}
+            help={{
+              items: [
+                { text: `${course} — a guided video course for trustees (${lessons.length} lessons)` },
+                { text: `Watch lessons in order; ${free_lessons.length} are free and the rest unlock with a subscription` },
+                { text: 'Each lesson includes a downloadable PDF worksheet where noted' },
+              ],
+              taPrompt: `Walk me through the ${course} course page and how to watch the lessons`,
+            }}
+          />
 
             {/* Course stats */}
             <div className="flex flex-wrap items-center gap-4 mb-6 text-sm">
@@ -219,7 +220,7 @@ export default function CoursePage() {
                           ? 'border-gold bg-gold/5'
                           : accessible
                           ? 'border-navy/20 bg-white hover:border-navy/30 hover:bg-navy/5'
-                          : 'border-navy/20 bg-slate-50 cursor-not-allowed opacity-60'
+                          : 'border-navy/20 bg-navy/5 cursor-not-allowed opacity-60'
                       }`}
                     >
                       {/* Lesson Number / Icon */}
@@ -229,7 +230,7 @@ export default function CoursePage() {
                             ? 'bg-gold text-navy'
                             : accessible
                             ? 'bg-navy/10 text-navy'
-                            : 'bg-slate-200 text-slate-400'
+                            : 'bg-navy/10 text-muted-foreground'
                         }`}
                       >
                         {accessible ? (
@@ -247,7 +248,7 @@ export default function CoursePage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className={`font-medium truncate ${
-                            isSelected ? 'text-navy' : accessible ? 'text-navy' : 'text-slate-500'
+                            isSelected ? 'text-navy' : accessible ? 'text-navy' : 'text-muted-foreground'
                           }`}>
                             {lesson.title}
                           </p>
@@ -280,7 +281,7 @@ export default function CoursePage() {
                             {isSelected ? 'Playing' : 'Watch'}
                           </span>
                         ) : (
-                          <span className="text-xs font-mono uppercase tracking-widest text-slate-400">
+                          <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                             Locked
                           </span>
                         )}
@@ -293,10 +294,9 @@ export default function CoursePage() {
 
             {/* All lessons open — no paywall */}
           </div>
-        </div>
 
-        <MobileBottomNav />
-      </main>
+          <MobileBottomNav />
+        </main>
     </div>
   );
 }

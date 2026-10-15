@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -430,38 +430,38 @@ export default function KnowledgeAdmin() {
     <div className="flex">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        <div className="page-container max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Knowledge Base Admin</h1>
-              <p className="page-subtitle">Create, edit, and manage knowledge articles</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Create, edit, and manage trust education articles' },
-                  { text: 'Organize articles by category for the Knowledge Base' },
-                  { text: 'Articles appear in the Knowledge Base for all users' },
-                  { text: 'Sync pulls articles from trustoffice.app/blog and resource guides' },
-                ]}
-                taPrompt="Walk me through the Knowledge Base Admin and how to create an article"
-              />
-              <Button
-                variant="outline"
-                onClick={handleSync}
-                disabled={syncing}
-                title="Pull articles from the marketing site (trustoffice.app)"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Syncing…' : 'Sync from Marketing Site'}
-              </Button>
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                New Article
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Knowledge Base Admin"
+            subtitle="Create, edit, and manage knowledge articles"
+            help={{
+              items: [
+                { text: 'Create, edit, and manage trust education articles' },
+                { text: 'Organize articles by category for the Knowledge Base' },
+                { text: 'Articles appear in the Knowledge Base for all users' },
+                { text: 'Sync pulls articles from trustoffice.app/blog and resource guides' },
+              ],
+              taPrompt: 'Help me manage the Knowledge Base admin tools',
+            }}
+            actions={
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  title="Pull articles from the marketing site (trustoffice.app)"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Syncing…' : 'Sync from Marketing Site'}
+                </Button>
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Article
+                </Button>
+              </>
+            }
+          />
 
           {/* Sync result banner */}
           {syncResult && (

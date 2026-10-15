@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import KnowledgeCard from '@/components/KnowledgeCard';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
@@ -165,26 +165,20 @@ export default function KnowledgeBasePage() {
     <div className="flex">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        <div className="page-container max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Knowledge Base</h1>
-              <p className="page-subtitle">
-                Trust education articles and resources for trust administrators
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Browse published trust education articles across all categories' },
-                  { text: 'Search, filter by category, and sort articles' },
-                  { text: 'Click any article card to read the full content' },
-                ]}
-                taPrompt="Walk me through the Knowledge Base"
-              />
-            </div>
-          </div>
+          <PageHeader
+            title="Knowledge Base"
+            subtitle="Trust education articles and resources for trust administrators"
+            help={{
+              items: [
+                { text: 'Browse published trust education articles across all categories' },
+                { text: 'Search, filter by category, and sort articles' },
+                { text: 'Click any article card to read the full content' },
+              ],
+              taPrompt: 'Walk me through the Knowledge Base',
+            }}
+          />
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-3 mb-6">

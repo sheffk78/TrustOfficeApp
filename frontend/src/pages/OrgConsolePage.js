@@ -20,6 +20,11 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import PageHeader from '@/components/PageHeader';
 import { fetchWithAuth } from '@/utils/api';
 import { showError, humanizeErrorCode } from '@/utils/errors';
 import { useAuth } from '@/context/AuthContext';
@@ -125,6 +130,16 @@ const ACTION_LABELS = {
 
 const TRUST_PAGE_SIZE = 24;
 
+// Short title for the member-action confirm dialog (its description carries the
+// full prompt copied verbatim from the member menu).
+const memberConfirmTitle = (cm) => {
+  if (!cm) return 'Update member';
+  if (cm.body?.role) return cm.body.role === 'admin' ? 'Make org admin' : 'Set role to member';
+  if (cm.body?.status === 'suspended') return 'Suspend member';
+  if (cm.body?.status === 'active') return 'Activate member';
+  return 'Update member';
+};
+
 export default function OrgConsolePage() {
   const navigate = useNavigate();
   const { setSelectedTrust } = useAuth();
@@ -170,7 +185,7 @@ export default function OrgConsolePage() {
   const [inviting, setInviting] = useState(false);
   const [inviteErr, setInviteErr] = useState('');
   const [isOwner, setIsOwner] = useState(false);
-  const [confirmMember, setConfirmMember] = useState(null); // {member, action}
+  const [confirmMember, setConfirmMember] = useState(null); // parked member action {member, body, confirmLabel} — resumed by its AlertDialog
   const refreshBtn = useRef(null);
 
   const load = useCallback(async () => {
@@ -406,8 +421,14 @@ export default function OrgConsolePage() {
   }, [members, focusOrg]);
 
   // ——— member actions (real backend: PATCH status/role) ———
-  const patchMember = async (member, body, confirmLabel) => {
-    if (confirmLabel && !window.confirm(confirmLabel)) return;
+  // Confirmable member actions confirm through an AlertDialog (UI standard — the
+  // browser prompt is retired): the menu click PARKS the action here, and the
+  // dialog's Confirm button resumes it with the exact same body/copy.
+  const patchMember = (member, body, confirmLabel) => {
+    setConfirmMember({ member, body, confirmLabel });
+  };
+
+  const performPatchMember = async (member, body) => {
     try {
       const res = await fetchWithAuth(
         `/orgs/${focusOrg.org_id}/members/${member.member_id}`,
@@ -780,19 +801,20 @@ export default function OrgConsolePage() {
       return (
         <div className="flex flex-wrap items-center gap-2 mb-4" data-testid="org-switcher">
           {orgs.map(o => (
-            <button
+            <Button
               key={o.org_id}
+              variant="ghost"
               onClick={() => { setFocusOrg(o); setTrustQuery(''); setTrustLevel('all'); setTrustShown(TRUST_PAGE_SIZE); setTeamOpen(false); setTeamQuery(''); }}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${o.org_id === f.org_id
-                ? 'bg-navy text-white border-navy'
-                : 'bg-transparent text-navy border-border hover:border-navy/50'}`}
+              className={`px-3 py-1.5 text-sm border transition-colors ${o.org_id === f.org_id
+                ? 'bg-navy text-white border-navy hover:bg-navy hover:text-white'
+                : 'bg-transparent text-navy border-border hover:border-navy/50 hover:bg-transparent hover:text-navy'}`}
               data-testid={`org-chip-${o.org_id}`}
             >
               {o.name}
               <span className={`ml-2 text-xs ${o.org_id === f.org_id ? 'text-white/70' : 'text-muted-foreground'}`}>
                 {orgStats(o)}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       );
@@ -807,13 +829,14 @@ export default function OrgConsolePage() {
         {switcherOpen ? (
           <div className="absolute z-20 mt-2 w-full max-w-sm card-trust p-2" data-testid="org-switcher-menu">
             {orgs.map(o => (
-              <button key={o.org_id}
+              <Button key={o.org_id}
+                variant="ghost"
                 onClick={() => { setFocusOrg(o); setSwitcherOpen(false); setTrustQuery(''); setTrustLevel('all'); setTrustShown(TRUST_PAGE_SIZE); setTeamOpen(false); setTeamQuery(''); }}
-                className="w-full text-left px-3 py-2 rounded hover:bg-cream/60 text-sm"
+                className="w-full justify-start text-left px-3 py-2 rounded hover:bg-cream/60 text-sm"
               >
                 <span className="text-navy">{o.name}</span>
                 <span className="text-xs text-muted-foreground ml-2">{orgStats(o)}</span>
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -826,22 +849,28 @@ export default function OrgConsolePage() {
       <Sidebar />
       <main className="main-content dot-grid">
         <div className="page-container">
-          <div className="page-header flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <h1 className="page-title">Org Console</h1>
-              <p className="page-subtitle">
-                Your practice's account: the client trusts shared with your organization, the team that works them, and what the team does.
-              </p>
-              {lastUpdated ? (
-                <p className="text-xs text-muted-foreground mt-1" data-testid="last-updated">
-                  Updated {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                </p>
-              ) : null}
-            </div>
-            <Button variant="outline" className="btn-secondary" onClick={load} disabled={loading} data-testid="refresh-btn" ref={refreshBtn}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-            </Button>
-          </div>
+          <PageHeader
+            title="Org Console"
+            subtitle="Your practice's account: the client trusts shared with your organization, the team that works them, and what the team does."
+            help={{
+              items: [
+                { text: 'This console lists every client trust shared with your organization and who on your team can work it' },
+                { text: 'Switch organizations with the selector below the title; the level filter appears once your trust book grows' },
+                { text: 'Manage teammates from the Team card and export a governance packet from the org settings row' },
+              ],
+              taPrompt: 'Walk me through the Org Console',
+            }}
+            actions={
+              <Button variant="outline" className="btn-secondary" onClick={load} disabled={loading} data-testid="refresh-btn" ref={refreshBtn}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            }
+          />
+          {lastUpdated ? (
+            <p className="text-xs text-muted-foreground mt-1" data-testid="last-updated">
+              Updated {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </p>
+          ) : null}
 
           {loading && !orgs.length ? (
             <div className="card-trust skeleton h-40 w-full" />
@@ -869,14 +898,14 @@ export default function OrgConsolePage() {
                   {(rail.pending > 0 || rail.deadlineTrs > 0) ? (
                     <div className="flex flex-wrap items-center gap-2 mb-4" data-testid="attention-rail">
                       {rail.pending > 0 ? (
-                        <button
+                        <Button
                           onClick={() => { setTrustQuery(''); setTrustLevel('all'); }}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-navy bg-gold/20 border border-gold/40 rounded-full px-3 py-1.5"
+                          className="h-auto inline-flex items-center gap-1.5 text-xs font-medium text-navy bg-gold/20 border border-gold/40 hover:bg-gold/25 hover:text-navy px-3 py-1.5"
                           data-testid="rail-pending"
                         >
                           <FileSignature className="w-3.5 h-3.5 text-gold" />
                           {rail.pending} pending {rail.pending === 1 ? 'minute' : 'minutes'} across your trusts
-                        </button>
+                        </Button>
                       ) : null}
                       {rail.deadlineTrs > 0 ? (
                         <span className="inline-flex items-center gap-1.5 text-xs text-navy border border-gold/40 rounded-full px-3 py-1.5" data-testid="rail-deadlines">
@@ -930,20 +959,21 @@ export default function OrgConsolePage() {
                         </div>
                         <div className="flex gap-1">
                           {['all', 'preparer', 'viewer'].map(lv => (
-                            <button key={lv}
+                            <Button key={lv}
+                              variant="ghost"
                               onClick={() => { setTrustLevel(lv); setServerPage(1); }}
-                              className={`px-2.5 py-1 rounded-full text-xs border ${trustLevel === lv ? 'bg-navy text-white border-navy' : 'text-navy border-border hover:border-navy/50'}`}
+                              className={`px-2.5 py-1 h-auto text-xs border transition-colors ${trustLevel === lv ? 'bg-navy text-white border-navy hover:bg-navy hover:text-white' : 'bg-transparent text-navy border-border hover:border-navy/50 hover:bg-transparent hover:text-navy'}`}
                               data-testid={`trust-level-${lv}`}
                             >
                               {lv === 'all' ? 'All levels' : lv}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                         {serverMode ? (
                           <div className="flex gap-1" data-testid="advanced-filters">
                             <select
                               value={trustStatus} onChange={e => { setTrustStatus(e.target.value); setServerPage(1); }}
-                              className="text-xs border border-border rounded-md bg-background px-2 py-1.5 text-navy"
+                              className="text-xs border border-border bg-background px-2 py-1.5 text-navy"
                               data-testid="trust-status-filter"
                               aria-label="Status filter"
                             >
@@ -953,7 +983,7 @@ export default function OrgConsolePage() {
                             </select>
                             <select
                               value={trustDeadline} onChange={e => { setTrustDeadline(e.target.value); setServerPage(1); }}
-                              className="text-xs border border-border rounded-md bg-background px-2 py-1.5 text-navy"
+                              className="text-xs border border-border bg-background px-2 py-1.5 text-navy"
                               data-testid="trust-deadline-filter"
                               aria-label="Deadline filter"
                             >
@@ -966,7 +996,7 @@ export default function OrgConsolePage() {
                             </select>
                             <select
                               value={trustSort} onChange={e => { setTrustSort(e.target.value); setServerPage(1); }}
-                              className="text-xs border border-border rounded-md bg-background px-2 py-1.5 text-navy"
+                              className="text-xs border border-border bg-background px-2 py-1.5 text-navy"
                               data-testid="trust-sort"
                               aria-label="Sort"
                             >
@@ -1137,15 +1167,16 @@ export default function OrgConsolePage() {
                       <div className="flex items-center gap-2 text-sm text-navy">
                         <Settings className="w-4 h-4 text-navy" />
                         <span className="font-medium">{focusOrg.name}</span>
-                        <button
-                          className="text-xs text-muted-foreground hover:text-navy inline-flex items-center gap-1"
+                        <Button
+                          variant="ghost" size="sm"
+                          className="h-auto px-1 text-xs text-muted-foreground hover:text-navy hover:bg-transparent inline-flex items-center gap-1"
                           title={focusOrg.org_id}
                           onClick={() => { try { navigator.clipboard?.writeText(focusOrg.org_id); toast.success('Org ID copied.'); } catch {} }}
                           data-testid="org-id-copy"
                         >
                           <span>{focusOrg.org_id.slice(0, 10)}⋯{focusOrg.org_id.slice(-4)}</span>
                           <Copy className="w-3.5 h-3.5" />
-                        </button>
+                        </Button>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" className="btn-secondary"
@@ -1177,6 +1208,36 @@ export default function OrgConsolePage() {
           )}
         </div>
       </main>
+
+      {/* Confirm member action (AlertDialog per UI standard): the action
+          parked by the member menu is resumed here; Cancel, Esc, or an
+          outside click aborts it — the same no-op semantics as the old prompt. */}
+      <AlertDialog open={!!confirmMember} onOpenChange={(open) => { if (!open) setConfirmMember(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{memberConfirmTitle(confirmMember)}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmMember?.confirmLabel || 'Apply this change to this team member?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="member-confirm-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="member-confirm-confirm"
+              className="btn-primary"
+              onClick={(e) => {
+                e.preventDefault();
+                const parked = confirmMember;
+                setConfirmMember(null);
+                setMenuMember(null);
+                if (parked?.member && parked?.body) performPatchMember(parked.member, parked.body);
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Enter-confirmation (council R1+R3, 2026-10-09): impersonation must be
           unmistakable BEFORE the click. Gating every entry path. */}
@@ -1239,7 +1300,7 @@ export default function OrgConsolePage() {
             <Label htmlFor="invite-role" className="mt-3">Role</Label>
             <select
               id="invite-role" value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-              className="mt-1 w-full text-sm border border-border rounded-md bg-background px-3 py-2"
+              className="mt-1 w-full text-sm border border-border bg-background px-3 py-2"
               data-testid="invite-role-select"
             >
               <option value="member">Member</option>

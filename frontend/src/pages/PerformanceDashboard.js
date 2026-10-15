@@ -5,7 +5,8 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { showError } from '@/utils/errors';
 import { toast } from 'sonner';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
 import {
   BarChart,
   Bar,
@@ -100,33 +101,14 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
     loadData();
   };
 
-  // Loading skeleton
+  // Loading state — shared Spinner (UI-STANDARD rule 11), no ad-hoc skeletons
   if (loading && !summary) {
     return (
-      <div className="min-h-screen bg-background flex">
+      <div className="main-layout">
         <Sidebar />
-        <main className="flex-1 p-4 lg:p-8 lg:ml-64 pb-24 lg:pb-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center gap-3 mb-8">
-              <LayoutDashboard className="w-8 h-8 text-navy animate-pulse" />
-              <div className="h-8 w-48 bg-navy/10 animate-pulse rounded"></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="card-trust p-6">
-                  <div className="h-4 w-24 bg-navy/10 animate-pulse rounded mb-3"></div>
-                  <div className="h-10 w-20 bg-navy/10 animate-pulse rounded"></div>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="card-trust p-6">
-                  <div className="h-4 w-32 bg-navy/10 animate-pulse rounded mb-4"></div>
-                  <div className="h-48 bg-navy/5 animate-pulse rounded"></div>
-                </div>
-              ))}
-            </div>
+        <main className="main-content dot-grid mobile-layout-offset">
+          <div className="page-container max-w-7xl mx-auto flex items-center justify-center py-20">
+            <Spinner label="Loading performance data" />
           </div>
         </main>
         <MobileBottomNav />
@@ -137,10 +119,10 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
   // Error state
   if (error && !summary) {
     return (
-      <div className="min-h-screen bg-background flex">
+      <div className="main-layout">
         <Sidebar />
-        <main className="flex-1 p-4 lg:p-8 lg:ml-64 pb-24 lg:pb-8">
-          <div className="max-w-7xl mx-auto text-center py-20">
+        <main className="main-content dot-grid mobile-layout-offset">
+          <div className="page-container max-w-7xl mx-auto text-center py-20">
             <AlertTriangle className="w-16 h-16 mx-auto mb-6 text-rust" />
             <h1 className="font-serif text-3xl text-navy dark:text-white mb-4">
               Failed to Load Performance Data
@@ -151,9 +133,8 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
               Try Again
             </Button>
           </div>
-          <MobileBottomNav />
         </main>
-        <Sidebar />
+        <MobileBottomNav />
       </div>
     );
   }
@@ -210,8 +191,8 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
       title: 'Minutes Created',
       value: summary?.minutes_created || 0,
       icon: FilePen,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-navy',
+      bgColor: 'bg-navy/10',
     },
     {
       title: 'Distributions Processed',
@@ -224,8 +205,8 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
       title: 'Compliance Score',
       value: (summary?.compliance_score || 0) + '/100',
       icon: Shield,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-600/10',
+      color: 'text-gold',
+      bgColor: 'bg-gold/10',
     },
   ];
 
@@ -261,10 +242,10 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
   const recentActivities = activities?.activities || [];
 
   return (
-    <div className="min-h-screen bg-background flex" data-testid="performance-page">
+    <div className="main-layout" data-testid="performance-page">
       <Sidebar />
-      <main className="flex-1 p-4 lg:p-8 lg:ml-64 pb-24 lg:pb-8">
-        <div className="max-w-7xl mx-auto">
+      <main className="main-content dot-grid mobile-layout-offset">
+        <div className="page-container max-w-7xl mx-auto">
           {/* Tab switcher (Holdings ↔ Performance) */}
           {onTabChange && (
             <Tabs value={tab || 'performance'} onValueChange={onTabChange} className="mb-6">
@@ -281,36 +262,31 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
             </Tabs>
           )}
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title flex items-center gap-3">
-                <BarChart3 className="w-8 h-8 text-navy dark:text-white" />
-                Performance Dashboard
-              </h1>
-              <p className="page-subtitle">
-                Key performance metrics for your trusts — minutes, distributions, compliance, and trends
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'View aggregated KPIs across all your managed trusts' },
-                  { text: 'Track monthly trends in minutes creation and distributions' },
-                  { text: 'Monitor recent activity across all trusts in one feed' },
-                  { text: 'Compare your performance against platform-wide benchmarks' },
-                ]}
-                taPrompt="Walk me through the Performance Dashboard and what each section shows"
-              />
-              <button
-                onClick={handleRefresh}
-                className="btn-primary flex items-center gap-2"
-                disabled={loading}
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-            </div>
-          </div>
+          <PageHeader
+            title="Performance Dashboard"
+            subtitle="Key performance metrics for your trusts — minutes, distributions, compliance, and trends"
+            actions={
+              <>
+                <Button
+                  onClick={handleRefresh}
+                  className="btn-primary flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </>
+            }
+            help={{
+              items: [
+                { text: 'View aggregated KPIs across all your managed trusts' },
+                { text: 'Track monthly trends in minutes creation and distributions' },
+                { text: 'Monitor recent activity across all trusts in one feed' },
+                { text: 'Compare your performance against platform-wide benchmarks' },
+              ],
+              taPrompt: 'Walk me through the Performance Dashboard and what each section shows',
+            }}
+          />
 
           {/* Trust Selector Note */}
           {summary?.trusts?.length === 0 && (
@@ -331,7 +307,7 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
                 data-testid={`kpi-${kpi.title.toLowerCase().replace(/\s+/g, '-')}`}
               >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <div className={`w-10 h-10 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
+                  <div className={`w-10 h-10 ${kpi.bgColor} flex items-center justify-center`}>
                     <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
                   </div>
                   <Badge variant="secondary" className="text-xs font-mono">
@@ -362,7 +338,7 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
                   {distributionStatusData.map((item) => (
                     <div
                       key={item.status}
-                      className="flex items-center gap-2 p-3 rounded-lg bg-navy/5 dark:bg-white/5 min-w-[120px]"
+                      className="flex items-center gap-2 p-3 bg-navy/5 dark:bg-white/5 min-w-[120px]"
                     >
                       <div
                         className={`w-3 h-3 rounded-full ${
@@ -519,25 +495,25 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
             <CardContent>
               {/* Platform Stats Summary */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-3 rounded-lg bg-navy/5 dark:bg-white/5">
+                <div className="p-3 bg-navy/5 dark:bg-white/5">
                   <p className="text-xs text-muted-foreground mb-1">Total Minutes (6mo)</p>
                   <p className="text-lg font-bold text-navy dark:text-white">
                     {platformStats.total_minutes_6mo || 0}
                   </p>
                 </div>
-                <div className="p-3 rounded-lg bg-navy/5 dark:bg-white/5">
+                <div className="p-3 bg-navy/5 dark:bg-white/5">
                   <p className="text-xs text-muted-foreground mb-1">Total Distributions (6mo)</p>
                   <p className="text-lg font-bold text-navy dark:text-white">
                     {platformStats.total_distributions_6mo || 0}
                   </p>
                 </div>
-                <div className="p-3 rounded-lg bg-navy/5 dark:bg-white/5">
+                <div className="p-3 bg-navy/5 dark:bg-white/5">
                   <p className="text-xs text-muted-foreground mb-1">Distribution Value (6mo)</p>
                   <p className="text-lg font-bold text-gold">
                     ${(platformStats.total_distribution_amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
                 </div>
-                <div className="p-3 rounded-lg bg-navy/5 dark:bg-white/5">
+                <div className="p-3 bg-navy/5 dark:bg-white/5">
                   <p className="text-xs text-muted-foreground mb-1">Platform Approval Rate</p>
                   <p className="text-lg font-bold text-success">
                     {platformStats.approval_rate || 0}%
@@ -613,7 +589,7 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
                     {benchmarks.trust_distribution.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-navy/5 dark:bg-white/5 text-sm"
+                        className="flex items-center gap-2 p-2 bg-navy/5 dark:bg-white/5 text-sm"
                       >
                         <span className="text-muted-foreground">{item.trusts_count} trust{item.trusts_count !== 1 ? 's' : ''}:</span>
                         <span className="font-mono font-medium text-navy dark:text-white">{item.users_count}</span>
@@ -640,10 +616,10 @@ export default function PerformanceDashboard({ tab, onTabChange }) {
                   {recentActivities.map((activity, idx) => (
                     <div
                       key={activity.id || idx}
-                      className="flex items-start gap-3 p-3 rounded-lg hover:bg-navy/5 dark:hover:bg-white/5 transition-colors border border-transparent hover:border-navy/10"
+                      className="flex items-start gap-3 p-3 hover:bg-navy/5 dark:hover:bg-white/5 transition-colors border border-transparent hover:border-navy/10"
                     >
                       <div
-                        className={`p-2 rounded-lg ${activityStatusColors[activity.status] || 'bg-muted/10'} shrink-0`}
+                        className={`p-2 ${activityStatusColors[activity.status] || 'bg-muted/10'} shrink-0`}
                       >
                         {activityTypeIcons[activity.type] || <Activity className="w-4 h-4" />}
                       </div>

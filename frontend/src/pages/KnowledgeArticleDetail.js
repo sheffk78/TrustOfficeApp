@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 
 const CATEGORY_LABELS = {
   trust_basics: 'Trust Basics',
@@ -174,29 +174,33 @@ export default function KnowledgeArticleDetail() {
     <div className="flex">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-subtle-bg min-h-screen pb-20 md:pb-0 lg:ml-64 pt-16 lg:pt-0 print:bg-white">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
-          {/* Page header with back button + help */}
-          <div className="page-header flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/knowledge')}
-            >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-              Back to Knowledge Base
-            </Button>
-            <PageHelpButton
-              items={[
+        <div className="page-container max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-8">
+          {/* Page header: title + back action + help via shared component */}
+          <PageHeader
+            title="Knowledge"
+            help={{
+              items: [
                 { text: 'Read trust education articles from the Knowledge Base' },
                 { text: 'Use the Trust Assistant to ask questions about this article' },
                 { text: 'Print or share articles for your trust records' },
-              ]}
-              taPrompt="Help me understand this article and how it applies to my trust"
-            />
-          </div>
+              ],
+              taPrompt: 'Help me understand this article and how it applies to my trust',
+            }}
+            actions={
+              <Button
+                variant="outline"
+                size="sm"
+                className="btn-secondary"
+                onClick={() => navigate('/knowledge')}
+              >
+                <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+                Back to Knowledge Base
+              </Button>
+            }
+          />
 
           {/* Article header */}
-          <article className="card-trust border border-border overflow-hidden">
+          <article className="card-trust corner-mark border border-border overflow-hidden">
             {/* Header section */}
             <div className="p-6 md:p-8 border-b border-border print:pb-4">
               {/* Category badge */}

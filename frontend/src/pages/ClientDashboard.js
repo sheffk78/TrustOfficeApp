@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/api';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import TrustCard from '@/components/TrustCard';
 import QuickActionsBar from '@/components/QuickActionsBar';
 import { toast } from 'sonner';
@@ -247,43 +247,37 @@ export default function ClientDashboard() {
       <main className="main-content dot-grid">
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link to="/clients">
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  Clients
+          <PageHeader
+            title={loading ? 'Loading…' : client?.name || 'Client Dashboard'}
+            subtitle="Multi-trust client overview — health, deadlines, and meetings across all linked trusts"
+            help={{
+              items: [
+                { text: 'View all trusts linked to this client in one place' },
+                { text: 'Track health scores and compliance across trusts' },
+                { text: 'See upcoming deadlines and recent meetings cross-trust' },
+              ],
+              taPrompt: 'Walk me through the Client Dashboard and how to manage multi-trust clients',
+            }}
+            actions={
+              <>
+                <Link to="/clients">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground">
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Clients
+                  </Button>
+                </Link>
+                <Button
+                  onClick={loadClientData}
+                  variant="outline"
+                  className="btn-secondary"
+                  data-testid="refresh-btn"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
                 </Button>
-              </Link>
-              <div>
-                <h1 className="page-title">
-                  {loading ? 'Loading…' : client?.name || 'Client Dashboard'}
-                </h1>
-                <p className="page-subtitle">
-                  Multi-trust client overview — health, deadlines, and meetings across all linked trusts
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'View all trusts linked to this client in one place' },
-                  { text: 'Track health scores and compliance across trusts' },
-                  { text: 'See upcoming deadlines and recent meetings cross-trust' },
-                ]}
-                taPrompt="Walk me through the Client Dashboard and how to manage multi-trust clients"
-              />
-              <Button
-                onClick={loadClientData}
-                variant="outline"
-                className="btn-secondary"
-                data-testid="refresh-btn"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-          </div>
+              </>
+            }
+          />
 
           {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -322,7 +316,7 @@ export default function ClientDashboard() {
                 {/* Client Profile Card */}
                 <div className="lg:col-span-2 card-trust corner-mark">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-navy/5 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 bg-navy/5 flex items-center justify-center shrink-0">
                       <Users className="w-6 h-6 text-navy" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -458,7 +452,7 @@ export default function ClientDashboard() {
                       {recentMeetings.map((meeting, idx) => (
                         <div
                           key={meeting.meeting_id || idx}
-                          className="flex items-center justify-between p-3 border border-border rounded-lg hover:border-navy/30 transition-colors"
+                          className="flex items-center justify-between p-3 border border-border hover:border-navy/30 transition-colors"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <FileText className="w-4 h-4 text-navy shrink-0" />
@@ -507,7 +501,7 @@ export default function ClientDashboard() {
                         return (
                           <div
                             key={deadline.deadline_id || idx}
-                            className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                            className={`flex items-center justify-between p-3 border transition-colors ${
                               isOverdue
                                 ? 'border-error/30 bg-error/5'
                                 : 'border-border hover:border-navy/30'
@@ -643,7 +637,7 @@ export default function ClientDashboard() {
                 <Label htmlFor="select-trust">Select Trust</Label>
                 <select
                   id="select-trust"
-                  className="w-full text-sm border border-border rounded-md px-3 py-2 bg-background text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                  className="w-full input-trust"
                   value={selectedTrustId}
                   onChange={(e) => setSelectedTrustId(e.target.value)}
                 >

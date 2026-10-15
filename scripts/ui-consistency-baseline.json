@@ -36,12 +36,8 @@
  },
  "CertificatesTab.jsx": {},
  "ClassBeneficiariesTab.jsx": {},
- "ClientDashboard.js": {
-  "R2_radius_hard": 4
- },
- "ClientsListPage.js": {
-  "R2_radius_hard": 1
- },
+ "ClientDashboard.js": {},
+ "ClientsListPage.js": {},
  "CommunicationsPage.js": {
   "R4_raw_btn": 1
  },
@@ -53,9 +49,7 @@
  "ContactPage.js": {
   "R1_header": 1
  },
- "CoursePage.js": {
-  "R3_palette": 5
- },
+ "CoursePage.js": {},
  "CreateMinutesPage.js": {
   "R1_header": 1,
   "R4_raw_btn": 4
@@ -86,15 +80,9 @@
  "InvestmentsTabbed.js": {
   "R1_header": 1
  },
- "KnowledgeAdmin.js": {
-  "R1_header": 1
- },
- "KnowledgeArticleDetail.js": {
-  "R1_header": 1
- },
- "KnowledgeBasePage.js": {
-  "R1_header": 1
- },
+ "KnowledgeAdmin.js": {},
+ "KnowledgeArticleDetail.js": {},
+ "KnowledgeBasePage.js": {},
  "LeadsAccessPage.js": {
   "R1_header": 1
  },
@@ -139,17 +127,11 @@
  "NotFoundPage.js": {},
  "OnboardingPage.js": {},
  "OrgConsolePage.js": {
-  "R2_radius_full": 5,
-  "R2_radius_hard": 4,
-  "R4_raw_btn": 5
+  "R2_radius_full": 2
  },
  "OverviewTab.jsx": {},
  "PerformanceDashboard.js": {
-  "R1_header": 1,
-  "R2_radius_full": 1,
-  "R2_radius_hard": 9,
-  "R3_palette": 4,
-  "R4_raw_btn": 1
+  "R2_radius_full": 1
  },
  "PostCheckoutPage.js": {
   "R2_radius_hard": 1
@@ -181,9 +163,7 @@
  "SuccessorPacketPage.js": {},
  "TransactionLedgerPage.js": {},
  "TransfersTab.jsx": {},
- "TrustAccessPage.js": {
-  "R2_radius_hard": 3
- },
+ "TrustAccessPage.js": {},
  "TrustAccessPanel.js": {},
  "TrustAdminKitsPage.js": {},
  "TrustAssistantPage.js": {},

@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWithAuth } from '@/utils/api';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { format, parseISO } from 'date-fns';
@@ -121,41 +121,39 @@ export default function ClientsListPage() {
       <main className="main-content dot-grid">
         <div className="page-container">
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Clients</h1>
-              <p className="page-subtitle">
-                Manage multi-trust clients — view health, deadlines, and meetings across all linked trusts
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'View all your multi-trust clients in one place' },
-                  { text: 'Click a client card to see their full dashboard' },
-                  { text: 'Add new clients and link trusts to them' },
-                ]}
-                taPrompt="Walk me through the Clients page and how to manage multi-trust clients"
-              />
-              <Button
-                onClick={loadClients}
-                variant="outline"
-                className="btn-secondary"
-                data-testid="refresh-btn"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-              <Button
-                onClick={() => setAddOpen(true)}
-                className="btn-primary"
-                data-testid="add-client-btn"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Client
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Clients"
+            subtitle="Manage multi-trust clients — view health, deadlines, and meetings across all linked trusts"
+            help={{
+              items: [
+                { text: 'View all your multi-trust clients in one place' },
+                { text: 'Click a client card to see their full dashboard' },
+                { text: 'Add new clients and link trusts to them' },
+              ],
+              taPrompt: 'Walk me through the Clients page and how to manage multi-trust clients',
+            }}
+            actions={
+              <>
+                <Button
+                  onClick={loadClients}
+                  variant="outline"
+                  className="btn-secondary"
+                  data-testid="refresh-btn"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+                <Button
+                  onClick={() => setAddOpen(true)}
+                  className="btn-primary"
+                  data-testid="add-client-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Client
+                </Button>
+              </>
+            }
+          />
 
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -189,7 +187,7 @@ export default function ClientsListPage() {
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-lg bg-navy/5 flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 bg-navy/5 flex items-center justify-center shrink-0">
                             <Users className="w-5 h-5 text-navy" />
                           </div>
                           <div className="min-w-0">
