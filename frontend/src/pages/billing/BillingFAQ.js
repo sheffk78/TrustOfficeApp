@@ -6,7 +6,7 @@ export default function BillingFAQ() {
   return (
     <>
       {/* Billing FAQ */}
-      <div className="card-trust">
+      <div className="card-trust corner-mark">
         <h3 className="font-serif text-lg text-navy mb-4">Frequently Asked Questions</h3>
         <div className="space-y-4 text-sm">
           <div>

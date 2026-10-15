@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Check, CreditCard, Loader2, Lock } from 'lucide-react';
+import { Check, CreditCard, Lock } from 'lucide-react';
+import Spinner from '@/components/Spinner';
 import { Button } from '@/components/ui/button';
 import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 
@@ -41,7 +42,7 @@ const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infini
   return (
     <div
       ref={cardRef}
-      className={`card-trust relative border-border bg-card ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${isTargetPlan && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
+      className={`card-trust corner-mark relative border-border bg-card ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${isTargetPlan && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
       data-testid="plan-card-trustee"
     >
       {isIneligible ? (
@@ -55,10 +56,10 @@ const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infini
         </div>
       )}
       <h3 className="font-serif text-xl text-navy mb-2">Trustee Plan</h3>
-      <p className="text-xs text-muted-foreground mb-3">{TRUSTEE_TIER.trustLimit}</p>
+      <p className="text-xs font-mono text-muted-foreground mb-3">{TRUSTEE_TIER.trustLimit}</p>
       {isIneligible && (
         <p className="text-xs text-warning mb-3 font-medium">
-          Your account has {userTrustCount} trust
+          Your account has <span className="font-mono">{userTrustCount}</span> trust
           {userTrustCount !== 1 ? 's' : ''}. This plan supports up to{' '}
           {TRUSTEE_TIER.maxTrusts === Infinity ? 'unlimited' : TRUSTEE_TIER.maxTrusts}.
         </p>
@@ -66,21 +67,23 @@ const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infini
 
       {/* Monthly/Annual toggle */}
       <div className="flex justify-center mb-4">
-        <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
-          <button
+        <div className="inline-flex items-center border border-border p-1">
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setPeriod('monthly')}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+            className={`text-xs font-medium ${period === 'monthly' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Monthly
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setPeriod('annual')}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+            className={`text-xs font-medium ${period === 'annual' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Annual <span className="ml-1 text-success">Save 20%</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -90,7 +93,7 @@ const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infini
       </div>
       {period === 'annual' ? (
         <>
-          <p className="text-xs text-muted-foreground mb-2">
+          <p className="text-xs font-mono text-muted-foreground mb-2">
             ${TRUSTEE_TIER.annual.toLocaleString()} billed annually · save ${TRUSTEE_TIER.monthly * 12 - TRUSTEE_TIER.annual}/yr
           </p>
           <p className="text-xs text-success mb-3 font-medium">
@@ -98,7 +101,7 @@ const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infini
           </p>
         </>
       ) : (
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="text-xs font-mono text-muted-foreground mb-3">
           ${TRUSTEE_TIER.monthly * 12}/year · switch to annual to save ${TRUSTEE_TIER.monthly * 12 - TRUSTEE_TIER.annual}
         </p>
       )}
@@ -119,7 +122,7 @@ const isIneligible = userTrustCount != null && TRUSTEE_TIER.maxTrusts !== Infini
       >
         {processing ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Spinner size={16} className="mr-2" />
             Processing...
           </>
         ) : isIneligible ? (
@@ -148,32 +151,34 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
   return (
     <div
       ref={cardRef}
-      className={`card-trust relative border-gold/40 bg-gold/5 ${isTargetPlan ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
+      className={`card-trust corner-mark relative border-gold/40 bg-gold/5 ${isTargetPlan ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
       data-testid={`plan-card-${WINGPOINT_TIER.id}`}
     >
       <div className="absolute top-0 right-0 bg-gold text-navy px-3 py-1 font-mono text-xs uppercase">
         WingPoint Exclusive
       </div>
       <h3 className="font-serif text-xl text-navy mb-2">WingPoint Plan</h3>
-      <p className="text-xs text-muted-foreground mb-3">{WINGPOINT_TIER.trustLimit}</p>
+      <p className="text-xs font-mono text-muted-foreground mb-3">{WINGPOINT_TIER.trustLimit}</p>
 
       {/* Monthly/Annual toggle */}
       <div className="flex justify-center mb-4">
-        <div className="inline-flex items-center bg-subtle-bg border border-border rounded-full p-1">
-          <button
+        <div className="inline-flex items-center border border-border p-1">
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setPeriod('monthly')}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'monthly' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
+            className={`text-xs font-medium ${period === 'monthly' ? 'btn-gold' : 'btn-secondary'}`}
           >
             Monthly
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setPeriod('annual')}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${period === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
+            className={`text-xs font-medium ${period === 'annual' ? 'btn-gold' : 'btn-secondary'}`}
           >
             Annual <span className="ml-1 text-success">save $240/yr</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -186,7 +191,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
             <span className="font-mono text-lg text-muted-foreground line-through ml-2">$149</span>
             <span className="text-xs text-muted-foreground">/mo</span>
           </div>
-          <div className="inline-block bg-gold/10 text-gold px-2 py-1 rounded font-mono text-xs font-semibold mb-2">
+          <div className="inline-block bg-gold/10 text-gold px-2 py-1 font-mono text-xs font-semibold mb-2">
             Save $30/mo vs Estate $149/mo
           </div>
           <p className="text-xs text-muted-foreground mb-3 font-medium">
@@ -201,10 +206,10 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
             <span className="font-mono text-lg text-muted-foreground line-through ml-2">$149</span>
             <span className="text-xs text-muted-foreground">/mo</span>
           </div>
-          <div className="inline-block bg-gold/10 text-gold px-2 py-1 rounded font-mono text-xs font-semibold mb-2">
+          <div className="inline-block bg-gold/10 text-gold px-2 py-1 font-mono text-xs font-semibold mb-2">
             Save $30/mo vs Estate $149/mo
           </div>
-          <p className="text-xs text-success mb-3 font-medium">
+          <p className="text-xs font-mono text-success mb-3 font-medium">
             ${WINGPOINT_TIER.annual.toLocaleString()} billed annually · save $240/yr vs monthly
           </p>
         </>
@@ -226,7 +231,7 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
       >
         {processing ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Spinner size={16} className="mr-2" />
             Processing...
           </>
         ) : (

@@ -1,4 +1,5 @@
-import { Loader2, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
+import Spinner from '@/components/Spinner';
 import { Button } from '@/components/ui/button';
 import { TIERS } from './pricingConfig';
 import BillingPeriodToggle from './BillingPeriodToggle';
@@ -65,7 +66,7 @@ export default function TierChangeSection({
             <div
               key={tier.id}
               ref={cardRef(tier.id)}
-              className={`card-trust relative p-6 ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${tier.popular ? 'border-gold/40' : ''} ${isCurrentTier && !isIneligible ? 'ring-2 ring-navy' : ''} ${targetPlan === tier.id && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
+              className={`card-trust corner-mark relative p-6 ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${tier.popular ? 'border-gold/40' : ''} ${isCurrentTier && !isIneligible ? 'ring-2 ring-navy' : ''} ${targetPlan === tier.id && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
               data-testid={`tier-change-card-${tier.id}`}
             >
               {tier.popular && !isCurrentTier && !isIneligible && (
@@ -85,10 +86,10 @@ export default function TierChangeSection({
                 </div>
               )}
               <h4 className="font-serif text-lg text-navy mb-1">{tier.name}</h4>
-              <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
+              <p className="text-xs font-mono text-muted-foreground mb-3">{tier.trustLimit}</p>
               {isIneligible && (
                 <p className="text-xs text-warning mb-3 font-medium">
-                  Your account has {userTrustCount} trust
+                  Your account has <span className="font-mono">{userTrustCount}</span> trust
                   {userTrustCount !== 1 ? 's' : ''}. This plan supports up to{' '}
                   {tier.maxTrusts === Infinity ? 'unlimited' : tier.maxTrusts}.
                 </p>
@@ -100,11 +101,11 @@ export default function TierChangeSection({
                 <span className="text-muted-foreground text-sm">/month</span>
               </div>
               {billingPeriod === 'annual' ? (
-                <p className="text-xs text-muted-foreground mb-2">
+                <p className="text-xs font-mono text-muted-foreground mb-2">
                   ${tier.annual.toLocaleString()}/yr
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground mb-2">
+                <p className="text-xs font-mono text-muted-foreground mb-2">
                   ${tier.monthly * 12}/yr
                 </p>
               )}
@@ -116,7 +117,7 @@ export default function TierChangeSection({
                 data-testid={`change-to-${tier.id}-btn`}
               >
                 {actionLoading === 'change-plan' ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size={16} className="mr-2" />
                 ) : null}
                 {isIneligible ? (
                   <>

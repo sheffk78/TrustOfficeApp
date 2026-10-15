@@ -1,4 +1,5 @@
-import { Check, CreditCard, Loader2, Lock } from 'lucide-react';
+import { Check, CreditCard, Lock } from 'lucide-react';
+import Spinner from '@/components/Spinner';
 import { Button } from '@/components/ui/button';
 
 // Reusable pricing plan card for a single tier.
@@ -36,7 +37,7 @@ export default function PlanCard({
   return (
     <div
       ref={cardRef}
-      className={`card-trust relative ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${tier.popular ? 'border-gold/30 bg-gold/5' : ''} ${isTargetPlan && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
+      className={`card-trust corner-mark relative ${isIneligible ? 'opacity-50 pointer-events-none' : ''} ${tier.popular ? 'border-gold/30 bg-gold/5' : ''} ${isTargetPlan && !isIneligible ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg' : ''}`}
       data-testid={`plan-card-${tier.id}`}
     >
       {tier.popular && !isIneligible && (
@@ -51,10 +52,10 @@ export default function PlanCard({
         </div>
       )}
       <h3 className="font-serif text-xl text-navy mb-2">{tier.name}</h3>
-      <p className="text-xs text-muted-foreground mb-3">{tier.trustLimit}</p>
+      <p className="text-xs font-mono text-muted-foreground mb-3">{tier.trustLimit}</p>
       {isIneligible && (
         <p className="text-xs text-warning mb-3 font-medium">
-          Your account has {userTrustCount} trust
+          Your account has <span className="font-mono">{userTrustCount}</span> trust
           {userTrustCount !== 1 ? 's' : ''}. This plan supports up to{' '}
           {tier.maxTrusts === Infinity ? 'unlimited' : tier.maxTrusts}.
         </p>
@@ -67,7 +68,7 @@ export default function PlanCard({
       </div>
       {billingPeriod === 'annual' ? (
         <>
-          <p className="text-xs text-muted-foreground mb-2">
+          <p className="text-xs font-mono text-muted-foreground mb-2">
             ${tier.annual.toLocaleString()} billed annually · save ${tier.monthly * 12 - tier.annual}/yr
           </p>
           <p className="text-xs text-success mb-3 font-medium">
@@ -75,7 +76,7 @@ export default function PlanCard({
           </p>
         </>
       ) : (
-        <p className="text-xs text-muted-foreground mb-3">
+        <p className="text-xs font-mono text-muted-foreground mb-3">
           ${tier.monthly * 12}/year · switch to annual to save ${tier.monthly * 12 - tier.annual}
         </p>
       )}
@@ -95,7 +96,7 @@ export default function PlanCard({
       >
         {processing ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Spinner size={16} className="mr-2" />
             Processing...
           </>
         ) : isIneligible ? (

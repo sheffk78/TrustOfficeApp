@@ -13,9 +13,11 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import {
   Mail, Search, Copy, Check, Inbox, Clock, Users,
-  ArrowLeft, MessageSquare, Loader2, Lock, ArrowUpCircle,
+  ArrowLeft, MessageSquare, Lock, ArrowUpCircle,
 } from 'lucide-react';
 import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
 
 const POLL_INTERVAL_MS = 30000;
 const API_BASE = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -101,7 +103,7 @@ function TrustEmailCard({ trustId, trustName }) {
     return (
       <div className="card-trust p-6 mb-6">
         <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> <span className="text-sm">Loading...</span>
+          <Spinner size={16} /> <span className="text-sm">Loading...</span>
         </div>
       </div>
     );
@@ -112,7 +114,7 @@ function TrustEmailCard({ trustId, trustName }) {
     return (
       <div className="card-trust p-6 mb-6">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 bg-amber-50 flex items-center justify-center flex-shrink-0">
             <Lock className="w-5 h-5 text-amber-600" />
           </div>
           <div className="flex-1">
@@ -120,7 +122,7 @@ function TrustEmailCard({ trustId, trustName }) {
             <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
               BCC a unique email address on emails to beneficiaries to automatically log them here.
             </p>
-            <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 inline-block">
+            <div className="bg-amber-50 border border-amber-200 px-3 py-2 inline-block">
               <p className="text-sm text-amber-800">
                 Available on <strong>Estate ($149/mo)</strong> and <strong>Advisor ($399/mo)</strong> plans.
               </p>
@@ -136,8 +138,8 @@ function TrustEmailCard({ trustId, trustName }) {
     return (
       <div className="card-trust p-6 mb-6">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <Inbox className="w-5 h-5 text-blue-600" />
+          <div className="w-10 h-10 bg-navy/5 flex items-center justify-center flex-shrink-0">
+            <Inbox className="w-5 h-5 text-navy" />
           </div>
           <div className="flex-1">
             <h2 className="font-serif text-lg text-navy mb-1">Email Archive</h2>
@@ -145,7 +147,7 @@ function TrustEmailCard({ trustId, trustName }) {
               BCC a unique email address on emails to beneficiaries to automatically log them in your Communications Log.
             </p>
             <Button size="sm" onClick={handleEnable} disabled={toggling}>
-              {toggling ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Enabling...</> : 'Enable Email Archive'}
+              {toggling ? <><Spinner size={16} className="mr-1.5" /> Enabling...</> : 'Enable Email Archive'}
             </Button>
           </div>
         </div>
@@ -195,9 +197,10 @@ function ConversationItem({ conv, userId, isActive, onClick }) {
   const senderIsMe = conv.last_message_sender_id === userId;
 
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`w-full p-3 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0 ${
+      className={`w-full p-3 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0 h-auto font-normal normal-case tracking-normal ${
         isActive ? 'bg-muted/30' : ''
       }`}
     >
@@ -241,7 +244,7 @@ function ConversationItem({ conv, userId, isActive, onClick }) {
           )}
         </div>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -286,9 +289,10 @@ function MessageBubble({ msg, isSent, senderName }) {
 
 function CommunicationItem({ comm, onClick, isActive }) {
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`w-full p-3 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0 ${
+      className={`w-full p-3 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border last:border-b-0 h-auto font-normal normal-case tracking-normal ${
         isActive ? 'bg-muted/30' : ''
       }`}
     >
@@ -317,7 +321,7 @@ function CommunicationItem({ comm, onClick, isActive }) {
           )}
         </div>
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -483,43 +487,38 @@ export default function MessagingPage() {
       <Sidebar />
       <div className="main-content dot-grid mobile-layout-offset">
         <div className="page-container">
-          {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Messages</h1>
-              <p className="page-subtitle">
-                Archive and search trust-related email conversations
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'CC or BCC your trust email address on any conversation to archive it here' },
-                  { text: 'Search across all archived messages by sender, subject, or content' },
-                  { text: 'Messages sync automatically every 30 seconds' },
-                ]}
-                taPrompt="How does the message archive work?"
-              />
-            </div>
-          </div>
+          <PageHeader
+            title="Messages"
+            subtitle="Archive and search trust-related email conversations"
+            help={{
+              items: [
+                { text: 'CC or BCC your trust email address on any conversation to archive it here' },
+                { text: 'Search across all archived messages by sender, subject, or content' },
+                { text: 'Messages sync automatically every 30 seconds' },
+              ],
+              taPrompt: 'How does the message archive work?',
+            }}
+          />
 
           {/* Trust Email Address Card */}
           <TrustEmailCard trustId={selectedTrust?.trust_id} trustName={selectedTrust?.name} />
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 mb-4 border border-border rounded-lg p-1 w-fit">
-            <button
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'conversations' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+          <div className="flex items-center gap-1 mb-4 border border-border p-1 w-fit">
+            <Button
+              variant="ghost"
+              className={`px-3 py-1.5 text-sm font-medium transition-colors h-auto font-normal normal-case tracking-normal ${viewMode === 'conversations' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
               onClick={() => setViewMode('conversations')}
             >
               Conversations
-            </button>
-            <button
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'log' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
+            </Button>
+            <Button
+              variant="ghost"
+              className={`px-3 py-1.5 text-sm font-medium transition-colors h-auto font-normal normal-case tracking-normal ${viewMode === 'log' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
               onClick={() => setViewMode('log')}
             >
               Communications Log
-            </button>
+            </Button>
           </div>
 
           {viewMode === 'log' ? (
@@ -528,9 +527,10 @@ export default function MessagingPage() {
               {/* Filter Buttons */}
               <div className="flex items-center gap-2 mb-4">
                 {['all', 'bcc_capture', 'manual'].map((f) => (
-                  <button
+                  <Button
                     key={f}
-                    className={`px-3 py-1 text-xs font-medium rounded-md border transition-colors ${
+                    variant="ghost"
+                    className={`px-3 py-1 text-xs font-medium border transition-colors h-auto font-normal normal-case tracking-normal ${
                       (commsFilter === '' ? 'all' : commsFilter) === f
                         ? 'bg-navy text-white border-navy'
                         : 'text-muted-foreground border-border hover:text-navy'
@@ -538,7 +538,7 @@ export default function MessagingPage() {
                     onClick={() => setCommsFilter(f === 'all' ? '' : f)}
                   >
                     {f === 'all' ? 'All' : f === 'bcc_capture' ? 'BCC Captured' : 'Manual'}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -555,7 +555,7 @@ export default function MessagingPage() {
 
               {commsLoading ? (
                 <div className="flex items-center justify-center pt-20">
-                  <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin" />
+                  <Spinner size={32} />
                 </div>
               ) : comms.length === 0 ? (
                 <div className="card-trust p-12 flex flex-col items-center justify-center text-center">
@@ -621,7 +621,7 @@ export default function MessagingPage() {
 
           {loading ? (
             <div className="flex items-center justify-center pt-20">
-              <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin" />
+              <Spinner size={32} />
             </div>
           ) : conversations.length === 0 ? (
             /* Empty State */

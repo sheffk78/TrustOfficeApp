@@ -18,7 +18,7 @@ const scrollToTestId = (testid, opts = { behavior: 'smooth', block: 'center' }) 
 const UpgradeBanner = ({ isWp }) => {
   if (isWp) {
     return (
-      <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg" data-testid="wp-upgrade-banner">
+      <div className="mb-4 p-4 bg-gold/10 border border-gold/30" data-testid="wp-upgrade-banner">
         <div className="flex items-start gap-3">
           <ArrowUpCircle className="w-5 h-5 text-navy flex-shrink-0 mt-0.5" />
           <div className="flex-1">
@@ -45,7 +45,7 @@ const UpgradeBanner = ({ isWp }) => {
     );
   }
   return (
-    <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-upgrade-banner">
+    <div className="mb-4 p-4 bg-gold/10 border border-gold/30 flex items-center gap-3" data-testid="wp-upgrade-banner">
       <ArrowUpCircle className="w-5 h-5 text-navy flex-shrink-0" />
       <p className="text-sm text-navy font-medium">
         Upgrade your plan to manage all your trusts.
@@ -56,7 +56,7 @@ const UpgradeBanner = ({ isWp }) => {
 
 // ── Resubscribe banner ──────────────────────────────────────────
 const ResubscribeBanner = ({ isWp }) => (
-  <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-resubscribe-banner">
+  <div className="mb-4 p-4 bg-gold/10 border border-gold/30 flex items-center gap-3" data-testid="wp-resubscribe-banner">
     <RefreshCw className="w-5 h-5 text-navy flex-shrink-0" />
     <p className="text-sm text-navy font-medium flex-1">
       {isWp
@@ -85,7 +85,7 @@ const ResubscribeBanner = ({ isWp }) => (
 
 // ── Update payment banner ───────────────────────────────────────
 const UpdatePaymentBanner = ({ isWp }) => (
-  <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-lg flex items-center gap-3" data-testid="wp-update-payment-banner">
+  <div className="mb-4 p-4 bg-gold/10 border border-gold/30 flex items-center gap-3" data-testid="wp-update-payment-banner">
     <CreditCard className="w-5 h-5 text-navy flex-shrink-0" />
     <p className="text-sm text-navy font-medium flex-1">
       {isWp

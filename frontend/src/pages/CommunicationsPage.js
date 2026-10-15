@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import PageHeader from '@/components/PageHeader';
 import { fetchWithAuth } from '@/utils/api';
-import PageHelpButton from '@/components/PageHelpButton';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import {
@@ -162,7 +162,7 @@ export default function CommunicationsPage() {
         <Sidebar />
         <div className="main-content dot-grid">
           <div className="page-container">
-            <div className="card-trust p-12 flex flex-col items-center justify-center">
+            <div className="card-trust corner-mark p-12 flex flex-col items-center justify-center">
               <MessageSquare className="w-12 h-12 text-muted-foreground/40 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-muted-foreground">Choose a trust to view communications log.</p>
@@ -180,38 +180,36 @@ export default function CommunicationsPage() {
       <div className="main-content dot-grid mobile-layout-offset">
         <div className="page-container">
 
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Communication Log</h1>
-              <p className="page-subtitle">Record and track all beneficiary communications — document calls, emails, and notices to satisfy UTC § 813</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Record and track all beneficiary communications in one place' },
-                  { text: 'Document calls, emails, and notices to satisfy UTC § 813 requirements' },
-                  { text: 'Maintain a complete history of beneficiary contact' },
-                ]}
-                taPrompt="Walk me through the Communication Log and how to log a beneficiary contact"
-              />
+          <PageHeader
+            title="Communication Log"
+            subtitle="Record and track all beneficiary communications — document calls, emails, and notices to satisfy UTC § 813"
+            help={{
+              items: [
+                { text: 'Record and track all beneficiary communications in one place' },
+                { text: 'Document calls, emails, and notices to satisfy UTC § 813 requirements' },
+                { text: 'Maintain a complete history of beneficiary contact' },
+              ],
+              taPrompt: 'Walk me through the Communication Log and how to log a beneficiary contact',
+            }}
+            actions={
               <Button className="btn-primary" onClick={() => setShowAdd(!showAdd)}>
                 <Plus className="w-4 h-4 mr-2"/>
                 Log Communication
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           {/* Summary + Filters */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <Card><CardContent className="p-4">
-              <div className="text-2xl font-bold text-navy">{summary?.total_communications || 0}</div>
+            <Card className="card-trust corner-mark"><CardContent className="p-4">
+              <div className="text-2xl font-bold text-navy font-mono">{summary?.total_communications || 0}</div>
               <div className="text-xs text-muted-foreground">Total Recorded</div>
             </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <div className="text-2xl font-bold text-warning">{summary?.pending_actions || 0}</div>
+            <Card className="card-trust corner-mark"><CardContent className="p-4">
+              <div className="text-2xl font-bold text-warning font-mono">{summary?.pending_actions || 0}</div>
               <div className="text-xs text-muted-foreground">Pending Actions</div>
             </CardContent></Card>
-            <Card className="col-span-2 card-trust">
+            <Card className="col-span-2 card-trust corner-mark">
               <CardContent className="p-3 flex gap-2 items-center">
                 <Search className="w-4 h-4 text-muted-foreground"/>
                 <Input
@@ -235,7 +233,7 @@ export default function CommunicationsPage() {
 
           {/* Add Form */}
           {showAdd && (
-            <Card className="mb-6 card-trust">
+            <Card className="mb-6 card-trust corner-mark">
               <CardContent className="p-4">
                 <h3 className="font-semibold text-navy mb-3">Log Communication</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -271,7 +269,7 @@ export default function CommunicationsPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button className="btn-primary" onClick={createCommunication}>Log Communication</Button>
-                  <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+                  <Button className="btn-secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
                 </div>
               </CardContent>
             </Card>
@@ -280,10 +278,10 @@ export default function CommunicationsPage() {
           {/* List */}
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="card-trust h-20 animate-pulse"/>)}
+              {[1,2,3].map(i => <div key={i} className="card-trust corner-mark h-20 animate-pulse"/>)}
             </div>
           ) : communications.length === 0 ? (
-            <div className="card-trust p-12 flex flex-col items-center justify-center">
+            <div className="card-trust corner-mark p-12 flex flex-col items-center justify-center">
               <MessageSquare className="w-12 h-12 text-muted-foreground/30 mb-3"/>
               <h2 className="text-lg font-semibold text-navy mb-1">No communications logged</h2>
               <p className="text-sm text-muted-foreground mb-4">Every trustee-beneficiary interaction should be documented. Start logging emails, calls, and notices.</p>
@@ -295,9 +293,9 @@ export default function CommunicationsPage() {
                 const Icon = COMM_TYPE_ICONS[comm.comm_type] || MessageSquare;
                 const needsAction = comm.action_required && !comm.action_completed;
                 return (
-                  <div key={comm.comm_id} className={`card-trust ${needsAction ? 'border-warning/30' : ''} p-4`}>
+                  <div key={comm.comm_id} className={`card-trust corner-mark ${needsAction ? 'border-warning/30' : ''} p-4`}>
                     <div className="flex items-start gap-3">
-                      <div className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded ${needsAction ? 'bg-warning/10 text-warning' : 'bg-navy/5 text-navy'}`}>
+                      <div className={`w-9 h-9 flex items-center justify-center flex-shrink-0 ${needsAction ? 'bg-warning/10 text-warning' : 'bg-navy/5 text-navy'}`}>
                         <Icon className="w-4 h-4"/>
                       </div>
                       <div className="flex-1">
@@ -306,19 +304,19 @@ export default function CommunicationsPage() {
                           {needsAction && (
                             <Badge className="bg-warning/10 text-warning">Action Required</Badge>
                           )}
-                          <span className="text-xs text-muted-foreground ml-auto">{formatDate(comm.created_at)}</span>
+                          <span className="text-xs text-muted-foreground ml-auto font-mono">{formatDate(comm.created_at)}</span>
                         </div>
                         <h3 className="font-semibold text-navy text-sm">{comm.subject}</h3>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{comm.content}</p>
                         {needsAction && comm.action_due && (
                           <p className="text-xs text-warning mt-2 flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5"/>
-                            Action due {formatDate(comm.action_due)}
+                            Action due <span className="font-mono">{formatDate(comm.action_due)}</span>
                           </p>
                         )}
                       </div>
                       {needsAction && (
-                        <Button size="sm" variant="outline" onClick={() => completeAction(comm.comm_id)}>
+                        <Button size="sm" className="btn-secondary" onClick={() => completeAction(comm.comm_id)}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1"/>
                           Complete
                         </Button>
@@ -331,13 +329,9 @@ export default function CommunicationsPage() {
           )}
           {communications.length < commTotal && (
             <div className="mt-4 text-center">
-              <button
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="btn-secondary"
-              >
+              <Button className="btn-secondary" onClick={handleLoadMore} disabled={loadingMore}>
                 {loadingMore ? 'Loading...' : 'Load More'}
-              </button>
+              </Button>
             </div>
           )}
         </div>

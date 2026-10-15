@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
 import EmailArchiveCard from '@/components/EmailArchiveCard';
 import { 
   User,
@@ -24,7 +25,6 @@ import {
   Download,
   FileText,
   ChevronRight,
-  Loader2,
   HeartHandshake,
   Mail,
   Clock,
@@ -265,8 +265,8 @@ export default function SettingsPage() {
         const el = document.querySelector(`[data-section="${targetId}"]`);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-navy/30', 'rounded');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-navy/30', 'rounded'), 3000);
+          el.classList.add('ring-2', 'ring-navy/30');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-navy/30'), 3000);
         }
       }, 350);
     }
@@ -892,21 +892,19 @@ export default function SettingsPage() {
               </TabsList>
             )}
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">{rolePage ? 'Trust Roles' : 'Settings'}</h1>
-              <p className="page-subtitle">
-              {rolePage
-                ? 'Keep every trustee, successor, protector, and handoff instruction in one place.'
-                : 'Configure trust settings, preferences, and account details — manage notifications, security, and trust profile information'}
-              </p>
-              {/* NOW-phase security package: explicit SSN-intake warning. */}
-              <p className="text-xs text-muted-foreground mt-2">
-                Never enter SSNs — TrustOffice does not support SSN storage. EIN fields accept the 9-digit Tax ID format (XX-XXXXXXX).
-              </p>
-            </div>
-            <PageHelpButton
-              items={[
+          <PageHeader
+            title={rolePage ? 'Trust Roles' : 'Settings'}
+            subtitle={rolePage
+              ? 'Keep every trustee, successor, protector, and handoff instruction in one place.'
+              : 'Configure trust settings, preferences, and account details — manage notifications, security, and trust profile information'}
+            actions={rolePage ? (
+              <Button type="button" className="btn-secondary" onClick={() => navigate('/successor-packet')}>
+                <FileText className="w-4 h-4 mr-2" />
+                View Successor Packet
+              </Button>
+            ) : null}
+            help={{
+              items: [
                 ...(rolePage ? [
                   { text: 'Record the current trustees, successor trustees, and trust protector' },
                   { text: 'Add the locations and instructions a successor will need' },
@@ -916,31 +914,33 @@ export default function SettingsPage() {
                   { text: 'Manage notifications, security, and trust profile information' },
                   { text: 'Update your personal and billing information' },
                 ]),
-              ]}
-              taPrompt="Walk me through the Settings page and what I can configure"
-            />
-            {rolePage && (
-              <div className="flex flex-col items-end gap-2">
-                <Button type="button" className="btn-secondary" onClick={() => navigate('/successor-packet')}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  View Successor Packet
-                </Button>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-navy underline underline-offset-2"
-                  onClick={() => navigate('/authority')}
-                >
-                  View recorded trustee powers (Legal Powers page)
-                </button>
-              </div>
-            )}
-          </div>
+              ],
+              taPrompt: 'Walk me through the Settings page and what I can configure',
+            }}
+          />
+          {/* NOW-phase security package: explicit SSN-intake warning. */}
+          <p className="text-xs text-muted-foreground mt-2">
+            Never enter SSNs — TrustOffice does not support SSN storage. EIN fields accept the 9-digit Tax ID format (XX-XXXXXXX).
+          </p>
+          {rolePage && (
+            <div className="flex flex-col items-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-navy underline underline-offset-2"
+                onClick={() => navigate('/authority')}
+              >
+                View recorded trustee powers (Legal Powers page)
+              </Button>
+            </div>
+          )}
 
           <TabsContent value="profile">
           {/* Trust Settings */}
           {selectedTrust && (
             <>
-            <div className="card-trust mb-8">
+            <div className="card-trust corner-mark mb-8">
               <div className="flex items-center gap-2 mb-6">
                 <Building2 className="w-5 h-5 text-navy" />
                 <h2 className="font-serif text-xl text-navy">Trust Profile</h2>
@@ -993,7 +993,7 @@ export default function SettingsPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-error hover:bg-error/10"
                             onClick={() => removeTrustee(index)}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1089,14 +1089,15 @@ export default function SettingsPage() {
                         <Label className="label-trust">IRS Determination Letter</Label>
                         <p className="text-sm text-muted-foreground mt-1">
                           Upload your IRS determination letter in the{' '}
-                          <button
+                          <Button
                             type="button"
-                            onClick={() => navigate('/vault')}
+                            variant="ghost"
                             className="text-navy underline hover:text-navy/80"
+                            onClick={() => navigate('/vault')}
                             data-testid="settings-vault-link"
                           >
                             Vault
-                          </button>
+                          </Button>
                           {' '}— it will be stored securely with your other trust documents.
                         </p>
                       </div>
@@ -1252,7 +1253,7 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10 mt-6">
                   {isReadOnly && (
-                    <p className="text-sm text-amber-600 flex items-center gap-1.5">
+                    <p className="text-sm text-warning flex items-center gap-1.5">
                       <AlertCircle className="w-4 h-4" />
                       Subscribe to save changes
                     </p>
@@ -1281,7 +1282,7 @@ export default function SettingsPage() {
           {/* ============ PEOPLE TAB ============ */}
           <TabsContent value="people">
                 {/* Grantor */}
-                <div className="card-trust mb-8">
+                <div className="card-trust corner-mark mb-8">
                   <div className="flex items-center gap-2 mb-6">
                     <Users className="w-5 h-5 text-navy" />
                     <h2 className="font-serif text-xl text-navy">Grantor</h2>
@@ -1306,7 +1307,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Successor Trustee */}
-                <div className="card-trust mb-8">
+                <div className="card-trust corner-mark mb-8">
                   <div className="flex items-center gap-2 mb-6">
                     <Shield className="w-5 h-5 text-navy" />
                     <h2 className="font-serif text-xl text-navy">Successor Trustee</h2>
@@ -1375,7 +1376,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Secondary Successor Trustee */}
-                <div className="card-trust mb-8 opacity-90 border border-navy/10">
+                <div className="card-trust corner-mark mb-8 opacity-90 border border-navy/10">
                   <div className="flex items-center gap-2 mb-4">
                     <Shield className="w-5 h-5 text-navy/60" />
                     <h2 className="font-serif text-xl text-navy">Secondary Successor Trustee</h2>
@@ -1432,7 +1433,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Successor Instructions */}
-                <div className="card-trust mb-8">
+                <div className="card-trust corner-mark mb-8">
                   <div className="flex items-center gap-2 mb-6">
                     <FileText className="w-5 h-5 text-navy" />
                     <h2 className="font-serif text-xl text-navy">Successor Instructions</h2>
@@ -1447,7 +1448,7 @@ export default function SettingsPage() {
                       <textarea
                         value={trustData.successor_instructions}
                         onChange={(e) => setTrustData({ ...trustData, successor_instructions: e.target.value })}
-                        className="mt-1 w-full rounded border border-input bg-background px-3 py-2 text-sm min-h-[120px]"
+                        className="mt-1 w-full border border-input bg-background px-3 py-2 text-sm min-h-[120px]"
                         placeholder="Personal wishes, priorities, values, and guidance for your successor trustee. This is your voice to them."
                       />
                       <p className="text-xs text-muted-foreground mt-1">This will be included in the Successor Trustee Packet</p>
@@ -1467,7 +1468,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Trust Protector */}
-                <div className="card-trust mb-8">
+                <div className="card-trust corner-mark mb-8">
                   <div className="flex items-center gap-2 mb-6">
                     <Shield className="w-5 h-5 text-gold" />
                     <h2 className="font-serif text-xl text-navy">Trust Protector</h2>
@@ -1587,7 +1588,7 @@ export default function SettingsPage() {
                                         : [...trustData.trust_protector_powers, power.value];
                                       setTrustData({ ...trustData, trust_protector_powers: powers });
                                     }}
-                                    className="mt-0.5 h-5 w-5 accent-[#d5ad36]"
+                                    className="mt-0.5 h-5 w-5 accent-gold"
                                   />
                                   <div>
                                     <p className="text-xs font-medium text-navy">{power.label}</p>
@@ -1614,7 +1615,7 @@ export default function SettingsPage() {
                             onClick={handleSendTrustProtectorNotice}
                             disabled={loading || isReadOnly}
                           >
-                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                            {loading ? <Spinner size={16} /> : <Mail className="w-4 h-4" />}
                             Send Notice
                           </Button>
                         </div>
@@ -1624,7 +1625,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Key Contacts */}
-                <div className="card-trust mb-8">
+                <div className="card-trust corner-mark mb-8">
                   <div className="flex items-center gap-2 mb-6">
                     <Mail className="w-5 h-5 text-navy" />
                     <h2 className="font-serif text-xl text-navy">Key Contacts</h2>
@@ -1665,7 +1666,7 @@ export default function SettingsPage() {
                 {selectedTrust && (
                   <div className="flex items-center justify-end pt-4 border-t border-navy/10">
                     {isReadOnly && (
-                      <p className="text-sm text-amber-600 mr-auto flex items-center gap-1.5">
+                      <p className="text-sm text-warning mr-auto flex items-center gap-1.5">
                         <AlertCircle className="w-4 h-4" />
                         Subscribe to save changes
                       </p>
@@ -1744,18 +1745,16 @@ export default function SettingsPage() {
                           const selected = (spendingThreshold.scope_classifications || []).includes(cls);
                           return (
                             <div key={cls} className="flex flex-col items-start">
-                              <button
+                              <Button
                                 type="button"
                                 onClick={() => toggleScopeClassification(cls)}
-                                className={`px-3 py-1.5 text-xs font-medium border transition-colors ${
-                                  selected
-                                    ? 'bg-navy text-white border-navy'
-                                    : 'bg-white text-navy border-navy/30 hover:border-navy'
-                                }`}
+                                className={selected
+                                  ? 'bg-navy text-white border-navy px-3 py-1.5 text-xs font-medium border transition-colors'
+                                  : 'bg-white text-navy border-navy/30 hover:border-navy px-3 py-1.5 text-xs font-medium border transition-colors'}
                                 data-testid={`scope-classification-${cls.replace(/\s+/g, '-').toLowerCase()}`}
                               >
                                 {cls}
-                              </button>
+                              </Button>
                               <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[140px] leading-tight">
                                 {CLASSIFICATION_DESCRIPTIONS[cls]}
                               </span>
@@ -1807,7 +1806,7 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between pt-4 border-t border-navy/10">
                   {isReadOnly && (
-                    <p className="text-sm text-amber-600 flex items-center gap-1.5">
+                    <p className="text-sm text-warning flex items-center gap-1.5">
                       <AlertCircle className="w-4 h-4" />
                       Subscribe to save changes
                     </p>
@@ -1943,9 +1942,7 @@ export default function SettingsPage() {
 
           {/* ============ PROFILE TAB ============ */}
           {/* Billing Section */}
-          {/* ============ PROFILE TAB ============ */}
-          {/* Billing Section */}
-          <div className="card-trust mb-8">
+          <div className="card-trust corner-mark mb-8">
             <div className="flex items-center gap-2 mb-4">
               <CreditCard className="w-5 h-5 text-navy" />
               <h2 className="font-serif text-xl text-navy">Billing & Subscription</h2>
@@ -1968,7 +1965,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2 mb-4">
               <Gift className="w-5 h-5 text-gold" />
               <h2 className="font-serif text-xl text-navy">Refer a Friend</h2>
-              <span className="bg-gold/20 text-gold px-2 py-0.5 text-xs font-medium rounded">
+              <span className="bg-gold/20 text-gold px-2 py-0.5 text-xs font-medium font-mono uppercase tracking-wider">
                 $50 CREDIT
               </span>
             </div>
@@ -1979,12 +1976,12 @@ export default function SettingsPage() {
             
             {referralLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-navy" />
+                <Spinner size={24} />
               </div>
             ) : (
               <div className="space-y-4">
                 {/* Referral Link */}
-                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded">
+                <div className="bg-navy/5 p-4 rounded">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                     Your Referral Link
                   </Label>
@@ -1992,7 +1989,7 @@ export default function SettingsPage() {
                     <Input
                       value={referralData?.referral_link || ''}
                       readOnly
-                      className="font-mono text-sm bg-white dark:bg-slate-800"
+                      className="font-mono text-sm bg-white"
                       data-testid="referral-link-input"
                     />
                     <Button
@@ -2018,16 +2015,16 @@ export default function SettingsPage() {
                 {/* Credit Balance */}
                 {referralStats && (
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-gold/10 rounded">
-                      <p className="text-2xl font-bold text-gold">${referralStats.available_credit || 0}</p>
+                    <div className="text-center p-3 bg-gold/10">
+                      <p className="font-mono text-2xl font-bold text-gold">${referralStats.available_credit || 0}</p>
                       <p className="text-xs text-muted-foreground">Available Credit</p>
                     </div>
-                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded">
-                      <p className="text-2xl font-bold text-navy">{referralStats.total_referred || 0}</p>
+                    <div className="text-center p-3 bg-navy/5 rounded">
+                      <p className="font-mono text-2xl font-bold text-navy">{referralStats.total_referred || 0}</p>
                       <p className="text-xs text-muted-foreground">Friends Invited</p>
                     </div>
                     <div className="text-center p-3 bg-success/10">
-                      <p className="text-2xl font-bold text-success">{referralStats.successful_conversions || 0}</p>
+                      <p className="font-mono text-2xl font-bold text-success">{referralStats.successful_conversions || 0}</p>
                       <p className="text-xs text-muted-foreground">Subscribed</p>
                     </div>
                   </div>
@@ -2036,10 +2033,10 @@ export default function SettingsPage() {
                 {/* Lifetime + Expiring */}
                 {referralStats && (referralStats.lifetime_credits_earned > 0 || referralStats.credits_expiring) && (
                   <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                    <span>Lifetime credits earned: <span className="font-semibold text-navy">${referralStats.lifetime_credits_earned || 0}</span> / ${referralStats.lifetime_cap || 500}</span>
+                    <span>Lifetime credits earned: <span className="font-semibold text-navy">${referralStats.lifetime_credits_earned || 0}</span> / <span className="font-mono">${referralStats.lifetime_cap || 500}</span></span>
                     {referralStats.credits_expiring && (
                       <span className="text-warning">
-                        ${referralStats.credits_expiring.amount} credit expires {new Date(referralStats.credits_expiring.expires_at).toLocaleDateString()}
+                        <span className="font-mono">${referralStats.credits_expiring.amount}</span> credit expires <span className="font-mono">{new Date(referralStats.credits_expiring.expires_at).toLocaleDateString()}</span>
                       </span>
                     )}
                   </div>
@@ -2054,7 +2051,7 @@ export default function SettingsPage() {
                     </h3>
                     <div className="space-y-2">
                       {referralStats.referrals.slice(0, 5).map((ref, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                        <div key={idx} className="flex items-center justify-between text-sm py-2 border-b border-navy/10 last:border-0">
                           <div>
                             <p className="font-medium">{ref.name}</p>
                             <p className="text-xs text-muted-foreground">{ref.email}</p>
@@ -2079,13 +2076,13 @@ export default function SettingsPage() {
                 )}
                 
                 {/* How it works */}
-                <div className="bg-navy/5 dark:bg-navy/20 p-4 rounded mt-4">
+                <div className="bg-navy/5 p-4 mt-4">
                   <h3 className="text-sm font-medium text-navy mb-2">How it works</h3>
                   <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Share your unique referral link with friends</li>
                     <li>They sign up and get 50% off their first payment</li>
                     <li>When they subscribe, you earn a $50 credit</li>
-                    <li>Credits apply automatically to your next bill — ${referralStats?.lifetime_cap || 500} lifetime max</li>
+                    <li>Credits apply automatically to your next bill — <span className="font-mono">${referralStats?.lifetime_cap || 500}</span> lifetime max</li>
                   </ol>
                 </div>
               </div>
@@ -2093,7 +2090,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Notification Preferences Section */}
-          <div className="card-trust mb-8" data-testid="notification-preferences-section">
+          <div className="card-trust corner-mark mb-8" data-testid="notification-preferences-section">
             <div className="flex items-center gap-2 mb-4">
               <Bell className="w-5 h-5 text-navy" />
               <h2 className="font-serif text-xl text-navy">Notification Preferences</h2>
@@ -2246,7 +2243,7 @@ export default function SettingsPage() {
                 data-testid="export-minutes-btn"
               >
                 {exportLoading === 'minutes' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} />
                 ) : (
                   <FileText className="w-4 h-4" />
                 )}
@@ -2261,7 +2258,7 @@ export default function SettingsPage() {
                 data-testid="export-distributions-btn"
               >
                 {exportLoading === 'distributions' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} />
                 ) : (
                   <FileText className="w-4 h-4" />
                 )}
@@ -2276,7 +2273,7 @@ export default function SettingsPage() {
                 data-testid="export-compensation-btn"
               >
                 {exportLoading === 'compensation' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} />
                 ) : (
                   <FileText className="w-4 h-4" />
                 )}
@@ -2291,7 +2288,7 @@ export default function SettingsPage() {
                 data-testid="export-tasks-btn"
               >
                 {exportLoading === 'tasks' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} />
                 ) : (
                   <FileText className="w-4 h-4" />
                 )}
@@ -2306,7 +2303,7 @@ export default function SettingsPage() {
                 data-testid="export-expenses-btn"
               >
                 {exportLoading === 'expenses' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size={16} />
                 ) : (
                   <FileText className="w-4 h-4" />
                 )}
@@ -2334,7 +2331,7 @@ export default function SettingsPage() {
                 >
                   {exportLoading === 'full' ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Spinner size={16} />
                       Generating...
                     </>
                   ) : (
@@ -2453,7 +2450,7 @@ export default function SettingsPage() {
                 data-testid="seed-demo-btn"
               >
                 {demoLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size={16} className="mr-2" />
                 ) : (
                   <Sparkles className="w-4 h-4 mr-2" />
                 )}
@@ -2465,7 +2462,7 @@ export default function SettingsPage() {
                   <Button
                     variant="outline"
                     disabled={demoLoading || !demoStatus?.has_demo_data}
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    className="border-error/30 text-error hover:bg-error/10 hover:text-error"
                     data-testid="delete-data-btn"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
@@ -2474,7 +2471,7 @@ export default function SettingsPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle className="font-serif text-xl text-red-600">Remove Demo Data?</DialogTitle>
+                    <DialogTitle className="font-serif text-xl text-error">Remove Demo Data?</DialogTitle>
                     <DialogDescription>
                       This will remove all sample/demo data from your account. Your own trusts and records will NOT be affected.
                     </DialogDescription>
@@ -2509,11 +2506,11 @@ export default function SettingsPage() {
                     <Button 
                       onClick={handleDeleteDemoData}
                       disabled={demoLoading}
-                      className="bg-red-600 hover:bg-red-700 text-white"
+                      className="bg-error hover:bg-error/90 text-white"
                       data-testid="confirm-delete-data-btn"
                     >
                       {demoLoading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Spinner size={16} className="mr-2" />
                       ) : (
                         <Trash2 className="w-4 h-4 mr-2" />
                       )}
@@ -2529,7 +2526,7 @@ export default function SettingsPage() {
                 disabled={demoLoading}
                 className="text-muted-foreground"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${demoLoading ? 'animate-spin' : ''}`} />
+                {demoLoading ? <Spinner size={16} className="mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                 Refresh
               </Button>
             </div>
@@ -2585,23 +2582,13 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={userPrefs.admin_access_locked}
+                <Switch
+                  checked={userPrefs.admin_access_locked}
+                  onCheckedChange={() => handleAdminAccessLockToggle()}
                   disabled={userPrefsLoading}
-                  onClick={handleAdminAccessLockToggle}
                   data-testid="admin-access-lock-toggle"
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                    userPrefs.admin_access_locked ? 'bg-success' : 'bg-navy/10'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      userPrefs.admin_access_locked ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+                  aria-label="Admin access lock"
+                />
               </div>
 
               {/* Two-factor management (enrollment / recovery codes / disable) */}

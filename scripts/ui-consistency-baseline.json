@@ -31,16 +31,12 @@
  "BenevolenceTabbed.js": {
   "R1_header": 1
  },
- "BillingPage.js": {
-  "R2_radius_hard": 1
- },
+ "BillingPage.js": {},
  "CertificatesTab.jsx": {},
  "ClassBeneficiariesTab.jsx": {},
  "ClientDashboard.js": {},
  "ClientsListPage.js": {},
- "CommunicationsPage.js": {
-  "R4_raw_btn": 1
- },
+ "CommunicationsPage.js": {},
  "CompensationPage.js": {},
  "ConnectWingPoint.js": {
   "R2_radius_hard": 2,
@@ -99,11 +95,7 @@
   "R2_radius_hard": 1,
   "R3_palette": 11
  },
- "MessagingPage.js": {
-  "R2_radius_hard": 7,
-  "R3_palette": 2,
-  "R4_raw_btn": 5
- },
+ "MessagingPage.js": {},
  "MinutesDetailPage.js": {
   "R1_header": 1,
   "R2_radius_full": 2,
@@ -147,11 +139,7 @@
  "RiskDashboardPage.js": {},
  "ScheduleAPage.js": {},
  "SeparationTab.js": {},
- "SettingsPage.js": {
-  "R2_radius_full": 2,
-  "R3_palette": 7,
-  "R4_raw_btn": 4
- },
+ "SettingsPage.js": {},
  "SignUpPage.js": {},
  "StateCompliancePage.js": {},
  "StatsPage.js": {

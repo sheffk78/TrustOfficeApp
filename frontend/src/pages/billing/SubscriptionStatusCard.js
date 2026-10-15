@@ -1,7 +1,8 @@
 import {
   AlertTriangle, ArrowUpCircle, Calendar, Check, Clock,
-  ExternalLink, Loader2, RefreshCw, XCircle,
+  ExternalLink, RefreshCw, XCircle,
 } from 'lucide-react';
+import Spinner from '@/components/Spinner';
 import { Button } from '@/components/ui/button';
 import StatusBadge from './StatusBadge';
 import { TIERS, planDisplayName, tierPriceFor, LEGACY_TRUSTEE_RATES } from './pricingConfig';
@@ -74,17 +75,17 @@ export default function SubscriptionStatusCard({
             <p className="text-sm text-muted-foreground mt-1">
               {subscription?.billing_period === 'annual' ? 'Annual billing' : 'Monthly billing'}
               {' · '}
-              {trustLimitLabel()}
+              <span className="font-mono">{trustLimitLabel()}</span>
             </p>
           )}
           {isGrandfathered && (
             <p className="text-xs text-success mt-1 font-medium">
-              Grandfathered: {legacyTrustLimit} trusts at your current price
+              Grandfathered: <span className="font-mono">{legacyTrustLimit}</span> trusts at your current price
             </p>
           )}
           {isLegacyPrice && !isCanceling && (
             <p className="text-xs text-success mt-1 font-medium">
-              Legacy rate locked in — ${subscription?.billing_period === 'annual' ? LEGACY_TRUSTEE_RATES.annual + '/yr' : LEGACY_TRUSTEE_RATES.monthly + '/mo'}. You keep this price on renewal; changing plans ends it.
+              Legacy rate locked in — <span className="font-mono">${subscription?.billing_period === 'annual' ? LEGACY_TRUSTEE_RATES.annual + '/yr' : LEGACY_TRUSTEE_RATES.monthly + '/mo'}</span>. You keep this price on renewal; changing plans ends it.
             </p>
           )}
         </div>
@@ -167,7 +168,7 @@ export default function SubscriptionStatusCard({
                 data-testid="manage-billing-btn"
               >
                 {actionLoading === 'portal' ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size={16} className="mr-2" />
                 ) : (
                   <ExternalLink className="w-4 h-4 mr-2" />
                 )}
@@ -186,7 +187,7 @@ export default function SubscriptionStatusCard({
             <div>
               <p className="font-medium text-warning">Subscription canceling</p>
               <p className="text-sm text-warning/80 mt-1">
-                Your subscription is set to cancel on {formatDate(subscription.current_period_end)}. 
+                Your subscription is set to cancel on <span className="font-mono">{formatDate(subscription.current_period_end)}</span>. 
                 You'll retain full access until then.
               </p>
               <Button
@@ -198,7 +199,7 @@ export default function SubscriptionStatusCard({
                 data-testid="reactivate-btn"
               >
                 {actionLoading === 'reactivate' ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size={16} className="mr-2" />
                 ) : (
                   <RefreshCw className="w-4 h-4 mr-2" />
                 )}
@@ -233,7 +234,7 @@ export default function SubscriptionStatusCard({
             data-testid="manage-billing-btn"
           >
             {actionLoading === 'portal' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Spinner size={16} className="mr-2" />
             ) : (
               <ExternalLink className="w-4 h-4 mr-2" />
             )}
@@ -248,7 +249,7 @@ export default function SubscriptionStatusCard({
             data-testid="cancel-subscription-btn"
           >
             {actionLoading === 'cancel' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Spinner size={16} className="mr-2" />
             ) : (
               <XCircle className="w-4 h-4 mr-2" />
             )}

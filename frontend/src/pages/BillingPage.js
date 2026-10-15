@@ -11,7 +11,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Extracted pricing config + components (frontend/src/pages/billing/)
 import { TIERS, WINGPOINT_TIER, planDisplayName, tierPriceFor } from './billing/pricingConfig';
@@ -29,7 +33,7 @@ import CancelFlowModal from '@/components/billing/CancelFlowModal';
 function RecordsRepositoryNote() {
   return (
     <div
-      className="mt-6 p-4 border border-navy/15 bg-navy/5 rounded-lg"
+      className="mt-6 p-4 border border-navy/15 bg-navy/5"
       data-testid="records-repository-note"
     >
       <p className="text-sm text-muted-foreground">
@@ -50,6 +54,9 @@ export default function BillingPage() {
   const [processing, setProcessing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  // Parked change-plan request for the confirm dialog (UI standard — the tier
+  // card CTA opens modal confirmation instead of a browser prompt).
+  const [planConfirm, setPlanConfirm] = useState(null); // { planId, period }
   // Phase 3: billing period toggle for the no-subscription plan picker
   // Default to 'annual' — shows the cheapest monthly amount with total annual savings.
   const [pickerBillingPeriod, setPickerBillingPeriod] = useState('annual');
@@ -160,16 +167,24 @@ export default function BillingPage() {
     }
   };
 
-  // Phase 3: change-plan endpoint for tier upgrades/downgrades.
-  // Body: { plan_type, billing_period }. Used by the existing-subscription
-  // "Change Plan" buttons rendered for each tier card below.
-  const handleChangePlan = async (planId, period = 'monthly') => {
+  // The confirmation copy for a parked plan change: the exact string the old
+  // browser confirm composed, including the legacy-rate warning (verbatim).
+  const planChangeMessage = (planId, period = 'monthly') => {
     const legacyWarning = subscription?.is_legacy_price
       ? `\n\n⚠️ You're on a grandfathered rate. Changing plans (including switching billing period) ENDS that rate — your subscription will bill at the current listed price for ${planDisplayName(planId)}. Your rate is only protected if you keep your current plan.`
       : '';
-    if (!window.confirm(`Change your plan to ${planDisplayName(planId)} (${period})? Your billing will be prorated for the remainder of your current cycle.${legacyWarning}`)) {
-      return;
-    }
+    return `Change your plan to ${planDisplayName(planId)} (${period})? Your billing will be prorated for the remainder of your current cycle.${legacyWarning}`;
+  };
+
+  // Phase 3: change-plan endpoint for tier upgrades/downgrades.
+  // Body: { plan_type, billing_period }. Used by the existing-subscription
+  // "Change Plan" buttons rendered for each tier card below. The buttons park
+  // the request in planConfirm; the AlertDialog at the end of the page resumes
+  // it (UI standard — modal confirm, no browser prompt). The guard keeps the
+  // old pre-confirm no-op semantics when nothing is parked.
+  const handleChangePlan = async (planId, period = 'monthly') => {
+    if (!planConfirm) return;
+    setPlanConfirm(null);
     setActionLoading('change-plan');
     try {
       const response = await fetchWithAuth('/subscription/change-plan', {
@@ -313,25 +328,21 @@ export default function BillingPage() {
           </Button>
 
           {/* Page Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Billing & Subscription</h1>
-              <p className="page-subtitle">
-                Manage your subscription, billing history, and payment methods — upgrade, downgrade, or cancel at any time
-              </p>
-            </div>
-            <PageHelpButton
-              items={[
+          <PageHeader
+            title="Billing & Subscription"
+            subtitle="Manage your subscription, billing history, and payment methods — upgrade, downgrade, or cancel at any time"
+            help={{
+              items: [
                 { text: 'Manage your subscription plan, billing history, and payment methods' },
                 { text: 'Upgrade, downgrade, or cancel your plan at any time' },
                 { text: 'View invoices and payment receipts' },
-              ]}
-              taPrompt="Help me understand the Billing page and my subscription options"
-            />
-          </div>
+              ],
+              taPrompt: 'Help me understand the Billing page and my subscription options',
+            }}
+          />
 
           {loading ? (
-            <div className="card-trust">
+            <div className="card-trust corner-mark">
               <div className="skeleton h-32 w-full"></div>
             </div>
           ) : !subscription ? (
@@ -424,7 +435,7 @@ export default function BillingPage() {
                   currentTierIndex={currentTierIndex}
                   currentBillingPeriod={currentBillingPeriod}
                   targetPlan={targetPlan}
-                  onChangePlan={handleChangePlan}
+                  onChangePlan={(planId, period) => setPlanConfirm({ planId, period })}
                   actionLoading={actionLoading}
                   cardRef={tierCardRef}
                   userTrustCount={userTrustCount}
@@ -479,6 +490,33 @@ export default function BillingPage() {
         loadSubscriptionState={loadSubscriptionState}
         onComplete={handleCancelComplete}
       />
+      {/* Change-plan confirmation (AlertDialog per UI standard): the tier-card
+          CTA parks {planId, period} here; Cancel, Esc, or an outside click
+          aborts it — the same no-op semantics as the old browser prompt. The
+          description is exactly the string the browser prompt used to show. */}
+      <AlertDialog open={!!planConfirm} onOpenChange={(open) => { if (!open) setPlanConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Your Plan</AlertDialogTitle>
+            <AlertDialogDescription>
+              {planConfirm ? planChangeMessage(planConfirm.planId, planConfirm.period) : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="plan-confirm-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="plan-confirm-confirm"
+              className="btn-primary"
+              onClick={(e) => {
+                e.preventDefault();
+                handleChangePlan(planConfirm?.planId, planConfirm?.period);
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
