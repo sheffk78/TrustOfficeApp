@@ -15,7 +15,10 @@ export default function Pagination({ page, totalPages, onChange }) {
         <ChevronLeft className="w-4 h-4" />
       </Button>
       <span className="text-sm text-muted-foreground">
-        Page {page} of {totalPages}
+        Page{' '}
+        <span className="font-mono font-medium">{page}</span>
+        {' '}of{' '}
+        <span className="font-mono font-medium">{totalPages}</span>
       </span>
       <Button
         variant="outline"

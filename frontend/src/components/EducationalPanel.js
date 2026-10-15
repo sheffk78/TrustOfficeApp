@@ -168,7 +168,7 @@ export default function EducationalPanel({ trustId, healthScore }) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1.5 text-xs font-mono border transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-navy text-cream border-navy'
+                    ? 'bg-navy text-white border-navy'
                     : 'border-navy/20 text-muted-foreground hover:border-navy/40'
                 }`}
                 data-testid={`edu-tab-${tab.id}`}

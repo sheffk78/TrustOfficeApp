@@ -6,7 +6,11 @@ import { Input } from '@/components/ui/input';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { FolderOpen, Plus, Search } from 'lucide-react';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import {
   CATEGORY_ICONS,
@@ -35,6 +39,7 @@ export default function VaultPage() {
   const [activeCategory, setActiveCategory] = useState('');
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [criticalDismissed, setCriticalDismissed] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const copyTimeoutRef = useRef(null);
 
   // 2FA step-up: vault downloads are a protected action. When the backend
@@ -120,7 +125,15 @@ export default function VaultPage() {
     });
   }, []);
 
-  const handleDelete = useCallback((id) => deleteDocument(id, loadData), [loadData]);
+  // Delete confirm: the Trash button on a document card parks the id here,
+  // the AlertDialog below fires deleteDocument on confirm (UI standard —
+  // no unconfirmed destructive actions).
+  const handleDelete = useCallback((id) => setPendingDeleteId(id), []);
+  const confirmDelete = useCallback(() => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (id) deleteDocument(id, loadData);
+  }, [pendingDeleteId, loadData]);
   const handleDownload = useCallback((docId, fileName) => downloadDocument(docId, fileName), []);
 
   // 2FA step-up from the preview modal: park the original (download) request
@@ -147,7 +160,7 @@ export default function VaultPage() {
 
   if (!selectedTrust) {
     return (
-      <div className="card-trust p-12 flex flex-col items-center justify-center">
+      <div className="card-trust corner-mark p-12 flex flex-col items-center justify-center">
         <FolderOpen className="w-12 h-12 text-muted-foreground/40 mb-3" />
         <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
         <p className="text-sm text-muted-foreground">Choose a trust to view document vault.</p>
@@ -165,26 +178,29 @@ export default function VaultPage() {
 
   return (
     <>
-      <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Trust Document Vault</h1>
-              <p className="page-subtitle">Store, organize, and access trust documents — upload files, manage categories, and share with beneficiaries</p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Store, organize, and access all trust documents in one place' },
-                  { text: 'Upload files, manage categories, and control access' },
-                  { text: 'Share documents with beneficiaries and advisors securely' },
-                ]}
-                taPrompt="Help me understand the Document Vault and how to upload files"
-              />
-              <Button className="btn-primary" onClick={() => { upload.setShowAdd(!upload.showAdd); upload.setAddMode('upload'); }} disabled={dissolved} title={dissolved ? 'This trust is dissolved and read-only' : undefined}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Document
-              </Button>
-            </div>
-          </div>
+      <PageHeader
+        title="Trust Document Vault"
+        subtitle="Store, organize, and access trust documents — upload files, manage categories, and share with beneficiaries"
+        help={{
+          items: [
+            { text: 'Store, organize, and access all trust documents in one place' },
+            { text: 'Upload files, manage categories, and control access' },
+            { text: 'Share documents with beneficiaries and advisors securely' },
+          ],
+          taPrompt: 'Help me understand the Document Vault and how to upload files',
+        }}
+        actions={
+          <Button
+            className="btn-primary"
+            disabled={dissolved}
+            title={dissolved ? 'This trust is dissolved and read-only' : undefined}
+            onClick={() => { upload.setShowAdd(!upload.showAdd); upload.setAddMode('upload'); }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Document
+          </Button>
+        }
+      />
 
           <DissolvedTrustBanner trust={selectedTrust} />
 
@@ -197,7 +213,7 @@ export default function VaultPage() {
           {/* Cloud Backup */}
           <div
             ref={backupCardRef}
-            className={backupHighlight ? 'rounded-lg ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg transition-all' : ''}
+            className={backupHighlight ? 'ring-2 ring-gold ring-offset-2 ring-offset-subtle-bg transition-all border border-navy/20' : ''}
             data-testid="cloud-backup-focus-target"
           >
             <CloudBackupSection selectedTrust={selectedTrust} />
@@ -251,10 +267,10 @@ export default function VaultPage() {
           {/* Document Grid by Category */}
           {loading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-20 card-trust animate-pulse" />)}
+              {[1, 2, 3].map(i => <div key={i} className="h-20 card-trust corner-mark animate-pulse" />)}
             </div>
           ) : !hasDocuments ? (
-            <div className="card-trust p-12 flex flex-col items-center justify-center">
+            <div className="card-trust corner-mark p-12 flex flex-col items-center justify-center">
               <FolderOpen className="w-12 h-12 text-muted-foreground/30 mb-3" />
               <h2 className="text-lg font-semibold text-navy mb-1">Vault is empty</h2>
               <p className="text-sm text-muted-foreground mb-4">Upload your trust documents or link to files stored externally.</p>
@@ -278,6 +294,30 @@ export default function VaultPage() {
               ))}
             </div>
           )}
+      {/* Delete confirmation (AlertDialog per standard — no unconfirmed delete) */}
+      <AlertDialog open={!!pendingDeleteId} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete this document from the vault? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-vault-doc-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="delete-vault-doc-confirm"
+              className="bg-error text-error-foreground hover:bg-error/90"
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* 2FA step-up modal: appears only when the backend demands a fresh
           code for a protected download (2fa_stepup_required). Handles both
           the list-download path (use2faStepUp) and the preview-download

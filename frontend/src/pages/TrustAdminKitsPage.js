@@ -5,13 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import PageHelpButton from '@/components/PageHelpButton';
+import Spinner from '@/components/Spinner';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { fetchWithAuth } from '@/utils/api';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import {
   Car, Building, Home, FileText, Shield, Briefcase,
   ArrowLeft, Trash2, Download, CheckCircle2, AlertCircle,
-  Loader2, FilePen, MapPin, Calendar, DollarSign, Clock,
+  FilePen, MapPin, Calendar, DollarSign, Clock,
   FolderOpen, ChevronRight, Printer
 } from 'lucide-react';
 
@@ -47,6 +52,7 @@ export default function TrustAdminKitsPage() {
   const [existingKits, setExistingKits] = useState([]);
   const [kitsLoading, setKitsLoading] = useState(true);
   const [viewKitLoading, setViewKitLoading] = useState(false);
+  const [pendingKitDelete, setPendingKitDelete] = useState(null);
 
   // Load kit types on mount
   useEffect(() => {
@@ -164,9 +170,8 @@ export default function TrustAdminKitsPage() {
     }
   };
 
-  // Delete a kit
+  // Delete a kit — fired from the delete AlertDialog confirm below
   const deleteKit = async (kitId) => {
-    if (!window.confirm('Delete this kit?')) return;
     try {
       const res = await fetchWithAuth(`/trust-admin-kits/${kitId}`, {
         method: 'DELETE',
@@ -259,7 +264,7 @@ export default function TrustAdminKitsPage() {
           <h2 className="text-lg font-semibold mb-4">Your Generated Kits</h2>
           {viewKitLoading && (
             <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading kit…
+              <Spinner size={16} label="Loading kit" />
             </div>
           )}
           {existingKits.map(kit => {
@@ -277,7 +282,7 @@ export default function TrustAdminKitsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-sm">{kit.kit_title}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground font-mono">
                         {new Date(kit.created_at).toLocaleDateString()}
                       </p>
                     </div>
@@ -287,7 +292,8 @@ export default function TrustAdminKitsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={(e) => { e.stopPropagation(); deleteKit(kit.kit_id); }}
+                      onClick={(e) => { e.stopPropagation(); setPendingKitDelete(kit.kit_id); }}
+                      aria-label="Delete kit"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -339,7 +345,7 @@ export default function TrustAdminKitsPage() {
 
         {previewLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-gold" />
+            <Spinner size={32} />
             <p className="text-sm text-muted-foreground">Reading your trust profile...</p>
           </div>
         ) : !previewData ? (
@@ -366,12 +372,16 @@ export default function TrustAdminKitsPage() {
                   ['State', previewData.auto_gathered?.state_code],
                   ['Formation Date', previewData.auto_gathered?.formation_date?.split('T')[0]],
                   ['Trust Type', previewData.auto_gathered?.trust_type],
-                ].filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between text-sm py-1.5 border-b border-border/50 last:border-0">
-                    <span className="text-muted-foreground">{label}</span>
-                    <span className="font-medium">{value}</span>
-                  </div>
-                ))}
+                ].filter(([, v]) => v).map(([label, value]) => {
+                  // Mono per standard: numbers/dates/IDs (EIN, Formation Date)
+                  const monoRow = label === 'EIN' || label === 'Formation Date';
+                  return (
+                    <div key={label} className="flex items-center justify-between text-sm py-1.5 border-b border-border/50 last:border-0">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className={`font-medium${monoRow ? ' font-mono' : ''}`}>{value}</span>
+                    </div>
+                  );
+                })}
                 {/* Vault docs */}
                 {previewData.auto_gathered?.vault_docs?.length > 0 && (
                   <div className="pt-3">
@@ -415,7 +425,7 @@ export default function TrustAdminKitsPage() {
                           <select
                             value={formInputs[key] || ''}
                             onChange={(e) => updateInput(key, e.target.value)}
-                            className="w-full px-3 py-2 border border-border bg-background text-sm focus:ring-2 focus:ring-gold/40 focus:border-gold/40 outline-none"
+                            className="input-trust w-full text-sm"
                           >
                             <option value="">Select...</option>
                             {field.options?.map(opt => (
@@ -435,11 +445,7 @@ export default function TrustAdminKitsPage() {
                           value={formInputs[key] || ''}
                           onChange={(e) => updateInput(key, e.target.value)}
                           placeholder={field.placeholder || ''}
-                          className={`w-full px-3 py-2 border text-sm outline-none transition-colors ${
-                            isAutoFilled
-                              ? 'bg-success/10 dark:bg-success/20 border-success/30 dark:border-success/40'
-                              : 'bg-background border-border focus:ring-2 focus:ring-gold/40 focus:border-gold/40'
-                          }`}
+                          className={`input-trust w-full text-sm ${isAutoFilled ? 'bg-success/10 dark:bg-success/20' : ''}`}
                         />
                         {isAutoFilled && (
                           <p className="text-xs text-success mt-1 flex items-center gap-1">
@@ -462,7 +468,7 @@ export default function TrustAdminKitsPage() {
                 className="btn-gold"
               >
                 {generating ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                  <><Spinner size={16} className="mr-2" /> Generating...</>
                 ) : (
                   <>Generate Kit</>
                 )}
@@ -522,10 +528,10 @@ export default function TrustAdminKitsPage() {
               ]}
               taPrompt="Walk me through this Administration Kit"
             />
+            <Button variant="outline" size="sm" onClick={printKit}>
+              <Printer className="w-4 h-4 mr-1" /> Print
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={printKit}>
-            <Printer className="w-4 h-4 mr-1" /> Print
-          </Button>
         </div>
 
         <div className="mt-4 space-y-6">
@@ -569,7 +575,7 @@ export default function TrustAdminKitsPage() {
                 <div className="space-y-3">
                   {(content.instructions.steps || []).map((step, i) => (
                     <div key={i} className="flex gap-3">
-                      <div className="shrink-0 w-7 h-7 rounded-full bg-gold/10 text-gold flex items-center justify-center text-sm font-bold">
+                      <div className="shrink-0 w-7 h-7 bg-gold/10 text-gold flex items-center justify-center text-sm font-bold">
                         {step.step || i + 1}
                       </div>
                       <div className="flex-1 pb-1">
@@ -685,7 +691,7 @@ export default function TrustAdminKitsPage() {
                   {content.fees.map((fee, i) => (
                     <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border/40 last:border-0">
                       <span className="text-muted-foreground">{fee.fee_name}</span>
-                      <span className="font-medium">{fee.amount}</span>
+                      <span className="font-medium font-mono">{fee.amount}</span>
                     </div>
                   ))}
                 </div>
@@ -743,6 +749,32 @@ export default function TrustAdminKitsPage() {
               {view === 'detail' && renderDetailView()}
             </>
           )}
+      {/* Delete confirmation (AlertDialog per standard — no window.confirm) */}
+      <AlertDialog open={!!pendingKitDelete} onOpenChange={(open) => !open && setPendingKitDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Kit</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete this administration kit? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="delete-kit-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="delete-kit-confirm"
+              className="bg-error text-error-foreground hover:bg-error/90"
+              onClick={(e) => {
+                e.preventDefault();
+                const kitId = pendingKitDelete;
+                setPendingKitDelete(null);
+                if (kitId) deleteKit(kitId);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

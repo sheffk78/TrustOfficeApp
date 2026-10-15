@@ -5,7 +5,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 
@@ -61,45 +61,48 @@ export default function AuditTrailPage() {
   return (
     <div className="main-layout">
       <Sidebar />
-      <main className="main-content mobile-layout-offset">
+      <main className="main-content dot-grid mobile-layout-offset">
         <div className="page-container max-w-4xl mx-auto space-y-6">
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Audit Trail</h1>
-              <p className="page-subtitle">
-                View a complete log of all trust administration actions — track changes,
-                access, and decisions for compliance
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'View a complete log of all trust administration actions' },
-                  { text: 'Track changes, access, and decisions for compliance and transparency' },
-                  { text: 'Filter events by type to focus on minutes, distributions, or alerts' },
-                  { text: 'Export a court-ready Audit Defense PDF with the Export button' },
-                ]}
-                taPrompt="Walk me through the Audit Trail and what gets logged"
-                contextAlerts={
-                  events.length < 5
-                    ? [
-                        {
-                          text: 'Your audit trail is sparse. Regular activity (minutes, distributions) builds a stronger compliance record.',
-                          prompt: 'What should I be doing to build a strong audit trail for my trust?',
-                        },
-                      ]
-                    : []
-                }
-              />
-              <Button variant="outline" size="sm" onClick={loadAuditTrail}>
-                <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={downloading}>
-                <Download className="w-4 h-4 mr-1" /> {downloading ? 'Generating...' : 'Export'}
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Audit Trail"
+            subtitle="View a complete log of all trust administration actions — track changes, access, and decisions for compliance"
+            help={{
+              items: [
+                { text: 'View a complete log of all trust administration actions' },
+                { text: 'Track changes, access, and decisions for compliance and transparency' },
+                { text: 'Filter events by type to focus on minutes, distributions, or alerts' },
+                { text: 'Export a court-ready Audit Defense PDF with the Export button' },
+              ],
+              taPrompt: 'Walk me through the Audit Trail and what gets logged',
+              contextAlerts: (
+                events.length < 5
+                  ? [
+                      {
+                        text: 'Your audit trail is sparse. Regular activity (minutes, distributions) builds a stronger compliance record.',
+                        prompt: 'What should I be doing to build a strong audit trail for my trust?',
+                      },
+                    ]
+                  : []
+              )
+            }}
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={loadAuditTrail}>
+                  <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="btn-gold"
+                  onClick={handleExport}
+                  disabled={downloading}
+                >
+                  <Download className="w-4 h-4 mr-1" /> {downloading ? 'Generating...' : 'Export'}
+                </Button>
+              </>
+            }
+          />
 
           {/* Stats */}
           <StatsGrid events={events} />

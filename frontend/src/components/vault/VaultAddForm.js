@@ -27,10 +27,10 @@ export default function VaultAddForm({
   const submitDisabled = isUpload ? uploading || !uploadFile : !form.title;
 
   const tabClass = (active) =>
-    `flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+    `flex items-center gap-2 px-5 py-2.5 border-b-2 font-mono text-xs uppercase tracking-wider pb-2 -mb-px transition-colors ${
       active
-        ? 'border-navy text-navy'
-        : 'border-transparent text-muted-foreground hover:text-foreground'
+        ? 'border-gold text-navy'
+        : 'border-transparent text-muted-foreground hover:text-navy'
     }`;
 
   return (

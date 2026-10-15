@@ -3,7 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import { formatEIN } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
+import Spinner from '@/components/Spinner';
 import {
   FileText, Shield, HeartPulse, Landmark, Building2, Users,
   ClipboardList, Mail, BookOpen, FilePen, Home, Car,
@@ -271,8 +272,8 @@ const PrintableBinderPage = () => {
 
   if (!selectedTrust) {
     return (
-      <div className="card-trust p-12 flex flex-col items-center justify-center">
-        <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
+      <div className="card-trust corner-mark p-12 flex flex-col items-center justify-center">
+        <FileText className="w-12 h-12 text-navy/30 mb-3"/>
         <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
         <p className="text-sm text-muted-foreground">Choose a trust to view the Record Book.</p>
       </div>
@@ -285,36 +286,28 @@ const PrintableBinderPage = () => {
     <>
       <style>{PRINT_STYLES}</style>
       <div className="no-print">
-        <div className="page-header flex items-center justify-between">
-          <div>
-            <h1 className="page-title">Printable Record Book</h1>
-            <p className="page-subtitle">Organize your trust documents with printable inserts — print on standard letter-size paper, use a 3-ring binder with tab dividers for best results</p>
-          </div>
-          <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-            <PageHelpButton
-              items={[
-                { text: 'Print cover sheets, tab dividers, and reference cards for your physical trust binder' },
-                { text: 'Use a 3-ring binder with tab dividers for best results' },
-                { text: 'Print on standard letter-size paper' },
-              ]}
-              taPrompt="How do I set up a physical trust compliance binder?"
-            />
-          </div>
-        </div>
+        <PageHeader
+          title="Printable Record Book"
+          subtitle="Organize your trust documents with printable inserts — print on standard letter-size paper, use a 3-ring binder with tab dividers for best results"
+          help={{
+            items: [
+              { text: 'Print cover sheets, tab dividers, and reference cards for your physical trust binder' },
+              { text: 'Use a 3-ring binder with tab dividers for best results' },
+              { text: 'Print on standard letter-size paper' },
+            ],
+            taPrompt: 'How do I set up a physical trust compliance binder?',
+          }}
+        />
 
           {/* COVER SHEET SECTION */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-gold" />
+              <FileText className="w-5 h-5 text-gold" aria-hidden="true" />
               Binder Cover Sheet
             </h2>
-            <div className="card-trust border border-border p-6">
+            <div className="card-trust corner-mark p-6">
               {loading ? (
-                <div className="animate-pulse space-y-3">
-                  <div className="h-8 bg-subtle-bg rounded w-1/2"></div>
-                  <div className="h-4 bg-subtle-bg rounded w-1/3"></div>
-                  <div className="h-4 bg-subtle-bg rounded w-1/4"></div>
-                </div>
+                <Spinner size={32} label="Loading binder cover data" className="mx-auto my-4" />
               ) : (
                 <>
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -323,9 +316,9 @@ const PrintableBinderPage = () => {
                         {coverData?.trust_name || 'Your Trust Name'}
                       </h3>
                       <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-                        {coverData?.trust_type && <div>{coverData.trust_type}</div>}
-                        {coverData?.formation_date && <div>Formed: {coverData.formation_date}</div>}
-                        {coverData?.ein && <div>EIN: {formatEIN(coverData.ein)}</div>}
+                        {coverData?.trust_type && <div className="font-mono">{coverData.trust_type}</div>}
+                        {coverData?.formation_date && <div className="font-mono">Formed: {coverData.formation_date}</div>}
+                        {coverData?.ein && <div className="font-mono">EIN: {formatEIN(coverData.ein)}</div>}
                         {coverData?.jurisdiction && <div>Jurisdiction: {coverData.jurisdiction}</div>}
                         {coverData?.trustees?.length > 0 && (
                           <div>Trustee{coverData.trustees.length > 1 ? 's' : ''}: {coverData.trustees.join(', ')}</div>
@@ -334,7 +327,7 @@ const PrintableBinderPage = () => {
                     </div>
                     <Button
                       onClick={() => handlePrint('cover')}
-                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      className="btn-primary"
                       >
                       <Printer className="w-4 h-4" /> Print Cover Sheet
                     </Button>
@@ -358,20 +351,20 @@ const PrintableBinderPage = () => {
                 return (
                   <div
                     key={section.id}
-                    className="flex items-start gap-3 card-trust border border-border p-4"
+                    className="flex items-start gap-3 card-trust corner-mark p-4"
                   >
                     <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-gold" />
+                      <Icon className="w-5 h-5 text-gold" aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gold">Section {section.number}</span>
+                        <span className="text-xs font-mono uppercase tracking-wider text-gold">Section {section.number}</span>
                         <h3 className="text-sm font-semibold text-navy">{section.title}</h3>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
                       <Button
                         onClick={() => handlePrint(`tab-${section.id}`)}
-                        className="mt-2 h-auto inline-flex items-center gap-1.5 text-xs font-medium text-gold border border-gold/30 rounded-md px-2.5 py-1 hover:bg-gold/10 hover:border-gold/50 transition-colors"
+                        className="btn-secondary mt-2"
                       >
                         <Printer className="w-3 h-3" /> Print Divider
                       </Button>
@@ -385,17 +378,17 @@ const PrintableBinderPage = () => {
           {/* REFERENCE CARD */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-gold" />
+              <BookOpen className="w-5 h-5 text-gold" aria-hidden="true" />
               Trustee Quick Reference Card
             </h2>
-            <div className="card-trust border border-border p-6">
+            <div className="card-trust corner-mark p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 A single-page cheat sheet covering your fiduciary duties, decision filter, signing rules, and emergency protocols.
                 Print this and keep it at the front of your binder.
               </p>
               <Button
                 onClick={() => handlePrint('quick-ref')}
-                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      className="btn-primary"
                       >
                 <Printer className="w-4 h-4" /> Print Reference Card
               </Button>
@@ -405,17 +398,17 @@ const PrintableBinderPage = () => {
           {/* RESOLUTION TEMPLATE */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-              <FilePen className="w-5 h-5 text-gold" />
+              <FilePen className="w-5 h-5 text-gold" aria-hidden="true" />
               Resolution Template
             </h2>
-            <div className="card-trust border border-border p-6">
+            <div className="card-trust corner-mark p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 A blank WHEREAS/BE IT RESOLVED template with signature, witness, and notary blocks.
                 Print a fresh copy each time you need to record a formal trust resolution.
               </p>
               <Button
                 onClick={() => handlePrint('resolution')}
-                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      className="btn-primary"
                       >
                 <Printer className="w-4 h-4" /> Print Resolution Template
               </Button>
@@ -431,31 +424,31 @@ const PrintableBinderPage = () => {
               Step-by-step checklists for transferring specific asset types into or out of your trust. Print when you're ready to start a transfer.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-start gap-3 card-trust border border-border p-4">
+              <div className="flex items-start gap-3 card-trust corner-mark p-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
-                  <Home className="w-5 h-5 text-gold" />
+                  <Home className="w-5 h-5 text-gold" aria-hidden="true" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-navy">Real Estate Transfer</h3>
                   <p className="text-xs text-muted-foreground mt-1">Deed recording, insurance, mortgage, and tax steps.</p>
                   <Button
                     onClick={() => handlePrint('checklist-real-estate')}
-                    className="mt-2 h-auto inline-flex items-center gap-1.5 text-xs font-medium text-gold border border-gold/30 rounded-md px-2.5 py-1 hover:bg-gold/10 hover:border-gold/50 transition-colors"
+                    className="btn-secondary mt-2"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </Button>
                 </div>
               </div>
-              <div className="flex items-start gap-3 card-trust border border-border p-4">
+              <div className="flex items-start gap-3 card-trust corner-mark p-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-gold/10 dark:bg-gold/20 flex items-center justify-center">
-                  <Car className="w-5 h-5 text-gold" />
+                  <Car className="w-5 h-5 text-gold" aria-hidden="true" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-navy">Vehicle Transfer</h3>
                   <p className="text-xs text-muted-foreground mt-1">Title transfer, DMV, insurance, and registration steps.</p>
                   <Button
                     onClick={() => handlePrint('checklist-vehicle')}
-                    className="mt-2 h-auto inline-flex items-center gap-1.5 text-xs font-medium text-gold border border-gold/30 rounded-md px-2.5 py-1 hover:bg-gold/10 hover:border-gold/50 transition-colors"
+                    className="btn-secondary mt-2"
                   >
                     <Printer className="w-3 h-3" /> Print Checklist
                   </Button>
@@ -467,17 +460,17 @@ const PrintableBinderPage = () => {
           {/* FINANCIAL RECORDS (MONEY) SECTION */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-gold" />
+              <DollarSign className="w-5 h-5 text-gold" aria-hidden="true" />
               Financial Records
             </h2>
-            <div className="card-trust border border-border p-6">
+            <div className="card-trust corner-mark p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 Transaction ledger summary, distribution history, compensation summary, and investment portfolio.
                 Print this section for a comprehensive financial snapshot of your trust.
               </p>
               <Button
                 onClick={() => handlePrint('money')}
-                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      className="btn-primary"
                       >
                 <Printer className="w-4 h-4" /> Print Financial Records
               </Button>
@@ -487,17 +480,17 @@ const PrintableBinderPage = () => {
           {/* ENTITY STRUCTURE SECTION */}
           <div className="mb-10">
             <h2 className="text-lg font-semibold text-navy mb-4 flex items-center gap-2">
-              <Network className="w-5 h-5 text-gold" />
+              <Network className="w-5 h-5 text-gold" aria-hidden="true" />
               Entity Structure
             </h2>
-            <div className="card-trust border border-border p-6">
+            <div className="card-trust corner-mark p-6">
               <p className="text-sm text-muted-foreground mb-3">
                 Entity list, beneficiary roster, Schedule A assets, and communications log summary.
                 Print this section for a structural overview of your trust.
               </p>
               <Button
                 onClick={() => handlePrint('structure')}
-                      className="bg-gold hover:bg-gold/80 text-navy font-medium"
+                      className="btn-primary"
                       >
                 <Printer className="w-4 h-4" /> Print Entity Structure
               </Button>
@@ -511,27 +504,27 @@ const PrintableBinderPage = () => {
         {/* COVER SHEET */}
         {activePrint === 'cover' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '1in' }}>
-            <div className="text-center border-2 border-gray-300 rounded p-12" style={{ minHeight: '8in' }}>
+            <div className="text-center border-2 border-navy/30 p-12" style={{ minHeight: '8in' }}>
               <div className="mb-8 pt-4">
-                <div className="text-xs tracking-widest text-gray-400 uppercase mb-2">Trust Governance Workspace</div>
+                <div className="text-xs tracking-widest text-navy/40 uppercase mb-2">Trust Governance Workspace</div>
                 <div className="w-16 h-0.5 bg-gold mx-auto mb-6"></div>
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2" style={{ fontSize: '28pt' }}>
+              <h1 className="text-3xl font-bold text-navy mb-2" style={{ fontSize: '28pt' }}>
                 TRUST COMPLIANCE BINDER
               </h1>
-              <div className="w-24 h-0.5 bg-gray-300 mx-auto my-6"></div>
+              <div className="w-24 h-0.5 bg-gold mx-auto my-6"></div>
               <div className="mt-8 space-y-3" style={{ fontSize: '14pt' }}>
-                <div className="text-xl font-semibold text-gray-900">{coverData?.trust_name || '_________________'}</div>
-                {coverData?.trust_type && <div className="text-gray-600">{coverData.trust_type}</div>}
-                {coverData?.formation_date && <div className="text-gray-600">Formed: {coverData.formation_date}</div>}
-                {coverData?.ein && <div className="text-gray-600">EIN: {formatEIN(coverData.ein)}</div>}
-                {coverData?.jurisdiction && <div className="text-gray-600">Jurisdiction: {coverData.jurisdiction}</div>}
+                <div className="text-xl font-semibold font-mono text-navy">{coverData?.trust_name || '_________________'}</div>
+                {coverData?.trust_type && <div className="font-mono text-navy/60">{coverData.trust_type}</div>}
+                {coverData?.formation_date && <div className="font-mono text-navy/60">Formed: {coverData.formation_date}</div>}
+                {coverData?.ein && <div className="font-mono text-navy/60">EIN: {formatEIN(coverData.ein)}</div>}
+                {coverData?.jurisdiction && <div className="font-mono text-navy/60">Jurisdiction: {coverData.jurisdiction}</div>}
                 {coverData?.trustees?.length > 0 && (
-                  <div className="text-gray-600">Trustee{coverData.trustees.length > 1 ? 's' : ''}: {coverData.trustees.join(', ')}</div>
+                  <div className="font-mono text-navy/60">Trustee{coverData.trustees.length > 1 ? 's' : ''}: {coverData.trustees.join(', ')}</div>
                 )}
               </div>
-              <div className="mt-16 pt-8 border-t border-gray-200">
-                <div className="text-xs text-gray-400">
+              <div className="mt-16 pt-8 border-t border-navy/20">
+                <div className="text-xs text-navy/40">
                   Maintained with TrustOffice — trustoffice.app
                 </div>
               </div>
@@ -544,21 +537,21 @@ const PrintableBinderPage = () => {
           activePrint === `tab-${section.id}` && (
             <div key={section.id} className="section-divider-print p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
               <div className="flex flex-col items-center justify-center" style={{ minHeight: '700px' }}>
-                <div className="section-number" style={{ fontSize: '72pt', fontWeight: 700, color: 'rgba(217, 119, 6, 0.15)' }}>
+                <div className="section-number font-mono" style={{ fontSize: '72pt', fontWeight: 700, color: 'rgba(213, 173, 54, 0.15)' }}>
                   {section.number}
                 </div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontSize: '28pt' }}>
+                <h1 className="text-4xl font-bold text-navy mb-4" style={{ fontSize: '28pt' }}>
                   {section.title}
                 </h1>
                 <div className="w-32 h-0.5 bg-gold mb-6"></div>
-                <p className="text-gray-500 text-center max-w-md" style={{ fontSize: '12pt', lineHeight: 1.6 }}>
+                <p className="text-muted-foreground text-center max-w-md" style={{ fontSize: '12pt', lineHeight: 1.6 }}>
                   {section.description}
                 </p>
-                <div className="mt-8 w-full max-w-md pt-6 border-t border-gray-200">
-                  <p className="text-xs text-gray-400 text-center">Place behind tab divider {section.number} in your trust compliance binder.</p>
+                <div className="mt-8 w-full max-w-md pt-6 border-t border-navy/20">
+                  <p className="text-xs text-navy/40 text-center">Place behind tab divider {section.number} in your trust compliance binder.</p>
                 </div>
               </div>
-              <div className="text-center mt-8 text-xs text-gray-400">
+              <div className="text-center mt-8 text-xs text-navy/40">
                 TrustOffice — trustoffice.app
               </div>
             </div>
@@ -569,48 +562,48 @@ const PrintableBinderPage = () => {
         {activePrint === 'quick-ref' && (
           <div className="quick-ref-print p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
             <div className="max-w-lg mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '18pt' }}>
+              <h1 className="text-2xl font-bold text-navy mb-1" style={{ fontSize: '18pt' }}>
                 Trustee Quick Reference
               </h1>
               <div className="w-16 h-0.5 bg-gold mb-6 mt-2"></div>
 
-              <h2 className="text-lg font-semibold text-gray-900 mb-3" style={{ fontSize: '13pt' }}>Fiduciary Duties</h2>
+              <h2 className="text-lg font-semibold text-navy mb-3" style={{ fontSize: '13pt' }}>Fiduciary Duties</h2>
               {QUICK_REFERENCE.duties.map((d, i) => (
                 <div key={i} className="mb-3 pl-3 border-l-2 border-warning">
-                  <div className="font-semibold text-gray-900" style={{ fontSize: '11pt' }}>{d.title}</div>
-                  <div className="text-gray-600" style={{ fontSize: '10pt' }}>{d.text}</div>
+                  <div className="font-semibold text-navy" style={{ fontSize: '11pt' }}>{d.title}</div>
+                  <div className="text-navy/60" style={{ fontSize: '10pt' }}>{d.text}</div>
                 </div>
               ))}
 
-              <h2 className="text-lg font-semibold text-gray-900 mb-3 mt-6" style={{ fontSize: '13pt' }}>Decision Filter</h2>
-              <p className="text-gray-600 mb-2" style={{ fontSize: '10pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-3 mt-6" style={{ fontSize: '13pt' }}>Decision Filter</h2>
+              <p className="text-navy/60 mb-2" style={{ fontSize: '10pt' }}>
                 Before taking any action as trustee, ask yourself:
               </p>
               {QUICK_REFERENCE.decisionFilter.map((q, i) => (
                 <div key={i} className="flex items-start gap-2 mb-1">
                   <span className="text-gold font-bold" style={{ fontSize: '10pt' }}>✓</span>
-                  <span className="text-gray-700" style={{ fontSize: '10pt' }}>{q}</span>
+                  <span className="text-navy" style={{ fontSize: '10pt' }}>{q}</span>
                 </div>
               ))}
-              <p className="mt-2 text-gray-500 italic" style={{ fontSize: '9pt' }}>
+              <p className="mt-2 text-muted-foreground italic" style={{ fontSize: '9pt' }}>
                 If you cannot answer "yes" confidently, seek professional guidance before proceeding.
               </p>
 
-              <h2 className="text-lg font-semibold text-gray-900 mb-2 mt-6" style={{ fontSize: '13pt' }}>Signing Rule</h2>
-              <p className="text-gray-700 bg-subtle-bg p-3" style={{ fontSize: '10pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2 mt-6" style={{ fontSize: '13pt' }}>Signing Rule</h2>
+              <p className="text-navy bg-subtle-bg p-3" style={{ fontSize: '10pt' }}>
                 {QUICK_REFERENCE.signingRule}
               </p>
 
-              <h2 className="text-lg font-semibold text-gray-900 mb-2 mt-6" style={{ fontSize: '13pt' }}>Contact Your Attorney Immediately If:</h2>
+              <h2 className="text-lg font-semibold text-navy mb-2 mt-6" style={{ fontSize: '13pt' }}>Contact Your Attorney Immediately If:</h2>
               {QUICK_REFERENCE.emergency.map((e, i) => (
                 <div key={i} className="flex items-start gap-2 mb-1">
-                  <span className="text-red-500 font-bold" style={{ fontSize: '10pt' }}>⚠</span>
-                  <span className="text-gray-700" style={{ fontSize: '10pt' }}>{e}</span>
+                  <span className="text-warning font-bold" style={{ fontSize: '10pt' }}>⚠</span>
+                  <span className="text-navy" style={{ fontSize: '10pt' }}>{e}</span>
                 </div>
               ))}
 
-              <div className="mt-8 pt-4 border-t border-gray-200 text-center">
-                <p className="text-xs text-gray-400">TrustOffice — trustoffice.app</p>
+              <div className="mt-8 pt-4 border-t border-navy/20 text-center">
+                <p className="text-xs text-navy/40">TrustOffice — trustoffice.app</p>
               </div>
             </div>
           </div>
@@ -620,91 +613,91 @@ const PrintableBinderPage = () => {
         {activePrint === 'resolution' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
             <div className="max-w-xl mx-auto">
-              <h1 className="text-2xl font-bold text-center text-gray-900 mb-2" style={{ fontSize: '16pt' }}>
+              <h1 className="text-2xl font-bold text-center text-navy mb-2" style={{ fontSize: '16pt' }}>
                 RESOLUTION
               </h1>
-              <h2 className="text-center text-gray-600 mb-8" style={{ fontSize: '12pt' }}>
-                OF {coverData?.trust_name ? <span className="font-semibold">{coverData.trust_name.toUpperCase()}</span> : <span className="border-b border-gray-400" style={{ minWidth: '200px', display: 'inline-block' }}>&nbsp;</span>}
+              <h2 className="text-center text-navy/60 mb-8" style={{ fontSize: '12pt' }}>
+                OF {coverData?.trust_name ? <span className="font-semibold">{coverData.trust_name.toUpperCase()}</span> : <span className="border-b border-navy/60" style={{ minWidth: '200px', display: 'inline-block' }}>&nbsp;</span>}
               </h2>
 
               <div className="mb-6">
-                <p className="text-gray-600 mb-3" style={{ fontSize: '10pt' }}>WHEREAS, the Trustee(s) of the above-named Trust deem it necessary and appropriate to take the following action;</p>
+                <p className="text-navy/60 mb-3" style={{ fontSize: '10pt' }}>WHEREAS, the Trustee(s) of the above-named Trust deem it necessary and appropriate to take the following action;</p>
                 <div className="mb-6" style={{ fontSize: '10pt' }}>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">Describe the reason or background for this resolution</div>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">Continue background as needed</div>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">&nbsp;</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">Describe the reason or background for this resolution</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">Continue background as needed</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">&nbsp;</div>
                 </div>
               </div>
 
               <div className="mb-8">
-                <p className="text-gray-600 mb-3" style={{ fontSize: '10pt' }}>NOW, THEREFORE, BE IT RESOLVED that the Trustee(s) hereby authorize and direct the following action:</p>
+                <p className="text-navy/60 mb-3" style={{ fontSize: '10pt' }}>NOW, THEREFORE, BE IT RESOLVED that the Trustee(s) hereby authorize and direct the following action:</p>
                 <div style={{ fontSize: '10pt' }}>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">Describe the specific action being authorized</div>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">Continue description as needed</div>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">&nbsp;</div>
-                  <div className="border-b border-gray-300 py-2 text-gray-400">&nbsp;</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">Describe the specific action being authorized</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">Continue description as needed</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">&nbsp;</div>
+                  <div className="border-b border-navy/30 py-2 text-navy/40">&nbsp;</div>
                 </div>
               </div>
 
               <div className="mt-16 space-y-8" style={{ fontSize: '10pt' }}>
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Trustee Signature</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Trustee Signature</div>
                   </div>
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Date</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Date</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Printed Name</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Printed Name</div>
                   </div>
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Title (Trustee)</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Title (Trustee)</div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-12 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Witness</h3>
+              <div className="mt-12 pt-6 border-t border-navy/20">
+                <h3 className="text-sm font-semibold text-navy mb-3">Witness</h3>
                 <div className="grid grid-cols-2 gap-8" style={{ fontSize: '10pt' }}>
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Witness Signature</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Witness Signature</div>
                   </div>
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Date</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Date</div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-10 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Notary Acknowledgment</h3>
-                <p className="text-gray-600 mb-4" style={{ fontSize: '9pt' }}>
+              <div className="mt-10 pt-6 border-t border-navy/20">
+                <h3 className="text-sm font-semibold text-navy mb-3">Notary Acknowledgment</h3>
+                <p className="text-navy/60 mb-4" style={{ fontSize: '9pt' }}>
                   State of _____________, County of _____________
                 </p>
-                <p className="text-gray-600 mb-4" style={{ fontSize: '9pt' }}>
+                <p className="text-navy/60 mb-4" style={{ fontSize: '9pt' }}>
                   On this _____ day of _____________, 20_____, before me personally appeared the above-named Trustee, known to me to be the person whose name is subscribed to the foregoing instrument, and acknowledged that they executed the same for the purposes therein contained.
                 </p>
                 <div className="grid grid-cols-2 gap-8" style={{ fontSize: '10pt' }}>
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Notary Public Signature</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Notary Public Signature</div>
                   </div>
                   <div>
-                    <div className="border-b border-gray-900 mb-1 h-8"></div>
-                    <div className="text-gray-600">Commission Expiration</div>
+                    <div className="border-b border-navy mb-1 h-8"></div>
+                    <div className="text-navy/60">Commission Expiration</div>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 text-center">
-                <p className="text-xs text-gray-400">TrustOffice — trustoffice.app</p>
+                <p className="text-xs text-navy/40">TrustOffice — trustoffice.app</p>
               </div>
             </div>
           </div>
@@ -714,10 +707,10 @@ const PrintableBinderPage = () => {
         {activePrint === 'checklist-real-estate' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
             <div className="max-w-lg mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '16pt' }}>
+              <h1 className="text-2xl font-bold text-navy mb-1" style={{ fontSize: '16pt' }}>
                 Real Estate Transfer Checklist
               </h1>
-              <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>
+              <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>
                 {coverData?.trust_name || 'Trust Name: _______________'}
               </p>
               <div className="w-16 h-0.5 bg-gold mb-6"></div>
@@ -733,16 +726,16 @@ const PrintableBinderPage = () => {
                 'File any required state transfer tax forms or exemptions',
                 'Store recorded deed in Section 5 of this binder',
               ].map((step, i) => (
-                <div key={i} className="flex items-start gap-3 mb-3 py-2 border-b border-gray-100">
-                  <div className="w-6 h-6 border-2 border-gray-300 rounded flex-shrink-0 mt-0.5"></div>
-                  <span className="text-gray-700" style={{ fontSize: '11pt' }}>{step}</span>
+                <div key={i} className="flex items-start gap-3 mb-3 py-2 border-b border-navy/10">
+                  <div className="w-6 h-6 border-2 border-navy/30 flex-shrink-0 mt-0.5"></div>
+                  <span className="text-navy" style={{ fontSize: '11pt' }}>{step}</span>
                 </div>
               ))}
 
-              <div className="mt-8 p-3 bg-subtle-bg text-gray-500" style={{ fontSize: '9pt' }}>
+              <div className="mt-8 p-3 bg-subtle-bg text-muted-foreground" style={{ fontSize: '9pt' }}>
                 <strong>Note:</strong> Requirements vary by state. Some states require specific deed forms or have transfer tax exemptions for trusts. Consult your attorney before recording.
               </div>
-              <div className="mt-4 text-center text-xs text-gray-400">TrustOffice — trustoffice.app</div>
+              <div className="mt-4 text-center text-xs text-navy/40">TrustOffice — trustoffice.app</div>
             </div>
           </div>
         )}
@@ -751,10 +744,10 @@ const PrintableBinderPage = () => {
         {activePrint === 'checklist-vehicle' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
             <div className="max-w-lg mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '16pt' }}>
+              <h1 className="text-2xl font-bold text-navy mb-1" style={{ fontSize: '16pt' }}>
                 Vehicle Transfer Checklist
               </h1>
-              <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>
+              <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>
                 {coverData?.trust_name || 'Trust Name: _______________'}
               </p>
               <div className="w-16 h-0.5 bg-warning mb-6"></div>
@@ -768,16 +761,16 @@ const PrintableBinderPage = () => {
                 'Update vehicle registration to show Trust as owner',
                 'Store new title and registration documents in Section 5 of this binder',
               ].map((step, i) => (
-                <div key={i} className="flex items-start gap-3 mb-3 py-2 border-b border-gray-100">
-                  <div className="w-6 h-6 border-2 border-gray-300 rounded flex-shrink-0 mt-0.5"></div>
-                  <span className="text-gray-700" style={{ fontSize: '11pt' }}>{step}</span>
+                <div key={i} className="flex items-start gap-3 mb-3 py-2 border-b border-navy/10">
+                  <div className="w-6 h-6 border-2 border-navy/30 flex-shrink-0 mt-0.5"></div>
+                  <span className="text-navy" style={{ fontSize: '11pt' }}>{step}</span>
                 </div>
               ))}
 
-              <div className="mt-8 p-3 bg-subtle-bg text-gray-500" style={{ fontSize: '9pt' }}>
+              <div className="mt-8 p-3 bg-subtle-bg text-muted-foreground" style={{ fontSize: '9pt' }}>
                 <strong>Note:</strong> Some states require the trust name to appear on the title exactly as stated in the trust document. Contact your DMV for specific requirements.
               </div>
-              <div className="mt-4 text-center text-xs text-gray-400">TrustOffice — trustoffice.app</div>
+              <div className="mt-4 text-center text-xs text-navy/40">TrustOffice — trustoffice.app</div>
             </div>
           </div>
         )}
@@ -786,68 +779,68 @@ const PrintableBinderPage = () => {
         {activePrint === 'money' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
             <div className="max-w-xl mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '16pt' }}>
+              <h1 className="text-2xl font-bold text-navy mb-1" style={{ fontSize: '16pt' }}>
                 Financial Records
               </h1>
-              <p className="text-gray-500 mb-2" style={{ fontSize: '10pt' }}>
+              <p className="text-muted-foreground mb-2" style={{ fontSize: '10pt' }}>
                 {coverData?.trust_name || 'Trust Name: _______________'}
               </p>
               <div className="w-16 h-0.5 bg-gold mb-6"></div>
 
               {/* Transaction Ledger Summary */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Transaction Ledger Summary
               </h2>
               {moneyData && moneyData.transactions.length > 0 ? (
                 <>
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ borderBottom: '2px solid #ccc', borderTop: '2px solid #ccc' }}>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Direction</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Classification</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Memo</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Amount</th>
+                      <tr className="border-b border-t border-navy/20">
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Direction</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Classification</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Memo</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {moneyData.transactions.slice(0, 50).map((t, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{t.date || '—'}</td>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{t.direction || '—'}</td>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{t.governance_classification || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.purpose_memo || '—'}</td>
-                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 font-mono text-navy" style={{ padding: '3px 8px' }}>{t.date || '—'}</td>
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{t.direction || '—'}</td>
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{t.governance_classification || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.purpose_memo || '—'}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                  <div className="mb-6 p-3 border border-navy/20" style={{ fontSize: '10pt' }}>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Inflows:</span>
-                      <span className="text-gray-900 font-semibold">${moneyData.summary.totalInflows.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Inflows:</span>
+                      <span className="font-mono text-navy font-semibold">${moneyData.summary.totalInflows.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Outflows:</span>
-                      <span className="text-gray-900 font-semibold">${moneyData.summary.totalOutflows.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Outflows:</span>
+                      <span className="font-mono text-navy font-semibold">${moneyData.summary.totalOutflows.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between py-0.5" style={{ borderTop: '1px solid #ddd', marginTop: '2px', paddingTop: '4px' }}>
-                      <span className="text-gray-700 font-semibold">Net Cash Flow:</span>
-                      <span className="text-gray-900 font-bold">${moneyData.summary.netFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <div className="flex justify-between py-0.5 border-t border-navy/10" style={{ marginTop: '2px', paddingTop: '4px' }}>
+                      <span className="font-mono text-navy font-semibold">Net Cash Flow:</span>
+                      <span className="font-mono text-navy font-bold">${moneyData.summary.netFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {moneyData.transactions.length > 50 && (
-                      <div className="text-gray-500 mt-1" style={{ fontSize: '9pt' }}>
+                      <div className="font-mono text-muted-foreground mt-1" style={{ fontSize: '9pt' }}>
                         Showing 50 of {moneyData.transactions.length} transactions.
                       </div>
                     )}
                   </div>
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No transactions recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No transactions recorded.</p>
               )}
 
               {/* Distribution History */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Distribution History
               </h2>
               {moneyData && moneyData.distributions.length > 0 ? (
@@ -855,43 +848,43 @@ const PrintableBinderPage = () => {
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Beneficiary</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Purpose</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Status</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Amount</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Beneficiary</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Purpose</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Status</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {moneyData.distributions.slice(0, 50).map((d, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{d.date || '—'}</td>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{d.beneficiary_name || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{d.purpose_classification || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{d.approved_at ? 'Approved' : 'Pending'}</td>
-                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(d.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 font-mono text-navy" style={{ padding: '3px 8px' }}>{d.date || '—'}</td>
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{d.beneficiary_name || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{d.purpose_classification || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{d.approved_at ? 'Approved' : 'Pending'}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>${(d.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                  <div className="mb-6 p-3 border border-navy/20" style={{ fontSize: '10pt' }}>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Distributions:</span>
-                      <span className="text-gray-900 font-semibold">${moneyData.summary.distTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Distributions:</span>
+                      <span className="font-mono text-navy font-semibold">${moneyData.summary.distTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {moneyData.distributions.length > 50 && (
-                      <div className="text-gray-500 mt-1" style={{ fontSize: '9pt' }}>
+                      <div className="font-mono text-muted-foreground mt-1" style={{ fontSize: '9pt' }}>
                         Showing 50 of {moneyData.distributions.length} distributions.
                       </div>
                     )}
                   </div>
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No distributions recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No distributions recorded.</p>
               )}
 
               {/* Compensation Summary */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Compensation Summary
               </h2>
               {moneyData && moneyData.compensation.length > 0 ? (
@@ -899,43 +892,43 @@ const PrintableBinderPage = () => {
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Trustee</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Classification</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Over Plan?</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Amount</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Trustee</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Classification</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Over Plan?</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {moneyData.compensation.slice(0, 50).map((c, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{c.date || '—'}</td>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{c.trustee_name || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.classification_text || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.exceeds_plan_flag ? 'Yes' : 'No'}</td>
-                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(c.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 font-mono text-navy" style={{ padding: '3px 8px' }}>{c.date || '—'}</td>
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{c.trustee_name || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{c.classification_text || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{c.exceeds_plan_flag ? 'Yes' : 'No'}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>${(c.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                  <div className="mb-6 p-3 border border-navy/20" style={{ fontSize: '10pt' }}>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Compensation Paid:</span>
-                      <span className="text-gray-900 font-semibold">${moneyData.summary.compTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Compensation Paid:</span>
+                      <span className="font-mono text-navy font-semibold">${moneyData.summary.compTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {moneyData.compensation.length > 50 && (
-                      <div className="text-gray-500 mt-1" style={{ fontSize: '9pt' }}>
+                      <div className="font-mono text-muted-foreground mt-1" style={{ fontSize: '9pt' }}>
                         Showing 50 of {moneyData.compensation.length} payments.
                       </div>
                     )}
                   </div>
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No compensation payments recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No compensation payments recorded.</p>
               )}
 
               {/* Investment Portfolio Summary */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Investment Portfolio Summary
               </h2>
               {moneyData && moneyData.investments.length > 0 ? (
@@ -943,48 +936,48 @@ const PrintableBinderPage = () => {
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Name</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Cost Basis</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Current Value</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Name</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Type</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Cost Basis</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Current Value</th>
                       </tr>
                     </thead>
                     <tbody>
                       {moneyData.investments.map((inv, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{inv.name || inv.institution || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{inv.investment_type || inv.type || '—'}</td>
-                          <td className="py-1 text-right text-gray-700" style={{ padding: '3px 8px' }}>${(inv.cost_basis || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>${(inv.current_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{inv.name || inv.institution || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{inv.investment_type || inv.type || '—'}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>${(inv.cost_basis || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>${(inv.current_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                  <div className="mb-6 p-3 border border-navy/20" style={{ fontSize: '10pt' }}>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Cost Basis:</span>
-                      <span className="text-gray-900 font-semibold">${(moneyData.investmentSummary.total_cost_basis || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Cost Basis:</span>
+                      <span className="font-mono text-navy font-semibold">${(moneyData.investmentSummary.total_cost_basis || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Current Value:</span>
-                      <span className="text-gray-900 font-semibold">${(moneyData.investmentSummary.total_current_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Current Value:</span>
+                      <span className="font-mono text-navy font-semibold">${(moneyData.investmentSummary.total_current_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Return:</span>
-                      <span className="text-gray-900 font-semibold">${(moneyData.investmentSummary.total_return || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Return:</span>
+                      <span className="font-mono text-navy font-semibold">${(moneyData.investmentSummary.total_return || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between py-0.5" style={{ borderTop: '1px solid #ddd', marginTop: '2px', paddingTop: '4px' }}>
-                      <span className="text-gray-700 font-semibold">Return %:</span>
-                      <span className="text-gray-900 font-bold">{(moneyData.investmentSummary.total_return_pct || 0).toFixed(2)}%</span>
+                    <div className="flex justify-between py-0.5 border-t border-navy/10" style={{ marginTop: '2px', paddingTop: '4px' }}>
+                      <span className="font-mono text-navy font-semibold">Return %:</span>
+                      <span className="font-mono text-navy font-bold">{(moneyData.investmentSummary.total_return_pct || 0).toFixed(2)}%</span>
                     </div>
                   </div>
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No investments recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No investments recorded.</p>
               )}
 
-              <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-                <p className="text-xs text-gray-400">TrustOffice — trustoffice.app</p>
+              <div className="mt-6 pt-4 border-t border-navy/20 text-center">
+                <p className="text-xs text-navy/40">TrustOffice — trustoffice.app</p>
               </div>
             </div>
           </div>
@@ -994,45 +987,45 @@ const PrintableBinderPage = () => {
         {activePrint === 'structure' && (
           <div className="p-8" style={{ paddingLeft: '1.5in', paddingTop: '0.75in' }}>
             <div className="max-w-xl mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1" style={{ fontSize: '16pt' }}>
+              <h1 className="text-2xl font-bold text-navy mb-1" style={{ fontSize: '16pt' }}>
                 Entity Structure
               </h1>
-              <p className="text-gray-500 mb-2" style={{ fontSize: '10pt' }}>
+              <p className="text-muted-foreground mb-2" style={{ fontSize: '10pt' }}>
                 {coverData?.trust_name || 'Trust Name: _______________'}
               </p>
               <div className="w-16 h-0.5 bg-gold mb-6"></div>
 
               {/* Entity List Table */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Entity List
               </h2>
               {structureData && structureData.entities.length > 0 ? (
                 <table className="w-full mb-6" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Name</th>
-                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
-                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Formation Date</th>
-                      <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>EIN</th>
+                      <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Name</th>
+                      <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Type</th>
+                      <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Formation Date</th>
+                      <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>EIN</th>
                     </tr>
                   </thead>
                   <tbody>
                     {structureData.entities.map((e, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                        <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{e.name || '—'}</td>
-                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.entity_type || '—'}</td>
-                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.formation_date || '—'}</td>
-                        <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{e.ein ? formatEIN(e.ein) : '—'}</td>
+                      <tr key={i} className="border-b border-navy/10">
+                        <td className="py-1 font-mono text-navy" style={{ padding: '3px 8px' }}>{e.name || '—'}</td>
+                        <td className="py-1 font-mono text-navy/60" style={{ padding: '3px 8px' }}>{e.entity_type || '—'}</td>
+                        <td className="py-1 font-mono text-navy/60" style={{ padding: '3px 8px' }}>{e.formation_date || '—'}</td>
+                        <td className="py-1 font-mono text-navy/60" style={{ padding: '3px 8px' }}>{e.ein ? formatEIN(e.ein) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No entities recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No entities recorded.</p>
               )}
 
               {/* Beneficiary List Table */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Beneficiary List
               </h2>
               {structureData && structureData.beneficiaries.length > 0 ? (
@@ -1040,40 +1033,40 @@ const PrintableBinderPage = () => {
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Name</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Units</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Share %</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Name</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Type</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Units</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Share %</th>
                       </tr>
                     </thead>
                     <tbody>
                       {structureData.beneficiaries.map((b, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{b.holder_name || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{b.holder_type || '—'}</td>
-                          <td className="py-1 text-right text-gray-700" style={{ padding: '3px 8px' }}>{b.total_units || 0}</td>
-                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>{(b.percentage || 0).toFixed(2)}%</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{b.holder_name || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{b.holder_type || '—'}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>{b.total_units || 0}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>{(b.percentage || 0).toFixed(2)}%</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {structureData.classBeneficiaries.length > 0 && (
                     <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-1" style={{ fontSize: '11pt' }}>Class Beneficiaries</h3>
+                      <h3 className="text-sm font-semibold text-navy mb-1" style={{ fontSize: '11pt' }}>Class Beneficiaries</h3>
                       <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr>
-                            <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Class Type</th>
-                            <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Description</th>
-                            <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Percentage</th>
+                            <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Class Type</th>
+                            <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Description</th>
+                            <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Percentage</th>
                           </tr>
                         </thead>
                         <tbody>
                           {structureData.classBeneficiaries.map((cb, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                              <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{cb.class_type_label || cb.class_type || '—'}</td>
-                              <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{cb.description || '—'}</td>
-                              <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>{(cb.percentage || 0)}%</td>
+                            <tr key={i} className="border-b border-navy/10">
+                              <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{cb.class_type_label || cb.class_type || '—'}</td>
+                              <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{cb.description || '—'}</td>
+                              <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>{(cb.percentage || 0)}%</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1082,11 +1075,11 @@ const PrintableBinderPage = () => {
                   )}
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No beneficiaries recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No beneficiaries recorded.</p>
               )}
 
               {/* Schedule A Assets Table */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Schedule A — Trust Assets
               </h2>
               {structureData && structureData.scheduleA.length > 0 ? (
@@ -1094,38 +1087,38 @@ const PrintableBinderPage = () => {
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Description</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Category</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Location</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Status</th>
-                        <th className="text-right py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Value</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Description</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Category</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Location</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Status</th>
+                        <th className="text-right py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Value</th>
                       </tr>
                     </thead>
                     <tbody>
                       {structureData.scheduleA.map((s, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{s.description || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{s.category || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{s.location || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{s.status || '—'}</td>
-                          <td className="py-1 text-right text-gray-900" style={{ padding: '3px 8px' }}>{s.approximate_value != null ? '$' + s.approximate_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px' }}>{s.description || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{s.category || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{s.location || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{s.status || '—'}</td>
+                          <td className="py-1 text-right font-mono text-navy" style={{ padding: '3px 8px' }}>{s.approximate_value != null ? '$' + s.approximate_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <div className="mb-6 p-3" style={{ fontSize: '10pt', border: '1px solid #ccc' }}>
+                  <div className="mb-6 p-3 border border-navy/20" style={{ fontSize: '10pt' }}>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-gray-600">Total Assets Value:</span>
-                      <span className="text-gray-900 font-semibold">${structureData.scheduleA.reduce((sum, s) => sum + (s.approximate_value || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-navy/60">Total Assets Value:</span>
+                      <span className="font-mono text-navy font-semibold">${structureData.scheduleA.reduce((sum, s) => sum + (s.approximate_value || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No Schedule A assets recorded.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No Schedule A assets recorded.</p>
               )}
 
               {/* Communications Log Summary */}
-              <h2 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontSize: '13pt' }}>
+              <h2 className="text-lg font-semibold text-navy mb-2" style={{ fontSize: '13pt' }}>
                 Communications Log Summary
               </h2>
               {structureData && structureData.communications.length > 0 ? (
@@ -1133,37 +1126,37 @@ const PrintableBinderPage = () => {
                   <table className="w-full mb-4" style={{ fontSize: '10pt', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Date</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Type</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Direction</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Subject</th>
-                        <th className="text-left py-1 text-gray-700" style={{ borderBottom: '1px solid #999', padding: '4px 8px' }}>Action Required</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Date</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Type</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Direction</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Subject</th>
+                        <th className="text-left py-1 border-b border-navy/60 text-navy" style={{ padding: '4px 8px' }}>Action Required</th>
                       </tr>
                     </thead>
                     <tbody>
                       {structureData.communications.slice(0, 50).map((c, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px' }}>{c.created_at ? c.created_at.split('T')[0] : '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.comm_type || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.direction || '—'}</td>
-                          <td className="py-1 text-gray-700" style={{ padding: '3px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.subject || '—'}</td>
-                          <td className="py-1 text-gray-600" style={{ padding: '3px 8px' }}>{c.action_required ? 'Yes' : 'No'}</td>
+                        <tr key={i} className="border-b border-navy/10">
+                          <td className="py-1 font-mono text-navy" style={{ padding: '3px 8px' }}>{c.created_at ? c.created_at.split('T')[0] : '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{c.comm_type || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{c.direction || '—'}</td>
+                          <td className="py-1 text-navy" style={{ padding: '3px 8px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.subject || '—'}</td>
+                          <td className="py-1 text-navy/60" style={{ padding: '3px 8px' }}>{c.action_required ? 'Yes' : 'No'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {structureData.communications.length > 50 && (
-                    <div className="text-gray-500 mb-6" style={{ fontSize: '9pt' }}>
+                    <div className="font-mono text-muted-foreground mb-6" style={{ fontSize: '9pt' }}>
                       Showing 50 of {structureData.communications.length} communications.
                     </div>
                   )}
                 </>
               ) : (
-                <p className="text-gray-500 mb-6" style={{ fontSize: '10pt' }}>No communications logged.</p>
+                <p className="text-muted-foreground mb-6" style={{ fontSize: '10pt' }}>No communications logged.</p>
               )}
 
-              <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-                <p className="text-xs text-gray-400">TrustOffice — trustoffice.app</p>
+              <div className="mt-6 pt-4 border-t border-navy/20 text-center">
+                <p className="text-xs text-navy/40">TrustOffice — trustoffice.app</p>
               </div>
             </div>
           </div>

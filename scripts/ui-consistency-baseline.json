@@ -18,12 +18,9 @@
  },
  "AuditTrailPage.js": {},
  "AuthCallback.js": {},
- "AuthorityPage.js": {
-  "R2_radius_full": 1
- },
- "BeneficiariesPage.js": {
-  "R5_tabs": 5
- },
+ "AuthorityPage.js": {},
+ "BeneficiariesPage.js": {},
+ "BeneficiaryListTab.jsx": {},
  "BeneficiaryReportPage.js": {},
  "BenevolenceLogPage.js": {},
  "BenevolencePage.js": {},
@@ -37,6 +34,8 @@
  "BillingPage.js": {
   "R2_radius_hard": 1
  },
+ "CertificatesTab.jsx": {},
+ "ClassBeneficiariesTab.jsx": {},
  "ClientDashboard.js": {
   "R2_radius_hard": 4
  },
@@ -69,22 +68,20 @@
  "DocumentsTabbed.js": {
   "R1_header": 1
  },
+ "EntitiesTab.js": {},
  "EntityDetailPage.js": {},
  "ExpensesPage.js": {},
- "ExportDashboard.js": {
-  "R4_raw_btn": 2
- },
+ "ExportDashboard.js": {},
  "ExternalRedirect.js": {},
  "ForgotPasswordPage.js": {
   "R4_raw_btn": 1
  },
  "GovernancePage.js": {},
- "HealthComplianceTabbed.js": {
-  "R1_header": 1
- },
+ "HealthComplianceTabbed.js": {},
  "HealthDashboard.js": {
   "R4_raw_btn": 1
  },
+ "HierarchyTab.js": {},
  "InvestmentsPage.js": {},
  "InvestmentsTabbed.js": {
   "R1_header": 1
@@ -121,7 +118,7 @@
  },
  "MinutesDetailPage.js": {
   "R1_header": 1,
-  "R2_radius_full": 4,
+  "R2_radius_full": 2,
   "R4_raw_btn": 1
  },
  "MinutesEditor.js": {
@@ -146,6 +143,7 @@
   "R2_radius_hard": 4,
   "R4_raw_btn": 5
  },
+ "OverviewTab.jsx": {},
  "PerformanceDashboard.js": {
   "R1_header": 1,
   "R2_radius_full": 1,
@@ -160,43 +158,29 @@
   "R1_header": 1,
   "R4_raw_btn": 6
  },
- "PrintableBinderPage.js": {
-  "R1_header": 1,
-  "R2_radius_hard": 3,
-  "R3_palette": 216
- },
+ "PrintableBinderPage.js": {},
  "ResetPasswordPage.js": {
   "R4_raw_btn": 1
  },
- "RiskDashboardPage.js": {
-  "R4_raw_btn": 2
- },
+ "RiskDashboardPage.js": {},
  "ScheduleAPage.js": {},
+ "SeparationTab.js": {},
  "SettingsPage.js": {
   "R2_radius_full": 2,
   "R3_palette": 7,
   "R4_raw_btn": 4
  },
  "SignUpPage.js": {},
- "StateCompliancePage.js": {
-  "R4_raw_btn": 7
- },
+ "StateCompliancePage.js": {},
  "StatsPage.js": {
   "R1_header": 1,
   "R4_raw_btn": 4
  },
- "StructuresPage.js": {
-  "R2_radius_hard": 2,
-  "R4_raw_btn": 1
- },
- "SuccessorAccessPage.js": {
-  "R1_header": 1,
-  "R3_palette": 34
- },
- "SuccessorPacketPage.js": {
-  "R3_palette": 81
- },
+ "StructuresPage.js": {},
+ "SuccessorAccessPage.js": {},
+ "SuccessorPacketPage.js": {},
  "TransactionLedgerPage.js": {},
+ "TransfersTab.jsx": {},
  "TrustAccessPage.js": {
   "R2_radius_hard": 3
  },
@@ -210,10 +194,7 @@
  "TrustPartyManager.js": {
   "R1_header": 1
  },
- "VaultPage.js": {
-  "R1_header": 1,
-  "R2_radius_hard": 1
- },
+ "VaultPage.js": {},
  "WingPointRedirect.js": {},
  "WingPointWelcomePage.js": {
   "R2_radius_full": 1,

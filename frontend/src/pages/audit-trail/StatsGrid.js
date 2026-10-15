@@ -36,7 +36,7 @@ export default function StatsGrid({ events }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {stats.map((stat) => (
-        <div key={stat.label} className="card-trust text-center">
+        <div key={stat.label} className="card-trust corner-mark text-center">
           <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
           <p className="text-xs text-muted-foreground">{stat.label}</p>
         </div>

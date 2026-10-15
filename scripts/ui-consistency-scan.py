@@ -32,6 +32,7 @@ R1_EXEMPT = {
     "PostCheckoutPage.js", "NotFoundPage.js", "OnboardingPage.js",
     "ExternalRedirect.js", "WingPointRedirect.js", "WingPointWelcomePage.js",
     "ConnectWingPoint.js", "TrustAccessPanel.js", "trustProtectorPowers.js",
+    "SuccessorAccessPage.js",  # public token-gated route — centered layout intentional (Wave 4 audit F14)
 }
 
 RE_PAGE_TITLE = re.compile(r'\bpage-title\b')
@@ -39,6 +40,8 @@ RE_CONTAINER = re.compile(r'\bpage-container\b')
 # Pages whose shell (page-container) is supplied by a parent wrapper file — page renders
 # only inside that wrapper, so container presence is checked through the chain.
 WRAPPER_SUPPLIES = {
+    "PrintableBinderPage.js": ("DocumentsTabbed.js",),
+    "VaultPage.js": ("DocumentsTabbed.js",),
     "GovernancePage.js": ("HealthComplianceTabbed.js",),
     "RiskDashboardPage.js": ("HealthComplianceTabbed.js",),
     "StateCompliancePage.js": ("HealthComplianceTabbed.js",),

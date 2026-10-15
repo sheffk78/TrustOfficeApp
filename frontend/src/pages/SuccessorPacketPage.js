@@ -5,7 +5,7 @@ import { showError } from '@/utils/errors';
 import { formatEIN } from '@/utils/formatters';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { Printer, FileText, Users, Building2, Landmark, Phone, Mail, ClipboardList, Calendar, Shield, BookOpen } from 'lucide-react';
@@ -77,15 +77,15 @@ const fmtDate = (dateStr) => {
 };
 
 const InfoRow = ({ label, value }) => (
-  <div className="flex py-1.5 border-b border-gray-100">
-    <div className="w-40 flex-shrink-0 text-gray-500 text-sm">{label}</div>
-    <div className="text-navy text-sm font-medium">{value || 'Not specified'}</div>
+  <div className="flex py-1.5 border-b border-navy/10">
+    <div className="w-40 flex-shrink-0 text-muted-foreground text-sm">{label}</div>
+    <div className="text-navy text-sm font-medium font-mono">{value || 'Not specified'}</div>
   </div>
 );
 
 const SectionTitle = ({ icon: Icon, title }) => (
   <div className="flex items-center gap-2 mb-4">
-    {Icon && <Icon className="w-5 h-5 text-gold" />}
+    {Icon && <Icon className="w-5 h-5 text-gold" aria-hidden="true" />}
     <h2 className="text-lg font-bold text-navy">{title}</h2>
   </div>
 );
@@ -169,7 +169,7 @@ const SuccessorPacketPage = () => {
         <Sidebar />
         <main className="main-content no-print mobile-layout-offset">
           <div className="page-container max-w-5xl mx-auto">
-            <div className="card-trust p-12 flex flex-col items-center justify-center">
+            <div className="card-trust corner-mark p-12 flex flex-col items-center justify-center">
               <FileText className="w-12 h-12 text-muted-foreground/60 mb-3"/>
               <h2 className="text-xl font-semibold text-navy mb-1">Select a trust</h2>
               <p className="text-sm text-muted-foreground">Choose a trust to view the Successor Trustee Packet.</p>
@@ -224,37 +224,37 @@ const SuccessorPacketPage = () => {
         <Sidebar />
         <main className="main-content no-print">
           <div className="page-container max-w-5xl mx-auto">
-            <div className="page-header flex items-center justify-between">
-              <div>
-                <h1 className="page-title">Successor Trustee Packet</h1>
-                <p className="page-subtitle">A complete handoff document for your successor trustee. Print and store with your trust records.</p>
-              </div>
-              <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-                <PageHelpButton
-                  items={[
-                    { text: 'This packet compiles everything a successor trustee needs if the current trustee dies or becomes incapacitated' },
-                    { text: 'Fill in successor trustee info and key contacts in Trust Roles first for a complete packet' },
-                    { text: 'Print on standard letter-size paper. Uses your browser print dialog.' },
-                    { text: 'You can also email a secure link to your successor trustee that is valid for 30 days.' },
-                  ]}
-                  taPrompt="What should I include in my successor trustee packet?"
-                />
-                <Button
-                  onClick={handleSend}
-                  disabled={loading || sending}
-                  className="bg-navy hover:bg-navy/90 text-white font-medium disabled:opacity-50"
-                >
-                  <Mail className="w-4 h-4" /> {sending ? 'Sending...' : 'Send Packet to Successor'}
-                </Button>
-                <Button
-                  onClick={handlePrint}
-                  disabled={loading}
-                  className="bg-gold hover:bg-gold/80 text-navy font-medium disabled:opacity-50"
-                >
-                  <Printer className="w-4 h-4" /> Print Full Packet
-                </Button>
-              </div>
-            </div>
+            <PageHeader
+              title="Successor Trustee Packet"
+              subtitle="A complete handoff document for your successor trustee. Print and store with your trust records."
+              actions={
+                <>
+                  <Button
+                    onClick={handleSend}
+                    disabled={loading || sending}
+                    className="btn-primary"
+                  >
+                    <Mail className="w-4 h-4" /> {sending ? 'Sending...' : 'Send Packet to Successor'}
+                  </Button>
+                  <Button
+                    onClick={handlePrint}
+                    disabled={loading}
+                    className="btn-gold"
+                  >
+                    <Printer className="w-4 h-4" /> Print Full Packet
+                  </Button>
+                </>
+              }
+              help={{
+                items: [
+                  { text: 'This packet compiles everything a successor trustee needs if the current trustee dies or becomes incapacitated' },
+                  { text: 'Fill in successor trustee info and key contacts in Trust Roles first for a complete packet' },
+                  { text: 'Print on standard letter-size paper. Uses your browser print dialog.' },
+                  { text: 'You can also email a secure link to your successor trustee that is valid for 30 days.' },
+                ],
+                taPrompt: 'What should I include in my successor trustee packet?',
+              }}
+            />
 
             {error && (
               <div className="mb-4 p-3 bg-warning/5 border border-warning/20 text-warning text-sm rounded">
@@ -269,7 +269,7 @@ const SuccessorPacketPage = () => {
                 <div className="h-48 bg-subtle-bg rounded"></div>
               </div>
             ) : (
-              <div className="card-trust border border-border p-6">
+              <div className="card-trust corner-mark border border-border p-6">
                 <p className="text-sm text-muted-foreground mb-4">
                   Click "Print Full Packet" to generate a printable document with all sections below. The packet includes trust identification, trustee transition info, beneficiaries, assets, bank accounts, professional contacts, governance rules, upcoming deadlines, and your letter of guidance.
                 </p>
@@ -295,7 +295,7 @@ const SuccessorPacketPage = () => {
                     const Icon = s.icon;
                     return (
                       <div key={i} className="flex items-start gap-3 p-3 bg-subtle-bg rounded border border-border/50">
-                        <Icon className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" />
+                        <Icon className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" aria-hidden="true" />
                         <div>
                           <div className="text-sm font-semibold text-navy">{s.title}</div>
                           <div className="text-xs text-muted-foreground">{s.desc}</div>
@@ -317,22 +317,22 @@ const SuccessorPacketPage = () => {
         <div className="cover-page p-8" style={{ paddingLeft: '1in', paddingTop: '1in' }}>
           <div className="text-center" style={{ minHeight: '8in', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
             <div className="mb-8 pt-4">
-              <div className="text-xs tracking-widest text-gray-400 uppercase mb-2">Trust Governance Workspace</div>
+              <div className="text-xs tracking-widest text-muted-foreground/60 uppercase mb-2">Trust Governance Workspace</div>
               <div className="w-16 h-0.5 bg-gold mx-auto mb-6"></div>
             </div>
             <h1 className="text-3xl font-bold text-navy mb-2" style={{ fontSize: '28pt' }}>
               SUCCESSOR TRUSTEE PACKET
             </h1>
-            <div className="w-24 h-0.5 bg-gray-300 mx-auto my-6"></div>
+            <div className="w-24 h-0.5 bg-navy/20 mx-auto my-6"></div>
             <div className="mt-4 space-y-3" style={{ fontSize: '14pt' }}>
               <div className="text-xl font-semibold text-navy">{trustName}</div>
-              {trustData?.ein && <div className="text-gray-600">EIN: {formatEIN(trustData.ein)}</div>}
-              {trustData?.jurisdiction && <div className="text-gray-600">Jurisdiction: {trustData.jurisdiction}</div>}
-              {trustData?.start_date && <div className="text-gray-600">Formed: {fmtDate(trustData.start_date)}</div>}
+              {trustData?.ein && <div className="font-mono text-muted-foreground">EIN: {formatEIN(trustData.ein)}</div>}
+              {trustData?.jurisdiction && <div className="text-muted-foreground">Jurisdiction: {trustData.jurisdiction}</div>}
+              {trustData?.start_date && <div className="text-muted-foreground">Formed: {fmtDate(trustData.start_date)}</div>}
             </div>
-            <div className="mt-12 pt-8 border-t border-gray-200 w-full max-w-md">
-              <div className="text-sm text-gray-500 mb-2">Generated: {today}</div>
-              <div className="text-xs text-gray-400">Maintained with TrustOffice — trustoffice.app</div>
+            <div className="mt-12 pt-8 border-t border-navy/20 w-full max-w-md">
+              <div className="text-sm font-mono text-muted-foreground mb-2">Generated: {today}</div>
+              <div className="text-xs text-muted-foreground/60">Maintained with TrustOffice — trustoffice.app</div>
             </div>
           </div>
         </div>
@@ -341,7 +341,7 @@ const SuccessorPacketPage = () => {
         <div className="packet-section p-8" style={{ paddingLeft: '1in', paddingTop: '0.75in' }}>
           <div className="max-w-lg mx-auto">
             <SectionTitle icon={FileText} title="1. Trust Overview" />
-            <div className="bg-gray-50 rounded p-4">
+            <div className="bg-muted/50 rounded p-4">
               <InfoRow label="Trust Name" value={trustData?.name} />
               <InfoRow label="Trust Type" value={trustData?.trust_type} />
               <InfoRow label="EIN" value={trustData?.ein ? formatEIN(trustData.ein) : trustData?.ein} />
@@ -359,15 +359,15 @@ const SuccessorPacketPage = () => {
         <div className="packet-section p-8" style={{ paddingLeft: '1in', paddingTop: '0.75in' }}>
           <div className="max-w-lg mx-auto">
             <SectionTitle icon={Users} title="2. Trustee Transition" />
-            <div className="bg-gray-50 rounded p-4 mb-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Current Trustee(s)</h3>
+            <div className="bg-muted/50 rounded p-4 mb-4">
+              <h3 className="text-sm font-semibold text-foreground mb-2">Current Trustee(s)</h3>
               <InfoRow label="Trustee(s)" value={trustData?.trustees} />
               <InfoRow label="Role" value={trustData?.role} />
               <InfoRow label="Authority Clause" value={trustData?.authority_clause} />
               <InfoRow label="Grantor" value={trustData?.grantor_name} />
             </div>
-            <div className="bg-cyan-50 rounded p-4 border border-cyan-200">
-              <h3 className="text-sm font-semibold text-cyan-700 mb-2">Successor Trustee</h3>
+            <div className="bg-gold/10 rounded p-4 border border-gold/20">
+              <h3 className="text-sm font-semibold text-navy mb-2">Successor Trustee</h3>
               <InfoRow label="Name" value={trustData?.successor_trustee_name} />
               <InfoRow label="Email" value={trustData?.successor_trustee_email} />
               <InfoRow label="Phone" value={trustData?.successor_trustee_phone} />
@@ -375,8 +375,8 @@ const SuccessorPacketPage = () => {
               <InfoRow label="Notes" value={trustData?.successor_trustee_notes} />
             </div>
             {(trustData?.secondary_successor_trustee_name || trustData?.secondary_successor_trustee_email || trustData?.secondary_successor_trustee_phone) && (
-              <div className="bg-cyan-50/50 rounded p-4 border border-cyan-100 mt-4">
-                <h3 className="text-sm font-semibold text-cyan-700/80 mb-2">Secondary Successor Trustee (Backup)</h3>
+              <div className="bg-gold/10 rounded p-4 border border-gold/10 mt-4">
+                <h3 className="text-sm font-semibold text-navy/70 mb-2">Secondary Successor Trustee (Backup)</h3>
                 <InfoRow label="Name" value={trustData?.secondary_successor_trustee_name} />
                 <InfoRow label="Email" value={trustData?.secondary_successor_trustee_email} />
                 <InfoRow label="Phone" value={trustData?.secondary_successor_trustee_phone} />
@@ -393,26 +393,26 @@ const SuccessorPacketPage = () => {
             {beneficiaries.length > 0 ? (
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Name</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Email</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Phone</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Units</th>
+                  <tr className="border-b-2 border-navy/30">
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Name</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Email</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Phone</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Units</th>
                   </tr>
                 </thead>
                 <tbody>
                   {beneficiaries.map((b, i) => (
-                    <tr key={i} className="border-b border-gray-100">
+                    <tr key={i} className="border-b border-navy/10">
                       <td className="py-2 text-sm text-navy">{b.holder_name || b.name || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{b.email || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{b.phone || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{b.units || b.allocation_percentage || ''}</td>
+                      <td className="py-2 text-sm text-muted-foreground">{b.email || ''}</td>
+                      <td className="py-2 text-sm text-muted-foreground">{b.phone || ''}</td>
+                      <td className="py-2 text-sm font-mono text-muted-foreground">{b.units || b.allocation_percentage || ''}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <p className="text-sm text-gray-400 italic">No beneficiary records found. Add beneficiaries in the Beneficiaries page.</p>
+              <p className="text-sm text-muted-foreground/60 italic">No beneficiary records found. Add beneficiaries in the Beneficiaries page.</p>
             )}
           </div>
         </div>
@@ -424,20 +424,20 @@ const SuccessorPacketPage = () => {
             {entities.length > 0 ? (
               <div className="space-y-3">
                 {entities.map((e, i) => (
-                  <div key={i} className="bg-gray-50 rounded p-3">
+                  <div key={i} className="bg-muted/50 rounded p-3">
                     <div className="font-semibold text-sm text-navy">{e.name || e.legal_name || 'Entity'}</div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {e.entity_type && <span className="mr-3">Type: {e.entity_type}</span>}
-                      {e.ein && <span className="mr-3">EIN: {formatEIN(e.ein)}</span>}
+                      {e.ein && <span className="mr-3 font-mono">EIN: {formatEIN(e.ein)}</span>}
                       {e.governing_law && <span>Governing Law: {e.governing_law}</span>}
                     </div>
-                    {e.trustee_names && <div className="text-xs text-gray-600 mt-1">Trustees: {e.trustee_names}</div>}
-                    {e.manager_names && <div className="text-xs text-gray-600 mt-1">Managers: {e.manager_names}</div>}
+                    {e.trustee_names && <div className="text-xs text-muted-foreground mt-1">Trustees: {e.trustee_names}</div>}
+                    {e.manager_names && <div className="text-xs text-muted-foreground mt-1">Managers: {e.manager_names}</div>}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic">No entities or assets found. Add entities in the Trust & Entities page.</p>
+              <p className="text-sm text-muted-foreground/60 italic">No entities or assets found. Add entities in the Trust & Entities page.</p>
             )}
           </div>
         </div>
@@ -449,26 +449,26 @@ const SuccessorPacketPage = () => {
             {bankAccounts.length > 0 ? (
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Nickname</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Institution</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Type</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Last 4</th>
+                  <tr className="border-b-2 border-navy/30">
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Nickname</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Institution</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Type</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Last 4</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bankAccounts.map((a, i) => (
-                    <tr key={i} className="border-b border-gray-100">
+                    <tr key={i} className="border-b border-navy/10">
                       <td className="py-2 text-sm text-navy">{a.nickname || a.name || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{a.institution || a.bank_name || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{a.account_type || a.type || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">****{a.last_four || a.last4 || ''}</td>
+                      <td className="py-2 text-sm text-muted-foreground">{a.institution || a.bank_name || ''}</td>
+                      <td className="py-2 text-sm text-muted-foreground">{a.account_type || a.type || ''}</td>
+                      <td className="py-2 text-sm font-mono text-muted-foreground">****{a.last_four || a.last4 || ''}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <p className="text-sm text-gray-400 italic">No bank accounts found. Add bank accounts in the Banking section.</p>
+              <p className="text-sm text-muted-foreground/60 italic">No bank accounts found. Add bank accounts in the Banking section.</p>
             )}
           </div>
         </div>
@@ -478,20 +478,20 @@ const SuccessorPacketPage = () => {
           <div className="max-w-lg mx-auto">
             <SectionTitle icon={Phone} title="6. Professional Contacts" />
             <div className="space-y-4">
-              <div className="bg-gray-50 rounded p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Trust Attorney</h3>
+              <div className="bg-muted/50 rounded p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Trust Attorney</h3>
                 <InfoRow label="Name" value={trustData?.attorney_name} />
                 <InfoRow label="Phone" value={trustData?.attorney_phone} />
                 <InfoRow label="Email" value={trustData?.attorney_email} />
               </div>
-              <div className="bg-gray-50 rounded p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">CPA / Tax Preparer</h3>
+              <div className="bg-muted/50 rounded p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-2">CPA / Tax Preparer</h3>
                 <InfoRow label="Name" value={trustData?.cpa_name} />
                 <InfoRow label="Phone" value={trustData?.cpa_phone} />
                 <InfoRow label="Email" value={trustData?.cpa_email} />
               </div>
-              <div className="bg-gray-50 rounded p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Financial Advisor</h3>
+              <div className="bg-muted/50 rounded p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Financial Advisor</h3>
                 <InfoRow label="Name" value={trustData?.financial_advisor_name} />
                 <InfoRow label="Phone" value={trustData?.financial_advisor_phone} />
                 <InfoRow label="Email" value={trustData?.financial_advisor_email} />
@@ -504,30 +504,30 @@ const SuccessorPacketPage = () => {
         <div className="packet-section p-8" style={{ paddingLeft: '1in', paddingTop: '0.75in' }}>
           <div className="max-w-lg mx-auto">
             <SectionTitle icon={ClipboardList} title="7. Document Inventory" />
-            <div className="bg-gray-50 rounded p-4 mb-4">
+            <div className="bg-muted/50 rounded p-4 mb-4">
               <InfoRow label="Physical Document Location" value={trustData?.document_location} />
             </div>
             {vaultDocs.length > 0 ? (
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Document</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Category</th>
-                    <th className="text-left py-2 text-sm font-semibold text-gray-700">Date</th>
+                  <tr className="border-b-2 border-navy/30">
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Document</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Category</th>
+                    <th className="text-left py-2 text-sm font-semibold text-foreground">Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {vaultDocs.slice(0, 25).map((d, i) => (
-                    <tr key={i} className="border-b border-gray-100">
+                    <tr key={i} className="border-b border-navy/10">
                       <td className="py-2 text-sm text-navy">{d.name || d.title || d.filename || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{d.category || d.document_type || ''}</td>
-                      <td className="py-2 text-sm text-gray-600">{fmtDate(d.uploaded_at || d.date || d.created_at)}</td>
+                      <td className="py-2 text-sm text-muted-foreground">{d.category || d.document_type || ''}</td>
+                      <td className="py-2 text-sm font-mono text-muted-foreground">{fmtDate(d.uploaded_at || d.date || d.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <p className="text-sm text-gray-400 italic">No vault documents found. Upload documents in the Vault page.</p>
+              <p className="text-sm text-muted-foreground/60 italic">No vault documents found. Upload documents in the Vault page.</p>
             )}
           </div>
         </div>
@@ -536,7 +536,7 @@ const SuccessorPacketPage = () => {
         <div className="packet-section p-8" style={{ paddingLeft: '1in', paddingTop: '0.75in' }}>
           <div className="max-w-lg mx-auto">
             <SectionTitle icon={Shield} title="8. Governance Rules" />
-            <div className="bg-gray-50 rounded p-4">
+            <div className="bg-muted/50 rounded p-4">
               <InfoRow label="Review Cadence" value={trustData?.review_cadence} />
               <InfoRow label="Spending Threshold" value={trustData?.governance_settings?.spending_threshold ? `$${trustData.governance_settings.spending_threshold}` : null} />
               <InfoRow label="Benevolence Enabled" value={trustData?.benevolence_enabled ? 'Yes' : 'No'} />
@@ -551,13 +551,13 @@ const SuccessorPacketPage = () => {
             <SectionTitle icon={Calendar} title="9. Upcoming Deadlines" />
             {governanceTasks.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Governance Tasks</h3>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Governance Tasks</h3>
                 <table className="w-full border-collapse">
                   <tbody>
                     {governanceTasks.slice(0, 10).map((t, i) => (
-                      <tr key={i} className="border-b border-gray-100">
+                      <tr key={i} className="border-b border-navy/10">
                         <td className="py-2 text-sm text-navy">{t.title || t.task_type || ''}</td>
-                        <td className="py-2 text-sm text-gray-600 text-right">{fmtDate(t.due_date)}</td>
+                        <td className="py-2 text-sm font-mono text-muted-foreground text-right">{fmtDate(t.due_date)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -566,13 +566,13 @@ const SuccessorPacketPage = () => {
             )}
             {taxCalendar.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Tax Calendar</h3>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Tax Calendar</h3>
                 <table className="w-full border-collapse">
                   <tbody>
                     {taxCalendar.slice(0, 10).map((t, i) => (
-                      <tr key={i} className="border-b border-gray-100">
+                      <tr key={i} className="border-b border-navy/10">
                         <td className="py-2 text-sm text-navy">{t.deadline_type || t.title || ''}</td>
-                        <td className="py-2 text-sm text-gray-600 text-right">{fmtDate(t.due_date)}</td>
+                        <td className="py-2 text-sm font-mono text-muted-foreground text-right">{fmtDate(t.due_date)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -580,7 +580,7 @@ const SuccessorPacketPage = () => {
               </div>
             )}
             {governanceTasks.length === 0 && taxCalendar.length === 0 && (
-              <p className="text-sm text-gray-400 italic">No upcoming deadlines found.</p>
+              <p className="text-sm text-muted-foreground/60 italic">No upcoming deadlines found.</p>
             )}
           </div>
         </div>
@@ -592,16 +592,16 @@ const SuccessorPacketPage = () => {
 
             {trustData?.successor_instructions && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Letter of Guidance</h3>
-                <div className="bg-gray-50 rounded p-4 text-sm text-gray-700 whitespace-pre-wrap" style={{ fontSize: '10pt', lineHeight: 1.6 }}>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Letter of Guidance</h3>
+                <div className="bg-muted/50 rounded p-4 text-sm text-foreground whitespace-pre-wrap" style={{ fontSize: '10pt', lineHeight: 1.6 }}>
                   {trustData.successor_instructions}
                 </div>
               </div>
             )}
 
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">First 30 Days — Action Plan</h3>
-              <div className="bg-gray-50 rounded p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-2">First 30 Days — Action Plan</h3>
+              <div className="bg-muted/50 rounded p-4">
                 {[
                   'Obtain certified copies of the death certificate or physician\'s incapacity letter',
                   'Review the trust document and this packet thoroughly',
@@ -616,18 +616,18 @@ const SuccessorPacketPage = () => {
                   'Review upcoming deadlines and tax filing dates',
                   'Schedule a meeting with beneficiaries to discuss administration plans',
                 ].map((step, i) => (
-                  <div key={i} className="flex items-start gap-3 mb-2 py-1 border-b border-gray-100">
-                    <div className="w-5 h-5 border-2 border-gray-300 rounded flex-shrink-0 mt-0.5 flex items-center justify-center text-xs font-bold text-gray-400">{i + 1}</div>
-                    <span className="text-sm text-gray-700" style={{ fontSize: '10pt' }}>{step}</span>
+                  <div key={i} className="flex items-start gap-3 mb-2 py-1 border-b border-navy/10">
+                    <div className="w-5 h-5 border-2 border-navy/30 rounded flex-shrink-0 mt-0.5 flex items-center justify-center text-xs font-mono font-bold text-muted-foreground/60">{i + 1}</div>
+                    <span className="text-sm text-foreground" style={{ fontSize: '10pt' }}>{step}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Key Reminders</h3>
-              <div className="bg-amber-50 rounded p-4 border border-amber-200">
-                <ul className="space-y-2 text-sm text-gray-700" style={{ fontSize: '10pt' }}>
+              <h3 className="text-sm font-semibold text-foreground mb-2">Key Reminders</h3>
+              <div className="bg-warning/5 rounded p-4 border border-warning/20">
+                <ul className="space-y-2 text-sm text-foreground" style={{ fontSize: '10pt' }}>
                   <li className="flex items-start gap-2"><span className="text-gold font-bold">!</span> Always sign as "Trustee of the {trustName}" never individually.</li>
                   <li className="flex items-start gap-2"><span className="text-gold font-bold">!</span> Never commingle trust assets with personal assets.</li>
                   <li className="flex items-start gap-2"><span className="text-gold font-bold">!</span> Document every significant decision in meeting minutes.</li>
@@ -639,15 +639,15 @@ const SuccessorPacketPage = () => {
 
             {trustData?.document_location && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Physical Document Location</h3>
-                <div className="bg-gray-50 rounded p-4 text-sm text-gray-700" style={{ fontSize: '10pt' }}>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Physical Document Location</h3>
+                <div className="bg-muted/50 rounded p-4 text-sm text-foreground" style={{ fontSize: '10pt' }}>
                   {trustData.document_location}
                 </div>
               </div>
             )}
 
-            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-              <p className="text-xs text-gray-400">Generated with TrustOffice — trustoffice.app — {today}</p>
+            <div className="mt-8 pt-6 border-t border-navy/20 text-center">
+              <p className="text-xs font-mono text-muted-foreground/60">Generated with TrustOffice — trustoffice.app — {today}</p>
             </div>
           </div>
         </div>

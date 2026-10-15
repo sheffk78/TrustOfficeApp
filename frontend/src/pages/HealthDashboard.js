@@ -250,7 +250,7 @@ export default function HealthDashboard() {
                           onClick={() => setDays(d)}
                           className={`px-2 py-1 text-xs font-mono border transition-colors ${
                             days === d
-                              ? 'bg-navy text-cream border-navy'
+                              ? 'bg-navy text-white border-navy'
                               : 'border-navy/20 text-muted-foreground hover:border-navy/40'
                           }`}
                           data-testid={`range-${d}`}

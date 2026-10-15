@@ -5,7 +5,7 @@ import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { fetchWithAuth } from '@/utils/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import PageHelpButton from '@/components/PageHelpButton';
+import PageHeader from '@/components/PageHeader';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { safeFormatDate } from '@/utils/safeDate';
@@ -172,23 +172,21 @@ export default function ExportDashboard() {
       <main className="main-content dot-grid">
         <div className="page-container">
           {/* Header */}
-          <div className="page-header flex items-center justify-between">
-            <div>
-              <h1 className="page-title">Export &amp; Archive</h1>
-              <p className="page-subtitle">
-                Export trust data and create full archive backups for{' '}
-                {selectedTrust?.trust_name || 'your trust'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
-              <PageHelpButton
-                items={[
-                  { text: 'Export trust data as JSON or ZIP' },
-                  { text: 'Create a comprehensive archive including vault files' },
-                  { text: 'Download previous archives at any time' },
-                ]}
-                taPrompt="How do I export my trust data and create backups?"
-              />
+          <PageHeader
+            title="Export & Archive"
+            subtitle={`Export trust data and create full archive backups for ${
+              selectedTrust?.trust_name || 'your trust'
+            }`}
+            help={{
+              items: [
+                { text: 'Export trust data as JSON or ZIP' },
+                { text: 'Create a comprehensive archive including vault files' },
+                { text: 'Download previous archives at any time' },
+                { text: 'Archives include vault files; create one before major changes' },
+              ],
+              taPrompt: 'How do I export my trust data and create backups?',
+            }}
+            actions={
               <Button
                 onClick={loadArchives}
                 variant="outline"
@@ -199,8 +197,8 @@ export default function ExportDashboard() {
                 <RefreshCw className={`w-4 h-4 mr-2 ${loadingArchives ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           {!selectedTrust ? (
             <div className="card-trust p-8 text-center text-muted-foreground">
@@ -210,7 +208,7 @@ export default function ExportDashboard() {
           ) : (
             <>
               {/* Export Data Section */}
-              <div className="card-trust mb-8">
+              <div className="card-trust corner-mark mb-8">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-navy/10 flex items-center justify-center">
@@ -229,30 +227,22 @@ export default function ExportDashboard() {
                 <div className="flex items-center gap-4 mb-4">
                   <span className="text-sm font-medium text-navy">Format:</span>
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={() => setFormat('json')}
-                      className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono border transition-colors ${
-                        format === 'json'
-                          ? 'bg-navy text-cream border-navy'
-                          : 'border-navy/20 text-muted-foreground hover:border-navy/40'
-                      }`}
+                      className={`btn-secondary ${format === 'json' ? 'bg-navy text-white border-navy' : 'border-navy/20 text-muted-foreground hover:border-navy/40'}`}
                       data-testid="format-json"
                     >
                       <FileJson className="w-3 h-3" />
                       JSON
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setFormat('zip')}
-                      className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono border transition-colors ${
-                        format === 'zip'
-                          ? 'bg-navy text-cream border-navy'
-                          : 'border-navy/20 text-muted-foreground hover:border-navy/40'
-                      }`}
+                      className={`btn-secondary ${format === 'zip' ? 'bg-navy text-white border-navy' : 'border-navy/20 text-muted-foreground hover:border-navy/40'}`}
                       data-testid="format-zip"
                     >
                       <FileArchive className="w-3 h-3" />
                       ZIP
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -300,7 +290,7 @@ export default function ExportDashboard() {
               </div>
 
               {/* Archive Backups Section */}
-              <div className="card-trust">
+              <div className="card-trust corner-mark">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-navy/10 flex items-center justify-center">
@@ -353,7 +343,7 @@ export default function ExportDashboard() {
                             <Archive className="w-5 h-5 text-navy" />
                           </div>
                           <div>
-                            <p className="font-medium text-sm text-navy">
+                            <p className="font-medium text-sm font-mono text-navy">
                               Archive &middot; {safeFormatDate(archive.created_at, 'MMM d, yyyy h:mm a')}
                             </p>
                             <p className="text-xs text-muted-foreground font-mono">

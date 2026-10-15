@@ -30,7 +30,7 @@ export default function EventItem({ event, idx }) {
   return (
     <div
       key={event.id || idx}
-      className={`card-trust flex items-start gap-3 border ${colorClass}`}
+      className={`card-trust corner-mark flex items-start gap-3 border ${colorClass}`}
     >
       <div className="flex-shrink-0 mt-0.5">
         <Icon className="w-4 h-4" />
@@ -49,8 +49,8 @@ export default function EventItem({ event, idx }) {
         )}
       </div>
       <div className="flex-shrink-0 text-right">
-        <p className="text-xs font-medium">{dateStr}</p>
-        {timeStr && <p className="text-[10px] opacity-60">{timeStr}</p>}
+        <p className="text-xs font-medium font-mono">{dateStr}</p>
+        {timeStr && <p className="text-[10px] opacity-60 font-mono">{timeStr}</p>}
       </div>
     </div>
   );

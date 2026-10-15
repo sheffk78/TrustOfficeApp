@@ -145,19 +145,19 @@ export default function CloudBackupSection({ selectedTrust }) {
   };
 
   const formatStatus = (conn) => {
-    if (conn.last_backup_status === 'in_progress') return { icon: Loader2, text: 'Backup in progress...', color: 'text-blue-500', spin: true };
-    if (conn.last_backup_status === 'success') return { icon: CheckCircle2, text: `${conn.last_backup_doc_count || 0} files backed up`, color: 'text-green-600', spin: false };
-    if (conn.last_backup_status === 'partial') return { icon: AlertCircle, text: `Partial: ${conn.last_backup_doc_count || 0} backed up, some failed`, color: 'text-amber-600', spin: false };
-    if (conn.last_backup_status === 'failed') return { icon: AlertCircle, text: conn.last_backup_error || 'Backup failed', color: 'text-red-500', spin: false };
-    if (conn.last_backup_status === 'connected') return { icon: CheckCircle2, text: 'Connected — first backup pending', color: 'text-blue-500', spin: false };
-    return { icon: Cloud, text: 'Ready', color: 'text-gray-500', spin: false };
+    if (conn.last_backup_status === 'in_progress') return { icon: Loader2, text: 'Backup in progress...', color: 'text-info', spin: true };
+    if (conn.last_backup_status === 'success') return { icon: CheckCircle2, text: `${conn.last_backup_doc_count || 0} files backed up`, color: 'text-success', spin: false };
+    if (conn.last_backup_status === 'partial') return { icon: AlertCircle, text: `Partial: ${conn.last_backup_doc_count || 0} backed up, some failed`, color: 'text-warning', spin: false };
+    if (conn.last_backup_status === 'failed') return { icon: AlertCircle, text: conn.last_backup_error || 'Backup failed', color: 'text-error', spin: false };
+    if (conn.last_backup_status === 'connected') return { icon: CheckCircle2, text: 'Connected — first backup pending', color: 'text-info', spin: false };
+    return { icon: Cloud, text: 'Ready', color: 'text-muted-foreground', spin: false };
   };
 
   if (loading) {
     return (
-      <div className="card-trust p-6 mb-6 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-        <div className="h-10 bg-gray-200 rounded w-1/2"></div>
+      <div className="card-trust corner-mark p-6 mb-6 animate-pulse">
+        <div className="h-6 bg-navy/10 w-1/3 mb-4"></div>
+        <div className="h-10 bg-navy/10 w-1/2"></div>
       </div>
     );
   }
@@ -178,31 +178,31 @@ export default function CloudBackupSection({ selectedTrust }) {
             const ProviderIcon = PROVIDER_ICONS[conn.provider] || Cloud;
             const status = formatStatus(conn);
             return (
-              <div key={conn.provider} className="border border-gray-200 rounded-lg p-4">
+              <div key={conn.provider} className="border border-navy/20 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <ProviderIcon className="w-5 h-5 text-navy" />
                     <span className="font-medium text-navy">{PROVIDER_LABELS[conn.provider]}</span>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Connected</span>
+                    <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full">Connected</span>
                   </div>
                   <button
                     onClick={() => disconnect(conn.provider)}
-                    className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    className="text-xs text-muted-foreground hover:text-error transition-colors"
                     data-testid={`disconnect-${conn.provider}`}
                   >
                     Disconnect
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                   <StatusIcon className={`w-4 h-4 ${status.color} ${status.spin ? 'animate-spin' : ''}`} />
                   <span className={status.color}>{status.text}</span>
-                  <span className="text-gray-400">·</span>
+                  <span className="text-muted-foreground">·</span>
                   <span>Last backup: {formatDate(conn.last_backup_at)}</span>
                 </div>
 
                 {/* Stats bar */}
-                <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
                   <span>
                     {stats.backed_up_documents} of {stats.total_documents} documents backed up
                   </span>
@@ -210,9 +210,9 @@ export default function CloudBackupSection({ selectedTrust }) {
 
                 {/* Progress bar */}
                 {stats.total_documents > 0 && (
-                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                  <div className="w-full h-1.5 bg-navy/10 rounded-full overflow-hidden mb-3">
                     <div
-                      className="h-full bg-green-500 transition-all"
+                      className="h-full bg-success transition-all"
                       style={{ width: `${(stats.backed_up_documents / stats.total_documents) * 100}%` }}
                     />
                   </div>
@@ -229,7 +229,7 @@ export default function CloudBackupSection({ selectedTrust }) {
                     <RefreshCw className={`w-3.5 h-3.5 ${backupRunning ? 'animate-spin' : ''}`} />
                     {backupRunning ? 'Backing up...' : 'Back Up Now'}
                   </button>
-                  <div className="text-xs text-gray-400 flex items-center gap-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <span>Weekly auto-backup: Sundays 2 AM UTC</span>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export default function CloudBackupSection({ selectedTrust }) {
       ) : (
         /* Not connected — show connect options */
         <div>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             Automatically back up your vault documents to your own cloud storage account.
             Files are organized by category and backed up weekly.
           </p>
@@ -263,11 +263,11 @@ export default function CloudBackupSection({ selectedTrust }) {
                 <button
                   key={key}
                   onClick={() => connectProvider(key)}
-                  className="border border-gray-200 rounded-lg px-4 py-3 hover:border-navy hover:bg-navy/5 transition-all flex items-center gap-2 group"
+                  className="border border-navy/20 px-4 py-3 hover:border-navy hover:bg-navy/5 transition-all flex items-center gap-2 group"
                   data-testid={`connect-${key}`}
                 >
-                  <Icon className="w-5 h-5 text-gray-600 group-hover:text-navy" />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-navy">
+                  <Icon className="w-5 h-5 text-muted-foreground group-hover:text-navy" />
+                  <span className="text-sm font-medium text-navy/70 group-hover:text-navy">
                     Connect {label}
                   </span>
                 </button>
@@ -275,11 +275,11 @@ export default function CloudBackupSection({ selectedTrust }) {
             })}
             <button
               onClick={startProtonConnect}
-              className="border border-gray-200 rounded-lg px-4 py-3 hover:border-navy hover:bg-navy/5 transition-all flex items-center gap-2 group"
+              className="border border-navy/20 px-4 py-3 hover:border-navy hover:bg-navy/5 transition-all flex items-center gap-2 group"
               data-testid="connect-proton_drive"
             >
-              <ShieldCheck className="w-5 h-5 text-gray-600 group-hover:text-navy" />
-              <span className="text-sm font-medium text-gray-700 group-hover:text-navy">
+              <ShieldCheck className="w-5 h-5 text-muted-foreground group-hover:text-navy" />
+              <span className="text-sm font-medium text-navy/70 group-hover:text-navy">
                 Connect Proton Drive
               </span>
             </button>
@@ -288,7 +288,7 @@ export default function CloudBackupSection({ selectedTrust }) {
       )}
 
       {/* Info note */}
-      <div className="mt-4 flex items-start gap-2 text-xs text-gray-400">
+      <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
         <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
         <span>
           Your cloud credentials are never stored — we use secure OAuth tokens.

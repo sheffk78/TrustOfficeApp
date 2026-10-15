@@ -1,21 +1,17 @@
 import { FILTER_OPTIONS } from './constants';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function FilterBar({ filter, onChange }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {FILTER_OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-            filter === opt.value
-              ? 'bg-navy text-white border-navy'
-              : 'card-trust text-muted-foreground border-border hover:border-navy/30'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
+    <Tabs value={filter} onValueChange={onChange} className="w-full">
+      <TabsList className="mb-6 bg-muted/50 flex w-full gap-1 overflow-x-auto whitespace-nowrap">
+        {FILTER_OPTIONS.map((opt) => (
+          <TabsTrigger key={opt.value} value={opt.value} className="flex items-center gap-2">
+            {opt.label}
+            {opt.icon && <opt.icon className="w-4 h-4" />}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
