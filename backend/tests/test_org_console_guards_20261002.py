@@ -225,11 +225,24 @@ class TestInviteRoleHonor:
 
 
 async def _seed_grant_fixtures(expires_at):
-    """Minimal owner/trust/org fixtures for grant_trust_access expiry checks."""
-    for coll in ("users", "trusts", "orgs", "org_members", "trust_grants"):
+    """Minimal owner/trust/org fixtures for grant_trust_access expiry checks.
+
+    Owner carries an estate subscription: the 365-day cap this suite targets now
+    sits behind the client-access tier gate (402 plan_upgrade_required for
+    trustee/free, 2026-10-14), so the plan doc keeps that gate from firing and
+    the assertions below still test the expiry rule itself.
+    """
+    for coll in ("users", "trusts", "orgs", "org_members", "trust_grants", "subscriptions"):
         await db[coll].delete_many({})
     owner = {"user_id": "u_owner2", "email": "o2@t.test", "name": "Owner2"}
     await db.users.insert_one({**owner, "created_at": _now(), "is_admin": False})
+    await db.subscriptions.replace_one(
+        {"user_id": owner["user_id"]},
+        {"subscription_id": f"sub_{owner['user_id']}", "user_id": owner["user_id"],
+         "plan_type": "estate", "status": "active",
+         "created_at": _now(), "updated_at": _now()},
+        upsert=True,
+    )
     await db.trusts.insert_one({
         "trust_id": "t_exp", "user_id": owner["user_id"], "name": "Expiry",
         "trust_type": "family", "created_at": _now(), "status": "active"})
