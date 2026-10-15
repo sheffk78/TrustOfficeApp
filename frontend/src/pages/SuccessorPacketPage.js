@@ -24,6 +24,13 @@ const PRINT_STYLES = `
   }
   .no-print { display: none !important; }
 
+  /* Serif headings — legal-instrument typography */
+  .printable-area h1, .printable-area h2, .printable-area h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
   /* Suppress browser default headers/footers (URL, date, page numbers) */
   @page {
     size: letter;
