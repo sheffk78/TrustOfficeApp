@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Users } from 'lucide-react';
 import { fetchWithAuth } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
 
 const AcceptInvitePage = () => {
   const { token } = useParams();
@@ -73,9 +74,9 @@ const AcceptInvitePage = () => {
 
   if (authLoading || status === 'accepting') {
     return (
-      <div className="min-h-screen bg-subtle-bg px-6 py-16 text-gray-900">
+      <div className="min-h-screen bg-subtle-bg px-6 py-16 text-navy">
         <div className="mx-auto max-w-lg animate-pulse space-y-4">
-          <div className="h-8 w-2/3 rounded bg-gray-200" />
+          <div className="skeleton h-8 w-2/3 rounded" />
           <div className="h-40 rounded bg-white shadow-sm" />
         </div>
       </div>
@@ -84,11 +85,11 @@ const AcceptInvitePage = () => {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-gray-900">
-        <div className="w-full max-w-lg rounded border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
+      <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-navy">
+        <div className="w-full max-w-lg rounded border border-navy/10 bg-white p-8 text-center shadow-sm sm:p-12">
           <Users className="mx-auto mb-4 h-10 w-10 text-gold" aria-hidden="true" />
           <h1 className="mb-3 text-2xl font-bold">{orgName ? <>You're invited to {orgName}</> : "You're invited to TrustOffice"}</h1>
-          <p className="mb-6 text-sm leading-6 text-gray-500">
+          <p className="mb-6 text-sm leading-6 text-muted-foreground">
             You've been invited to join your organization's workspace inside TrustOffice. One quick step: log in with the
             email this invitation was sent to, and your membership is confirmed automatically.
           </p>
@@ -99,7 +100,7 @@ const AcceptInvitePage = () => {
           >
             Log in to accept your invite
           </Link>
-          <p className="mt-6 text-xs text-gray-400">
+          <p className="mt-6 text-xs text-muted-foreground">
             New to TrustOffice? This invite works with the account tied to your email.
           </p>
         </div>
@@ -109,35 +110,35 @@ const AcceptInvitePage = () => {
 
   if (status === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-gray-900">
-        <div className="w-full max-w-lg rounded border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
+      <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-navy">
+        <div className="w-full max-w-lg rounded border border-navy/10 bg-white p-8 text-center shadow-sm sm:p-12">
           <AlertCircle className="mx-auto mb-4 h-10 w-10 text-gold" aria-hidden="true" />
           <h1 className="mb-3 text-2xl font-bold">We couldn't accept this invite</h1>
-          <p className="text-sm leading-6 text-gray-500">{errorMsg}</p>
+          <p className="text-sm leading-6 text-muted-foreground">{errorMsg}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-gray-900">
-      <div className="w-full max-w-lg rounded border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
+    <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-navy">
+      <div className="w-full max-w-lg rounded border border-navy/10 bg-white p-8 text-center shadow-sm sm:p-12">
         <CheckCircle2 className="mx-auto mb-4 h-10 w-10 text-gold" aria-hidden="true" />
         <h1 className="mb-3 text-2xl font-bold">You're all set</h1>
-        <p className="mb-6 text-sm leading-6 text-gray-500">
+        <p className="mb-6 text-sm leading-6 text-muted-foreground">
           You're now a member of <strong>{orgName || 'your organization'}</strong>.
           {inviterName
             ? <> {inviterName} invited you — the organization owner decides which clients' trusts you can work on and grants access from their side.</>
             : <> The organization owner decides which clients' trusts you can work on and grants access from their side.</>}
           {' '}Open the organization console to see what's been granted to you so far.
         </p>
-        <button
+        <Button
           onClick={() => navigate('/org-console')}
           data-testid="invite-success-cta"
-          className="inline-block bg-navy px-6 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-90"
+          className="inline-block btn-primary px-6 py-3 text-sm font-semibold shadow-sm"
         >
           Go to your organization console
-        </button>
+        </Button>
       </div>
     </div>
   );

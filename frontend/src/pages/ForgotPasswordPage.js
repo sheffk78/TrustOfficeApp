@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, ArrowLeft, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, AlertCircle, X } from 'lucide-react';
+import Spinner from "@/components/Spinner";
 
 const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -109,14 +110,16 @@ export default function ForgotPasswordPage() {
                       <p className="text-sm font-medium text-error">Unable to send reset link</p>
                       <p className="text-xs text-error/80 mt-0.5">{formError}</p>
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => setFormError('')}
                       className="text-error/60 hover:text-error flex-shrink-0"
                       aria-label="Dismiss error"
                     >
                       <X className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 )}
                 <div>
@@ -144,7 +147,7 @@ export default function ForgotPasswordPage() {
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Spinner size={16} className="mr-2" />
                       Sending...
                     </>
                   ) : (

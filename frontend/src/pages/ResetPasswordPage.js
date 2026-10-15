@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Lock, Eye, EyeOff, ArrowLeft, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
+import Spinner from "@/components/Spinner";
 
 const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -89,7 +90,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-subtle-bg p-4">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-navy mx-auto mb-4" />
+          <Spinner size={32} className="text-navy mx-auto mb-4" />
           <p className="text-muted-foreground">Verifying reset link...</p>
         </div>
       </div>
@@ -207,14 +208,16 @@ export default function ResetPasswordPage() {
                   disabled={loading}
                   data-testid="new-password-input"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -253,7 +256,7 @@ export default function ResetPasswordPage() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size={16} className="mr-2" />
                   Resetting...
                 </>
               ) : (

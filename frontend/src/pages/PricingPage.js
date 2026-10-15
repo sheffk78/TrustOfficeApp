@@ -375,22 +375,24 @@ export default function PricingPage() {
                     {/* Monthly/Annual toggle */}
                     <div className="flex justify-center mb-4">
                       <div className="inline-flex items-center bg-subtle-bg border border-border p-1">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => setTrusteePeriod('monthly')}
                           aria-pressed={trusteePeriod === 'monthly'}
                           className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${trusteePeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Monthly
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => setTrusteePeriod('annual')}
                           aria-pressed={trusteePeriod === 'annual'}
                           className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${trusteePeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Annual <span className="ml-1 text-success">Save 20%</span>
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -443,22 +445,24 @@ export default function PricingPage() {
                     {/* Monthly/Annual toggle */}
                     <div className="flex justify-center mb-4">
                       <div className="inline-flex items-center bg-subtle-bg border border-border p-1">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => setWingPointPeriod('monthly')}
                           aria-pressed={wingPointPeriod === 'monthly'}
                           className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${wingPointPeriod === 'monthly' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Monthly
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => setWingPointPeriod('annual')}
                           aria-pressed={wingPointPeriod === 'annual'}
                           className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
                           Annual <span className="ml-1 text-success">save $240/yr</span>
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -545,17 +549,19 @@ export default function PricingPage() {
       <section className="pb-6 px-8">
         <div className="max-w-4xl mx-auto flex flex-col items-center">
           <div className="inline-flex items-center bg-subtle-bg border border-border p-1" data-testid="billing-period-toggle">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setBillingPeriod('monthly')}
               aria-pressed={billingPeriod === 'monthly'}
               className={`px-5 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${billingPeriod === 'monthly' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
               data-testid="billing-period-monthly"
             >
               Monthly
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setBillingPeriod('annual')}
               aria-pressed={billingPeriod === 'annual'}
               className={`px-5 py-2 text-xs font-mono uppercase tracking-wider transition-colors ${billingPeriod === 'annual' ? 'bg-navy text-white' : 'text-muted-foreground hover:text-navy'}`}
@@ -563,7 +569,7 @@ export default function PricingPage() {
             >
               Annual
               <span className="ml-2 text-xs text-success">Save 20%</span>
-            </button>
+            </Button>
           </div>
         </div>
       </section>

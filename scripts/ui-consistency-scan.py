@@ -27,14 +27,16 @@ BASELINE = ROOT / "scripts" / "ui-consistency-baseline.json"
 
 # Files exempt from R1 (header rule) — intentional layouts per UI-STANDARD.md
 R1_EXEMPT = {
-    "LoginPage.js", "SignUpPage.js", "ForgotPasswordPage.py", "ForgotPasswordPage.js",
-    "ResetPasswordPage.js", "AcceptInvitePage.js", "AuthCallback.js",
+    "LoginPage.js", "SignUpPage.js", "ForgotPasswordPage.js", "ResetPasswordPage.js", "AcceptInvitePage.js", "AuthCallback.js",
     "PostCheckoutPage.js", "NotFoundPage.js", "OnboardingPage.js",
     "ExternalRedirect.js", "WingPointRedirect.js", "WingPointWelcomePage.js",
     "ConnectWingPoint.js", "trustProtectorPowers.js",
     "SuccessorAccessPage.js",  # public token-gated route — centered layout intentional (Wave 4 audit F14)
     "TrustAccessPanel.js",     # Wave 5: 12-line superseded stub, zero imports anywhere — unreachable
     # (TrustAccessPage.js REMOVED from exemption in Wave 5 — logged-in shell route, migrated to PageHeader)
+    "PricingPage.js",          # Wave 7: public marketing page — full-bleed layout, own navy nav + hero (no in-app shell)
+    "AffiliatePage.js",        # Wave 7: public marketing page — full-bleed dark hero, external-partner funnel
+    "ContactPage.js",          # Wave 7: public contact page — centered card layout, unrouted from App.js (marketing-site embed)
 }
 
 RE_PAGE_TITLE = re.compile(r'\bpage-title\b')

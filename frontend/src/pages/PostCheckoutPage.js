@@ -36,7 +36,7 @@ export default function PostCheckoutPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-navy/5 p-4" data-testid="post-checkout-page">
-      <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-8 text-center">
+      <div className="bg-white shadow-lg max-w-md w-full p-8 text-center">
         <div className="text-4xl mb-4" aria-hidden="true">✓</div>
         <h1 className="text-2xl font-semibold text-navy">
           {welcome || sessionId ? 'Welcome to TrustOffice' : 'You\u2019re all set'}

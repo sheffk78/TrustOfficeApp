@@ -429,7 +429,7 @@ export default function ConnectWingPoint() {
             </div>
 
             {/* WingPoint connect banner */}
-            <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy">
+            <div className="mb-6 bg-gold/10 border border-gold/30 p-4 text-navy">
               <p className="text-sm">
                 <strong>Connect to WingPoint.</strong> Log in to your TrustOffice
                 account to confirm the connection.
@@ -522,14 +522,15 @@ export default function ConnectWingPoint() {
                         <p className="text-sm font-medium text-error">Sign-in failed</p>
                         <p className="text-xs text-error/80 mt-0.5">{loginError}</p>
                       </div>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => setLoginError('')}
                         className="text-error/60 hover:text-error flex-shrink-0"
                         aria-label="Dismiss error"
                       >
                         <X className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   )}
 
@@ -575,14 +576,15 @@ export default function ConnectWingPoint() {
                         aria-label="Password"
                         required
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                         >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -658,7 +660,7 @@ export default function ConnectWingPoint() {
           </div>
 
           {/* Connection details card */}
-          <div className="bg-subtle-bg/50 border border-navy/10 rounded-lg p-4 mb-6 space-y-3">
+          <div className="bg-subtle-bg/50 border border-navy/10 p-4 mb-6 space-y-3">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                 Your TrustOffice Account
@@ -702,14 +704,15 @@ export default function ConnectWingPoint() {
                 <p className="text-sm font-medium text-error">Connection failed</p>
                 <p className="text-xs text-error/80 mt-0.5">{confirmError}</p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setConfirmError('')}
                 className="text-error/60 hover:text-error flex-shrink-0"
                 aria-label="Dismiss error"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           )}
 
@@ -734,7 +737,7 @@ export default function ConnectWingPoint() {
 
         <p className="text-center text-xs text-muted-foreground mt-4">
           Logged in as {user?.email}. Not you?{' '}
-          <button
+          <Button
             onClick={() => {
               localStorage.removeItem('auth_token');
               setUser(null);
@@ -743,7 +746,7 @@ export default function ConnectWingPoint() {
             className="text-navy hover:text-navy/70 underline"
           >
             Log out
-          </button>
+          </Button>
         </p>
       </div>
     </div>

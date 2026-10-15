@@ -238,7 +238,7 @@ export default function WingPointWelcomePage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* 1. Welcome Section */}
         <section className="text-center mb-12">
-          <div className="inline-block px-4 py-1.5 rounded-full bg-gold/10 border border-gold/30 mb-6">
+          <div className="inline-block px-4 py-1.5 bg-gold/10 border border-gold/30 mb-6">
             <span className="text-sm font-medium text-navy">WingPoint Customer</span>
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-navy mb-4 tracking-tight">
@@ -441,7 +441,9 @@ export default function WingPointWelcomePage() {
                 key={idx}
                 className="bg-white border border-border overflow-hidden"
               >
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-subtle-bg/50 transition-colors"
                 >
@@ -451,7 +453,7 @@ export default function WingPointWelcomePage() {
                   ) : (
                     <ChevronDown className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   )}
-                </button>
+                </Button>
                 {expandedFaq === idx && (
                   <div className="px-4 pb-4 text-sm text-muted-foreground leading-relaxed">
                     {item.a}
@@ -554,14 +556,15 @@ function NotLoggedInAction({
                   required
                   className="pr-10"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
                 aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                </Button>
               </div>
             </div>
             <div>

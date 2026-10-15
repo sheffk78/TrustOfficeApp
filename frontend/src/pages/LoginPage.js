@@ -423,7 +423,7 @@ export default function LoginPage() {
 
                 {/* Session expired banner -- when redirected from a 401 mid-session */}
                 {searchParams.get('reason') === 'session-expired' && (
-                  <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="session-expired-banner">
+                  <div className="mb-6 bg-gold/10 border border-gold/30 p-4 text-navy" data-testid="session-expired-banner">
                     <p className="text-sm">
                       Your session has expired. Please sign in again to continue.
                     </p>
@@ -432,7 +432,7 @@ export default function LoginPage() {
 
                 {/* WingPoint welcome-back banner -- only when ?wp=1 present */}
                 {searchParams.get('wp') === '1' && (
-                  <div className="mb-6 bg-gold/10 border border-gold/30 rounded-lg p-4 text-navy" data-testid="wp-welcome-banner">
+                  <div className="mb-6 bg-gold/10 border border-gold/30 p-4 text-navy" data-testid="wp-welcome-banner">
                     <p className="text-sm">
                       Welcome back. Your WingPoint trust is waiting in your TrustOffice account. Log in to continue setting up your management plan.
                     </p>
@@ -472,14 +472,16 @@ export default function LoginPage() {
                           <p className="text-sm font-medium text-error">Sign-in failed</p>
                           <p className="text-xs text-error/80 mt-0.5">{loginError}</p>
                         </div>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => setLoginError('')}
                           className="text-error/60 hover:text-error flex-shrink-0"
                           aria-label="Dismiss error"
                         >
                           <X className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     )}
                     <div>
@@ -529,14 +531,16 @@ export default function LoginPage() {
                           required
                           data-testid="password-input"
                         />
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                          >
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                        </Button>
                       </div>
                     </div>
 

@@ -1,17 +1,12 @@
 {
- "AcceptInvitePage.js": {
-  "R3_palette": 12,
-  "R4_raw_btn": 1
- },
+ "AcceptInvitePage.js": {},
  "AdminPage.js": {
   "R1_header": 1,
   "R2_radius_full": 1,
   "R3_palette": 2,
   "R5_tabs": 1
  },
- "AffiliatePage.js": {
-  "R1_header": 1
- },
+ "AffiliatePage.js": {},
  "ApprovalFlow.js": {
   "R2_radius_hard": 2,
   "R3_palette": 5
@@ -38,13 +33,8 @@
  "ClientsListPage.js": {},
  "CommunicationsPage.js": {},
  "CompensationPage.js": {},
- "ConnectWingPoint.js": {
-  "R2_radius_hard": 2,
-  "R4_raw_btn": 4
- },
- "ContactPage.js": {
-  "R1_header": 1
- },
+ "ConnectWingPoint.js": {},
+ "ContactPage.js": {},
  "CoursePage.js": {},
  "CreateMinutesPage.js": {
   "R1_header": 1,
@@ -63,9 +53,7 @@
  "ExpensesPage.js": {},
  "ExportDashboard.js": {},
  "ExternalRedirect.js": {},
- "ForgotPasswordPage.js": {
-  "R4_raw_btn": 1
- },
+ "ForgotPasswordPage.js": {},
  "GovernancePage.js": {},
  "HealthComplianceTabbed.js": {},
  "HealthDashboard.js": {
@@ -82,10 +70,7 @@
  "LeadsAccessPage.js": {
   "R1_header": 1
  },
- "LoginPage.js": {
-  "R2_radius_hard": 2,
-  "R4_raw_btn": 2
- },
+ "LoginPage.js": {},
  "MeetingAgenda.js": {
   "R2_radius_hard": 4,
   "R3_palette": 10,
@@ -125,17 +110,10 @@
  "PerformanceDashboard.js": {
   "R2_radius_full": 1
  },
- "PostCheckoutPage.js": {
-  "R2_radius_hard": 1
- },
- "PricingPage.js": {
-  "R1_header": 1,
-  "R4_raw_btn": 6
- },
+ "PostCheckoutPage.js": {},
+ "PricingPage.js": {},
  "PrintableBinderPage.js": {},
- "ResetPasswordPage.js": {
-  "R4_raw_btn": 1
- },
+ "ResetPasswordPage.js": {},
  "RiskDashboardPage.js": {},
  "ScheduleAPage.js": {},
  "SeparationTab.js": {},
@@ -164,9 +142,6 @@
  },
  "VaultPage.js": {},
  "WingPointRedirect.js": {},
- "WingPointWelcomePage.js": {
-  "R2_radius_full": 1,
-  "R4_raw_btn": 2
- },
+ "WingPointWelcomePage.js": {},
  "trustProtectorPowers.js": {}
 }
