@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AlertCircle, BookOpen, Building2, Calendar, CheckCircle2, ClipboardList,
-  FileText, Landmark, Shield, Users,
+  FileText, KeyRound, Landmark, Shield, Upload, Users,
 } from 'lucide-react';
 import { API } from '@/utils/api';
 import { formatEIN } from '@/utils/formatters';
@@ -73,6 +73,77 @@ const SuccessorAccessPage = () => {
   const [status, setStatus] = useState('loading');
   const [errorStatus, setErrorStatus] = useState(null);
 
+  // Jeff 2026-10-16 — no token in the URL: the successor lands on the entry form.
+  // Access code (default) or death-certificate claim, per the method the trustee chose.
+  const [mode, setMode] = useState(token ? 'packet' : 'entry'); // 'entry' | 'packet' | 'claim'
+  const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimDone, setClaimDone] = useState(false);
+  const [claimError, setClaimError] = useState('');
+  const [claimForm, setClaimForm] = useState({
+    trust_token: token || '',
+    claimant_name: '',
+    claimant_email: '',
+    claimant_phone: '',
+    notes: '',
+  });
+  const [claimFile, setClaimFile] = useState(null);
+
+  const loadPacketWithCode = async (enteredCode) => {
+    setClaimBusy(true);
+    setCodeError('');
+    try {
+      const response = await fetch(`${API}/successor-access/claim-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: enteredCode }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setCodeError(data.detail || 'That access code isn\'t valid.');
+        return;
+      }
+      const data = await response.json();
+      setPacket(data);
+      setStatus('success');
+      setMode('packet');
+    } catch {
+      setCodeError('We couldn\'t reach the server. Please try again in a moment.');
+    } finally {
+      setClaimBusy(false);
+    }
+  };
+
+  const submitClaim = async (event) => {
+    event.preventDefault();
+    if (!claimFile) {
+      setClaimError('Attach the death certificate (PDF or photo) to submit.');
+      return;
+    }
+    setClaimBusy(true);
+    setClaimError('');
+    try {
+      const form = new FormData();
+      form.append('file', claimFile);
+      Object.entries(claimForm).forEach(([key, value]) => form.append(key, value));
+      const response = await fetch(`${API}/successor-access/claim-verification`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setClaimError(data.detail || 'We couldn\'t submit that. Please check the form and try again.');
+        return;
+      }
+      setClaimDone(true);
+    } catch {
+      setClaimError('We couldn\'t reach the server. Please try again in a moment.');
+    } finally {
+      setClaimBusy(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     const loadPacket = async () => {
@@ -103,6 +174,148 @@ const SuccessorAccessPage = () => {
     loadPacket();
     return () => { cancelled = true; };
   }, [token]);
+
+  // ------- Entry form (no token in URL): access code or death-certificate claim -------
+  if (mode === 'entry' || mode === 'claim') {
+    if (claimDone) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-subtle-bg px-6 py-12 text-navy">
+          <div className="w-full max-w-lg card-trust corner-mark text-center">
+            <CheckCircle2 className="mx-auto mb-4 h-10 w-10 text-gold" aria-hidden="true" />
+            <h1 className="mb-3 text-2xl font-bold">Request received</h1>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Thank you. Our team reviews every request personally — you&apos;ll hear from us by email
+              once it&apos;s approved. If we need anything else, we&apos;ll contact you at
+              {' '}{claimForm.claimant_email || 'the email you provided'}.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen bg-subtle-bg px-4 py-10 text-navy sm:px-6 sm:py-16">
+        <main className="mx-auto max-w-xl">
+          <header className="mb-8 text-center">
+            <div className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-gold">TrustOffice</div>
+            <h1 className="mt-3 font-serif font-semibold tracking-tight text-navy text-3xl">
+              {mode === 'entry' ? 'Successor Access' : 'Request Access'}
+            </h1>
+            {mode === 'entry' ? (
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                Enter the access code the trustee shared with you to open the successor packet.
+              </p>
+            ) : (
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                Submit your request with the death certificate. Our team reviews each request
+                personally and emails you once it&apos;s approved.
+              </p>
+            )}
+          </header>
+
+          {mode === 'entry' ? (
+            <form
+              className="card-trust corner-mark p-6 sm:p-8"
+              onSubmit={(event) => { event.preventDefault(); loadPacketWithCode(code); }}
+            >
+              <label htmlFor="successor-code" className="mb-2 block text-sm font-medium text-navy">Access code</label>
+              <input
+                id="successor-code"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                autoComplete="off"
+                autoFocus
+                className="w-full rounded border border-navy/30 bg-white px-4 py-3 text-center font-mono text-lg tracking-[0.25em] text-navy outline-none focus:border-gold"
+              />
+              {codeError && (
+                <p className="mt-3 border border-warning/30 bg-warning/5 p-3 text-sm text-warning" role="alert">{codeError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={claimBusy || !code.trim()}
+                className="mt-5 w-full rounded bg-navy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {claimBusy ? 'Opening…' : 'Open the packet'}
+              </button>
+              <button
+                type="button"
+                className="mt-5 w-full text-center text-xs text-muted-foreground underline decoration-navy/20 underline-offset-4 hover:text-navy"
+                onClick={() => setMode('claim')}
+              >
+                No access code? Request access with a death certificate instead →
+              </button>
+            </form>
+          ) : (
+            <form className="card-trust corner-mark p-6 sm:p-8" onSubmit={submitClaim}>
+              <div className="mb-4 space-y-3">
+                <input
+                  required
+                  value={claimForm.claimant_name}
+                  onChange={(event) => setClaimForm({ ...claimForm, claimant_name: event.target.value })}
+                  placeholder="Your full name"
+                  className="w-full rounded border border-navy/30 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-gold"
+                />
+                <input
+                  required
+                  type="email"
+                  value={claimForm.claimant_email}
+                  onChange={(event) => setClaimForm({ ...claimForm, claimant_email: event.target.value })}
+                  placeholder="Your email"
+                  className="w-full rounded border border-navy/30 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-gold"
+                />
+                <input
+                  value={claimForm.claimant_phone}
+                  onChange={(event) => setClaimForm({ ...claimForm, claimant_phone: event.target.value })}
+                  placeholder="Your phone (optional)"
+                  className="w-full rounded border border-navy/30 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-gold"
+                />
+              </div>
+              <label className="mb-2 block text-sm font-medium text-navy">Death certificate (PDF or photo)</label>
+              <label
+                htmlFor="successor-claim-file"
+                className="flex cursor-pointer items-center justify-center gap-2 rounded border border-dashed border-navy/30 bg-white px-4 py-6 text-sm text-muted-foreground hover:border-gold"
+              >
+                <Upload className="h-4 w-4 text-gold" aria-hidden="true" />
+                {claimFile ? claimFile.name : 'Choose a file — PDF, JPG, or PNG (max 10 MB)'}
+              </label>
+              <input
+                id="successor-claim-file"
+                type="file"
+                accept="application/pdf,image/*"
+                className="sr-only"
+                onChange={(event) => setClaimFile(event.target.files?.[0] || null)}
+              />
+              <textarea
+                value={claimForm.notes}
+                onChange={(event) => setClaimForm({ ...claimForm, notes: event.target.value })}
+                placeholder="Anything our review team should know (optional)"
+                rows={3}
+                className="mt-3 w-full rounded border border-navy/30 bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-gold"
+              />
+              {claimError && (
+                <p className="mt-3 border border-warning/30 bg-warning/5 p-3 text-sm text-warning" role="alert">{claimError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={claimBusy}
+                className="mt-5 w-full rounded bg-navy px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {claimBusy ? 'Submitting…' : 'Submit request'}
+              </button>
+              <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+                Nothing about the trust is shown until your request is approved.
+              </p>
+            </form>
+          )}
+
+          <p className="mx-auto mt-8 max-w-md text-center text-xs leading-5 text-muted-foreground/70">
+            This is operational information, not legal advice. Please consult qualified legal and tax
+            professionals about your responsibilities as successor trustee.
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   if (status === 'loading') {
     return (

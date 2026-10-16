@@ -259,9 +259,47 @@ class EmailService:
         successor_name: str,
         trust_name: str,
         trustee_name: str,
-        packet_url: str
+        packet_url: str,
+        access_method: str = "access_code",
     ) -> Dict[str, Any]:
-        """Send the successor trustee a secure packet access link."""
+        """Send the successor trustee a secure packet access link.
+
+        Access method (Jeff 2026-10-16 — trustee's choice) shapes the "what to do" copy:
+        access_code → open the packet with the shared code; death_cert → register now,
+        submit the certificate when the time comes, human review, then access.
+        """
+        if access_method == "death_cert":
+            method_block = """
+            <p>How access works: <strong>you're on the death-certificate verification process.</strong>
+            Keep this email safe. When the time comes, submit the death certificate through the
+            button below — our team reviews each request personally, and you'll get your secure
+            packet link by email once it's approved. Nothing is visible to anyone until then.</p>
+            <p style="text-align: center; margin: 20px 0;">
+              <a href="{_SAFE_PACKET_URL}" class="button">Successor Access — Submit When Needed</a>
+            </p>
+            """.replace("{_SAFE_PACKET_URL}", "PLACEHOLDER_URL")
+            method_block_text = (
+                "How access works: you're on the death-certificate verification process. Keep this "
+                "email safe. When the time comes, submit the death certificate through the link "
+                "below - our team reviews each request personally, and you'll get your secure packet "
+                "link by email once it's approved. Nothing is visible to anyone until then."
+            )
+        else:
+            method_block = """
+            <p>How access works: <strong>you're on the access-code process.</strong> The trustee
+            shares a private access code with you. Go to the Successor Access page, enter the code,
+            and the full packet opens instantly — no paperwork, no waiting. You can do this any
+            time, or keep the code with your important papers for when it's needed.</p>
+            <p style="text-align: center; margin: 20px 0;">
+              <a href="PLACEHOLDER_URL" class="button">Successor Access — Enter Your Code</a>
+            </p>
+            """
+            method_block_text = (
+                "How access works: you're on the access-code process. The trustee shares a private "
+                "access code with you. Go to the Successor Access page, enter the code, and the full "
+                "packet opens instantly - no paperwork, no waiting. You can do this any time, or keep "
+                "the code with your important papers for when it's needed."
+            )
         return await self.send_templated_email(
             to_email=to_email,
             template_name="successor_packet",
@@ -270,6 +308,9 @@ class EmailService:
                 "trust_name": trust_name,
                 "trustee_name": trustee_name,
                 "packet_url": packet_url,
+                "method_block_html": method_block.replace("PLACEHOLDER_URL", packet_url),
+                "method_block_text": method_block_text,
+                "packet_url_plain": packet_url,
             },
             to_name=successor_name,
             tag="successor_packet",

@@ -757,6 +757,12 @@ async def startup_event():
         # One-time successor access links (MongoDB removes them after expiry)
         await db.successor_access.create_index("token_hash", unique=True)
         await db.successor_access.create_index("expires_at", expireAfterSeconds=0)
+        # Access-code method: hashed-code lookup + revocation queries (kind/code_hash)
+        await db.successor_access.create_index([("kind", 1), ("code_hash", 1)])
+        await db.successor_access.create_index([("trust_id", 1), ("kind", 1), ("revoked_at", 1)])
+        # Death-certificate review queue
+        await db.successor_claims.create_index("claim_id", unique=True)
+        await db.successor_claims.create_index([("status", 1), ("submitted_at", 1)])
         
         # Referral indexes
         await db.referral_codes.create_index("user_id", unique=True)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchWithAuth } from '@/utils/api';
 import { showError } from '@/utils/errors';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/PageHeader';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
-import { Printer, FileText, Users, Building2, Landmark, Phone, Mail, ClipboardList, Calendar, Shield, BookOpen } from 'lucide-react';
+import { Printer, FileText, Users, Building2, Landmark, Phone, Mail, ClipboardList, Calendar, Shield, BookOpen, KeyRound, FileBadge, RotateCcw, Ban, Info } from 'lucide-react';
 import use2faStepUp from '@/hooks/use2faStepUp';
 
 const PRINT_STYLES = `
@@ -109,6 +109,10 @@ const SuccessorPacketPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
+  // Successor Access (Jeff 2026-10-16: trustee chooses the method; Access Code default)
+  const [accessStatus, setAccessStatus] = useState(null);
+  const [showGeneratedCode, setShowGeneratedCode] = useState(null); // raw code shown once after generate/rotate
+  const [codeBusy, setCodeBusy] = useState(false);
 
   // 2FA step-up: successor-grant creation (sending the secure link) is a
   // protected action. A 403 2fa_stepup_required opens the code modal and the
@@ -134,30 +138,39 @@ const SuccessorPacketPage = () => {
 
         if (cancelled) return;
 
-        if (trustRes.ok) setTrustData(await trustRes.json());
+        if (trustRes.ok) {
+          const td = await trustRes.json();
+          setTrustData(td && typeof td === 'object' ? td : null);
+        }
         if (entitiesRes?.ok) {
           const ed = await entitiesRes.json();
-          setEntities(Array.isArray(ed) ? ed : (ed.items || ed.entities || []));
+          setEntities(Array.isArray(ed) ? ed : (Array.isArray(ed?.items) ? ed.items : Array.isArray(ed?.entities) ? ed.entities : []));
         }
         if (beneRes?.ok) {
           const bd = await beneRes.json();
-          setBeneficiaries(bd?.certificates || bd?.beneficiaries || []);
+          setBeneficiaries([
+            ...(Array.isArray(bd?.certificates) ? bd.certificates : []),
+            ...(Array.isArray(bd?.beneficiaries) ? bd.beneficiaries : []),
+          ]);
         }
         if (bankRes?.ok) {
           const bk = await bankRes.json();
-          setBankAccounts(bk?.accounts || bk?.bank_accounts || []);
+          setBankAccounts(Array.isArray(bk?.accounts) ? bk.accounts : Array.isArray(bk?.bank_accounts) ? bk.bank_accounts : Array.isArray(bk) ? bk : []);
         }
         if (vaultRes?.ok) {
           const vd = await vaultRes.json();
-          setVaultDocs(vd?.documents || vd || []);
+          setVaultDocs(Array.isArray(vd?.documents) ? vd.documents : Array.isArray(vd) ? vd : []);
         }
         if (govRes?.ok) {
           const gd = await govRes.json();
-          setGovernanceTasks(gd?.tasks || gd || []);
+          setGovernanceTasks(Array.isArray(gd?.tasks) ? gd.tasks : Array.isArray(gd) ? gd : []);
         }
         if (taxRes?.ok) {
-          const td = await taxRes.json();
-          setTaxCalendar(td?.entries || td?.calendar || []);
+          const tc = await taxRes.json();
+          // Guard: a bare array from the endpoint would make `tc?.entries` resolve to
+          // Array.prototype.entries (a function) — React then treats it as a functional
+          // update and the page crashes. Array.isArray checks keep state real arrays.
+          setTaxCalendar(Array.isArray(tc?.entries) ? tc.entries : Array.isArray(tc?.calendar) ? tc.calendar : Array.isArray(tc) ? tc : []);
         }
       } catch (e) {
         console.error('Failed to load packet data:', e);
@@ -169,6 +182,20 @@ const SuccessorPacketPage = () => {
     fetchAll();
     return () => { cancelled = true; };
   }, [selectedTrust?.trust_id]);
+
+  // Successor access status load — hooks must run before any early return (rules-of-hooks)
+  const loadAccessStatus = useCallback(async () => {
+    const tid = selectedTrust?.trust_id;
+    if (!tid) return;
+    try {
+      const res = await fetchWithAuth(`/trusts/${tid}/successor/access-status`);
+      if (res.ok) setAccessStatus(await res.json());
+    } catch {
+      // Non-fatal: the packet page still works without the access panel data.
+    }
+  }, [selectedTrust?.trust_id]);
+
+  useEffect(() => { loadAccessStatus(); }, [loadAccessStatus]);
 
   if (!selectedTrust) {
     return (
@@ -213,6 +240,72 @@ const SuccessorPacketPage = () => {
       showError(toast, e, { operation: 'send_successor_packet', page: 'SuccessorPacket' });
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    const tid = selectedTrust?.trust_id;
+    if (!tid) return;
+    setCodeBusy(true);
+    try {
+      const res = await runWithStepUp((extraHeaders) => fetchWithAuth(`/trusts/${tid}/successor/code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) },
+        body: JSON.stringify({}),
+      }));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to generate code');
+      setShowGeneratedCode(data.code);
+      toast.success('Access code ready. Copy it now — it is shown only this once.');
+      loadAccessStatus();
+    } catch (e) {
+      showError(toast, e, { operation: 'generate_successor_code', page: 'SuccessorPacket' });
+    } finally {
+      setCodeBusy(false);
+    }
+  };
+
+  const handleRevokeCode = async () => {
+    const tid = selectedTrust?.trust_id;
+    if (!tid) return;
+    setCodeBusy(true);
+    try {
+      const res = await runWithStepUp((extraHeaders) => fetchWithAuth(`/trusts/${tid}/successor/code`, {
+        method: 'DELETE',
+        headers: { ...(extraHeaders || {}) },
+      }));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to revoke code');
+      setShowGeneratedCode(null);
+      toast.success('Access code revoked. Your successor can no longer use it.');
+      loadAccessStatus();
+    } catch (e) {
+      showError(toast, e, { operation: 'revoke_successor_code', page: 'SuccessorPacket' });
+    } finally {
+      setCodeBusy(false);
+    }
+  };
+
+  const handleSetMethod = async (method) => {
+    const tid = selectedTrust?.trust_id;
+    if (!tid || accessStatus?.method === method) return;
+    setCodeBusy(true);
+    try {
+      const res = await runWithStepUp((extraHeaders) => fetchWithAuth(`/trusts/${tid}/successor/method`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) },
+        body: JSON.stringify({ method }),
+      }));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to update method');
+      toast.success(method === 'access_code'
+        ? 'Access code selected — your successor uses the code you share to open their packet.'
+        : 'Death-certificate verification selected — your successor submits documents and our team reviews before access.');
+      loadAccessStatus();
+    } catch (e) {
+      showError(toast, e, { operation: 'set_successor_method', page: 'SuccessorPacket' });
+    } finally {
+      setCodeBusy(false);
     }
   };
 
@@ -276,13 +369,138 @@ const SuccessorPacketPage = () => {
                 <div className="h-48 bg-subtle-bg rounded"></div>
               </div>
             ) : (
+              <div className="space-y-5">
+              {/* ==================== SUCCESSOR ACCESS (method selection + code) ==================== */}
+              <div className="card-trust corner-mark border border-border p-6">
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-bold text-navy flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-gold" aria-hidden="true" /> How your successor gets in
+                  </h2>
+                  {accessStatus?.code_set && accessStatus?.method === 'access_code' && (
+                    <span className="text-xs text-muted-foreground">Code {accessStatus.code_hint} ·
+                      {accessStatus.code_use_count > 0
+                        ? ` used ${accessStatus.code_use_count}×`
+                        : ' not used yet'}</span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You choose how your successor trustee opens their packet. The packet and their email
+                  will describe the process you pick.
+                </p>
+
+                {/* Method selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSetMethod('access_code')}
+                    disabled={codeBusy || loading}
+                    className={`text-left p-4 rounded border transition-colors ${accessStatus?.method !== 'death_cert' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'} disabled:opacity-60`}
+                  >
+                    <div className="flex items-center gap-2 mb-1 font-semibold text-navy text-sm">
+                      <KeyRound className="w-4 h-4 text-gold" aria-hidden="true" /> Access code
+                      {accessStatus?.method !== 'death_cert' && (
+                        <span className="text-[10px] uppercase tracking-wider font-mono text-gold border border-gold/50 bg-gold/5 px-1.5 py-0.5 rounded">Selected · Default</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      You share a one-time-shown code with your successor (in person, by phone, or with your papers).
+                      They enter it to view the packet instantly — no waiting, no paperwork. You're notified by email
+                      the moment it's used. Rotate or revoke anytime.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetMethod('death_cert')}
+                    disabled={codeBusy || loading}
+                    className={`text-left p-4 rounded border transition-colors ${accessStatus?.method === 'death_cert' ? 'border-gold bg-gold/5' : 'border-border hover:border-gold/50'} disabled:opacity-60`}
+                  >
+                    <div className="flex items-center gap-2 mb-1 font-semibold text-navy text-sm">
+                      <FileBadge className="w-4 h-4 text-gold" aria-hidden="true" /> Death-certificate verification
+                      {accessStatus?.method === 'death_cert' && (
+                        <span className="text-[10px] uppercase tracking-wider font-mono text-gold border border-gold/50 bg-gold/5 px-1.5 py-0.5 rounded">Selected</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Your successor registers now but sees nothing until the time comes. Then they submit a death
+                      certificate and ID, our team reviews it personally, and access is released. Highest assurance,
+                      human-reviewed.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Access-code active panel */}
+                {accessStatus?.method !== 'death_cert' && (
+                  <div>
+                    {showGeneratedCode ? (
+                      <div className="p-4 rounded border border-gold/40 bg-gold/5">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Copy this now — shown only once</div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <code className="font-mono text-xl tracking-[0.2em] text-navy">{showGeneratedCode}</code>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => { navigator.clipboard?.writeText(showGeneratedCode); toast.success('Code copied to clipboard'); }}
+                          >
+                            Copy code
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Share it only with your named successor. Generating a new code stops the old one immediately.
+                        </p>
+                      </div>
+                    ) : accessStatus?.code_set ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="button" onClick={handleGenerateCode} disabled={codeBusy}
+                          className="btn-secondary h-9 text-sm" >
+                          <RotateCcw className="w-4 h-4" /> Generate new code
+                        </Button>
+                        <Button type="button" onClick={handleRevokeCode} disabled={codeBusy}
+                          variant="outline" className="h-9 text-sm border-warning/40 text-warning hover:bg-warning/10">
+                          <Ban className="w-4 h-4" /> Revoke
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {accessStatus.code_first_used_at
+                            ? `First used ${new Date(accessStatus.code_first_used_at).toLocaleDateString()}`
+                            : 'Not used yet — your successor enters this code at trustoffice.app/successor-access'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="button" onClick={handleGenerateCode} disabled={codeBusy || loading}
+                          className="btn-primary h-9 text-sm">
+                          <KeyRound className="w-4 h-4" /> Generate access code
+                        </Button>
+                        <span className="text-xs text-muted-foreground">Recommended — nothing for your successor to do until they need it, and no waiting when they do.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Death-cert active panel */}
+                {accessStatus?.method === 'death_cert' && (
+                  <div className="flex items-start gap-3 p-4 rounded border border-border bg-subtle-bg">
+                    <Info className="w-4 h-4 text-gold mt-0.5 flex-shrink-0" aria-hidden="true" />
+                    <div className="text-xs text-muted-foreground">
+                      {accessStatus.pending_claims > 0
+                        ? `${accessStatus.pending_claims} claim${accessStatus.pending_claims === 1 ? '' : 's'} awaiting review. `
+                        : 'No claims submitted yet. '}
+                      Your successor follows the steps in their packet: they upload the death certificate and their
+                      ID, our team verifies personally, and they receive a secure packet link by email. If you
+                      expected a claim, check with your successor that they used the same email their invitation was sent to.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ==================== PACKET CONTENTS ==================== */}
               <div className="card-trust corner-mark border border-border p-6">
                 <p className="text-sm text-muted-foreground mb-4">
                   Click "Print Full Packet" to generate a printable document with all sections below. The packet includes trust identification, trustee transition info, beneficiaries, assets, bank accounts, professional contacts, governance rules, upcoming deadlines, and your letter of guidance.
                 </p>
                 {trustData?.successor_trustee_email && (
                   <p className="text-xs text-muted-foreground mb-4">
-                    Successor Trustee: {trustData.successor_trustee_name || trustData.successor_trustee_email} — a secure link will be emailed valid for 30 days.
+                    Successor Trustee: {trustData.successor_trustee_name || trustData.successor_trustee_email} — {accessStatus?.method === 'death_cert' ? 'they register now and submit the death certificate when the time comes; our team reviews before access is released.' : 'they can open the packet with the access code you share, any time.'}
                   </p>
                 )}
 
@@ -311,6 +529,7 @@ const SuccessorPacketPage = () => {
                     );
                   })}
                 </div>
+              </div>
               </div>
             )}
           </div>

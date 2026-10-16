@@ -1444,6 +1444,8 @@ Best regards,
               <strong>You don't need to do anything right now.</strong> This is for your records.
             </div>
 
+            {data.get('method_block_html', '')}
+
             <p>If the current trustee is ever unable to serve, here's what to do first:</p>
             <ol>
               <li>Open the secure packet at the button below — it has the trust details, accounts, contacts, and guidance.</li>
@@ -1477,6 +1479,8 @@ You've been named as the successor trustee for the {data.get('trust_name', 'Trus
 
 You don't need to do anything right now. This is for your records.
 
+{data.get('method_block_text', '')}
+
 If the current trustee is ever unable to serve, here's what to do first:
 1. Open the secure packet at the link below — it has the trust details, accounts, contacts, and guidance.
 2. Contact the trust attorney listed in the packet.
@@ -1487,6 +1491,38 @@ Open the secure packet here: {data.get('packet_url', '#')}
 This link is valid for 30 days and can be used once. If it expires, ask the current trustee to send you a new one.
 
 This is operational information to help you step in, not legal advice. For questions about your authority as successor trustee, please consult the trust attorney.
+
+Best regards,
+{data.get('trustee_name', 'The TrustOffice Team')}
+        """
+    },
+    "successor_code_used": {
+        "subject": lambda data: f"Your successor just used their access code — {data.get('trust_name', 'Trust')}",
+        "html": lambda data: _base_template(f"""
+            <h2>Access code used</h2>
+            <p>Hi {_h(data.get('trustee_name', 'there'))},</p>
+            <p>{_h(data.get('successor_name', 'Your successor trustee'))} just used their access code to open the successor packet for the <strong>{_h(data.get('trust_name', 'Trust'))}</strong>.</p>
+            <div class="success">
+              <strong>When:</strong> {_h(data.get('used_at', ''))}<br>
+              <strong>Times opened so far:</strong> {_h(str(data.get('use_count', '1')))}
+            </div>
+            <p>If this was you or your successor — all good, nothing to do. If you didn't expect this, rotate or revoke the code in TrustOffice under <strong>Successor Trustee Packet → Successor Access</strong>. Rotating takes effect immediately; the old code stops working.</p>
+            <p style="font-size: 12px; color: #666;">You're receiving this because your successor used the access code you generated. This is an operational notification, not legal advice.</p>
+            <p>Best regards,<br>{_h(data.get('trustee_name', 'The TrustOffice Team'))}</p>
+        """),
+        "text": lambda data: f"""
+Access code used
+
+Hi {data.get('trustee_name', 'there')},
+
+{data.get('successor_name', 'Your successor trustee')} just used their access code to open the successor packet for the {data.get('trust_name', 'Trust')}.
+
+When: {data.get('used_at', '')}
+Times opened so far: {data.get('use_count', '1')}
+
+If this was you or your successor — all good, nothing to do. If you didn't expect this, rotate or revoke the code in TrustOffice under Successor Trustee Packet → Successor Access. Rotating takes effect immediately; the old code stops working.
+
+You're receiving this because your successor used the access code you generated. This is an operational notification, not legal advice.
 
 Best regards,
 {data.get('trustee_name', 'The TrustOffice Team')}
