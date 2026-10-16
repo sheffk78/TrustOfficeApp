@@ -99,10 +99,21 @@ function finalizePlaceholder(setMessages, assistantId, updates) {
 
 /**
  * Read the latest messages from React state (via the functional updater trick).
+ *
+ * IMPORTANT: the updater MUST return prev (pass-through state), not just resolve.
+ * An updater whose callback returns undefined (resolve()'s return value) would
+ * REPLACE the message state with undefined — then any later setMessages(prev =>
+ * prev.map(...)) crashes the whole page with "Cannot read properties of
+ * undefined (reading 'map')" (prod incident err_41422d53fd3a, 2026-10-16,
+ * /trust-assistant: a interrupted stream → readLatest poisoned state → error
+ * path's .map blew up during render).
  */
 function readLatestMessages(setMessages) {
   return new Promise(resolve => {
-    setMessages(prev => resolve(prev));
+    setMessages(prev => {
+      resolve(prev);
+      return prev; // pass-through: keep state intact, never return undefined
+    });
   });
 }
 
