@@ -648,6 +648,8 @@ async def _handle_dry_run(request: WingPointProvisionRequest) -> dict:
         "trust_type_mapped": WINGPOINT_TRUST_TYPE_MAP.get(request.trust_type, "family"),
         "would_send_welcome_email": True,
         "would_apply_coupon": request.coupon_code or None,
+        "benevolence_enabled": True,
+        "tax_status": "508",
         "message": "Dry run — no data was persisted or email sent."
     }
 
