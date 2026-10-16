@@ -1496,6 +1496,56 @@ Best regards,
 {data.get('trustee_name', 'The TrustOffice Team')}
         """
     },
+    "successor_update": {
+        # Jeff 2026-10-16: trustee changed the access method or (re)generated the code —
+        # short update note to the successor. Distinct from successor_packet on purpose:
+        # no 30-day one-time link framing (there is no token here), button is the public
+        # Successor Access page. method_block_html arrives fully resolved (no PLACEHOLDER_URL).
+        "subject": lambda data: f"An update about accessing the {data.get('trust_name', 'Trust')} when you're trustee",
+        "html": lambda data: _base_template(f"""
+            <h2>Update on your successor packet access</h2>
+            <p>Hi {_h(data.get('successor_name', 'there'))},</p>
+            <p>An update about how you'll access the successor packet for the <strong>{_h(data.get('trust_name', 'Trust'))}</strong>:</p>
+
+            {data.get('method_block_html', '')}
+
+            <p>You don't need to do anything right now. This email is so the process your trustee
+            chose is spelled out and in your records — and matches any earlier email you got about
+            this packet. If anything here differs from what your trustee told you directly, go with
+            what they said and confirm with them.</p>
+
+            <p style="font-size: 12px; color: #666;">
+              The Successor Access page: {_h(data.get('packet_url', '#'))}
+            </p>
+
+            <p>This is operational information to help you step in, not legal advice. For questions
+            about your authority as successor trustee, please consult the trust attorney.</p>
+
+            <p>Best regards,<br>{_h(data.get('trustee_name', 'The TrustOffice Team'))}</p>
+        """),
+        "text": lambda data: f"""
+Update on your successor packet access
+
+Hi {data.get('successor_name', 'there')},
+
+An update about how you'll access the successor packet for the {data.get('trust_name', 'Trust')}:
+
+{data.get('method_block_text', '')}
+
+You don't need to do anything right now. This email is so the process your trustee chose is
+spelled out and in your records - and matches any earlier email you got about this packet.
+If anything here differs from what your trustee told you directly, go with what they said
+and confirm with them.
+
+The Successor Access page: {data.get('packet_url', '#')}
+
+This is operational information to help you step in, not legal advice. For questions about your
+authority as successor trustee, please consult the trust attorney.
+
+Best regards,
+{data.get('trustee_name', 'The TrustOffice Team')}
+        """
+    },
     "successor_code_used": {
         "subject": lambda data: f"Your successor just used their access code — {data.get('trust_name', 'Trust')}",
         "html": lambda data: _base_template(f"""

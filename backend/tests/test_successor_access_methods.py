@@ -346,6 +346,52 @@ async def test_successor_notify_is_rate_limited(ctx, owner_user, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_successor_update_email_renders_fully(ctx, owner_user, monkeypatch):
+    """REAL render pipeline: the update email must not contain unresolved placeholders.
+
+    Caught live on 2026-10-16: the helper originally passed PLACEHOLDER_URL through
+    method_block_html and the successor_packet template never substituted it — the successor
+    would have received a button linking to 'PLACEHOLDER_URL'. This test renders both method
+    blocks through the actual template and asserts the button URL is the live Successor Access page.
+    """
+    await _seed_trust()
+    sent_calls = []
+
+    async def fake_send_templated(**kwargs):
+        sent_calls.append(kwargs)
+        return {"status": "sent"}
+
+    monkeypatch.setattr(type(successor.email_service), "is_configured",
+                        property(lambda self: True), raising=False)
+    monkeypatch.setattr(successor.email_service, "send_templated_email", fake_send_templated)
+    successor.email_service.app_url = "https://app.trustoffice.test"
+
+    await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="death_cert"),
+                                         user=owner_user, _stepup=None)
+    # rate limiter keeps us honest — flush state and do the second render via code generation
+    successor._successor_notified_at.clear()
+    await successor.generate_successor_code("t_succ", user=owner_user, _stepup=None)
+
+    assert len(sent_calls) == 2
+    for call in sent_calls:
+        assert call["template_name"] == "successor_update"
+        import email_templates as et
+        rendered = et.render_template(call["template_name"], dict(call["template_data"]))
+        html = rendered["html"]
+        assert "PLACEHOLDER_URL" not in html
+        # the button/link is the real public entry page, for BOTH method blocks
+        assert "https://app.trustoffice.test/successor-access" in html
+        # death-cert block describes that process; code block mentions the code
+        block_text = call["template_data"]["method_block_text"].lower()
+        if "death-certificate" in block_text or "death certificate" in block_text:
+            assert "access-code" not in block_text
+        else:
+            assert "code" in block_text
+        # no 30-day/one-time token framing in update emails (that's the packet email's job)
+        assert "valid for 30 days" not in html
+
+
+@pytest.mark.asyncio
 async def test_claim_verification_rejects_bad_file_type(ctx, admin_user):
     await _seed_trust()
     from routers.successor import _hash_token

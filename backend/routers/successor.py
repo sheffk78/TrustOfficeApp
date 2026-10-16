@@ -529,20 +529,24 @@ async def _notify_successor_update(trust: dict, method: str, context: str) -> bo
         if last and (now - last).total_seconds() < SUCCESSOR_NOTIFY_MIN_INTERVAL_SECONDS:
             return False
         _successor_notified_at[trust["trust_id"]] = now
+        context_method = "access_code" if method == "access_code" else "death_cert"
+        block_html = _method_update_block(context).replace(
+            "PLACEHOLDER_URL", f"{email_service.app_url}/successor-access")
         await email_service.send_templated_email(
             to_email=successor_email,
-            template_name="successor_packet",
+            template_name="successor_update",
             template_data={
                 "successor_name": trust.get("successor_trustee_name") or "there",
                 "trust_name": trust.get("name") or "Trust",
-                "trustee_name": trust.get("trustee_names") or "The trustee",
+                "trustee_name": trust.get("trustee_names") or "The TrustOffice Team",
                 "packet_url": f"{email_service.app_url}/successor-access",
-                "method_block_html": _method_update_block(context),
+                "method_block_html": block_html,
                 "method_block_text": _method_update_block_text(context),
             },
             to_name=trust.get("successor_trustee_name"),
-            tag="successor_packet_update",
-            metadata={"email_type": "successor_packet_update", "context": context},
+            tag="successor_update",
+            metadata={"email_type": "successor_update", "context": context,
+                      "method": context_method},
         )
         return True
     except Exception:
