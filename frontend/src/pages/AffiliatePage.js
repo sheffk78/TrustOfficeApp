@@ -68,7 +68,7 @@ export default function AffiliatePage() {
       {/* Skip-to-content link for keyboard / screen-reader users */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white focus:rounded"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white"
       >
         Skip to main content
       </a>
@@ -185,7 +185,7 @@ export default function AffiliatePage() {
                 ))}
               </ul>
             </div>
-            <div className="bg-gradient-to-br from-navy to-navy/80 text-white p-8 rounded">
+            <div className="bg-gradient-to-br from-navy to-navy/80 text-white p-8">
               <Users className="w-12 h-12 text-gold mb-4" />
               <h3 className="font-serif text-2xl mb-4">Join Our Partner Community</h3>
               <p className="text-white/80 mb-6">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import Spinner from '@/components/Spinner';
 import OnboardingConfirmStep from '@/components/onboarding/OnboardingConfirmStep';
 import {
   PROGRESS_HINTS,
@@ -78,7 +79,7 @@ export default function OnboardingPage() {
   if (checkingTrusts) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-navy border-t-transparent rounded-full animate-spin"></div>
+        <Spinner size={32} />
       </div>
     );
   }

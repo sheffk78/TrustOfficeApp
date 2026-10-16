@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { trackSignupConversion, trackTrialStarted } from '@/utils/analytics';
+import Spinner from '@/components/Spinner';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -106,7 +107,7 @@ export default function AuthCallback() {
   return (
     <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
       <div className="text-center">
-        <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto mb-4"></div>
+        <Spinner size={32} className="mx-auto mb-4" />
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
           Completing Sign In
         </p>

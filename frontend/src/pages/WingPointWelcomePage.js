@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Spinner from '@/components/Spinner';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertTriangle, CreditCard, LayoutDashboard, BookOpen, Coins, Network, Scale, HeartPulse, Mail, LogIn, ChevronDown, ChevronUp } from 'lucide-react';
@@ -207,7 +208,7 @@ export default function WingPointWelcomePage() {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto mb-4"></div>
+          <Spinner size={32} className="mx-auto mb-4" />
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading</p>
         </div>
       </div>
@@ -256,7 +257,7 @@ export default function WingPointWelcomePage() {
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gold/10 border border-gold/30">
             <CreditCard className="w-4 h-4 text-navy" />
             <span className="text-sm text-navy font-medium">
-              You're eligible for WingPoint's exclusive annual plan at $99/mo.
+              You're eligible for WingPoint's exclusive annual plan at <span className="font-mono">$99/mo</span>.
             </span>
           </div>
         </section>
@@ -283,7 +284,7 @@ export default function WingPointWelcomePage() {
               <div className="flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-navy">WingPoint Annual plan</span> provides unlimited trusts at $99/mo, billed annually.
+                  <span className="font-medium text-navy">WingPoint Annual plan</span> provides unlimited trusts at <span className="font-mono">$99/mo</span>, billed annually.
                 </p>
               </div>
             </div>
@@ -366,8 +367,8 @@ export default function WingPointWelcomePage() {
           <div className="max-w-2xl mx-auto">
             <div className="bg-white border border-border p-6 flex flex-col">
               <h3 className="text-lg font-bold text-navy mb-1">{WINGPOINT_PLAN.name}</h3>
-              <p className="text-2xl font-serif font-bold text-navy mb-1">{WINGPOINT_PLAN.price}</p>
-              <p className="text-sm text-muted-foreground mb-4">{WINGPOINT_PLAN.billing} ({WINGPOINT_PLAN.annualTotal})</p>
+              <p className="text-2xl font-mono font-bold text-navy mb-1">{WINGPOINT_PLAN.price}</p>
+              <p className="text-sm text-muted-foreground mb-4"><span className="font-mono">{WINGPOINT_PLAN.annualTotal}</span> ({WINGPOINT_PLAN.billing})</p>
               <p className="text-sm text-navy mb-4 font-medium">{WINGPOINT_PLAN.trusts}</p>
               <ul className="space-y-2 flex-1">
                 {WINGPOINT_PLAN.features.map((feat) => (
@@ -512,7 +513,7 @@ function NotLoggedInAction({
         </div>
 
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center">
+          <div className="w-10 h-10 bg-gold/10 border border-gold/30 flex items-center justify-center">
             <Lock className="w-5 h-5 text-navy" />
           </div>
           <div>
@@ -523,7 +524,7 @@ function NotLoggedInAction({
 
         {tokenValid === null && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="w-4 h-4 border-2 border-navy border-t-transparent animate-spin rounded-full"></div>
+            <Spinner size={16} />
             Verifying your link...
           </div>
         )}
@@ -605,7 +606,7 @@ function NotLoggedInAction({
     return (
       <div>
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center">
+          <div className="w-10 h-10 bg-gold/10 border border-gold/30 flex items-center justify-center">
             <LogIn className="w-5 h-5 text-navy" />
           </div>
           <div>
@@ -772,14 +773,14 @@ function LoggedInAction({ subscription, navigate, plan }) {
         <ActionCard
           icon={<CreditCard className="w-5 h-5 text-navy" />}
           title="Activate your WingPoint plan"
-          description="Your trust is ready. Activate your exclusive WingPoint Annual plan with unlimited trusts at $99/mo, billed annually."
+          description={<>Your trust is ready. Activate your exclusive WingPoint Annual plan with unlimited trusts at <span className="font-mono">$99/mo</span>, billed annually.</>}
           buttonText="Start WingPoint Plan"
           onClick={() => navigate(`/pricing?wp=1&plan=wingpoint&billing=annual`)}
           buttonVariant="default"
         />
         <div className="p-4 bg-gold/10 border border-gold/30">
           <p className="text-sm text-navy">
-            <strong>WingPoint Exclusive:</strong> Unlimited trusts for $99/mo (billed annually). This special rate is available to WingPoint customers only and is not listed on our public pricing page.
+            <strong>WingPoint Exclusive:</strong> Unlimited trusts for <span className="font-mono">$99/mo</span> (billed annually). This special rate is available to WingPoint customers only and is not listed on our public pricing page.
           </p>
         </div>
       </div>
@@ -802,7 +803,7 @@ function LoggedInAction({ subscription, navigate, plan }) {
 function ActionCard({ icon, title, description, buttonText, onClick, buttonVariant = 'default' }) {
   return (
     <div className="flex flex-col sm:flex-row items-start gap-4">
-      <div className="w-12 h-12 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center flex-shrink-0">
+      <div className="w-12 h-12 bg-gold/10 border border-gold/30 flex items-center justify-center flex-shrink-0">
         {icon}
       </div>
       <div className="flex-1">

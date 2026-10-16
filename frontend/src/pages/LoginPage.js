@@ -313,7 +313,7 @@ export default function LoginPage() {
       {/* Skip-to-content link for keyboard / screen-reader users */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white focus:rounded"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-navy focus:text-white"
       >
         Skip to main content
       </a>
@@ -367,7 +367,7 @@ export default function LoginPage() {
                       <div className="p-3 bg-navy/5 border border-navy/20 flex items-center gap-2" data-testid="twofa-login-countdown" role="status">
                         <AlertCircle className="w-4 h-4 text-navy flex-shrink-0" />
                         <p className="text-sm text-navy">
-                          You can try again in {formatLockout(lockout.secondsLeft)}
+                          You can try again in <span className="font-mono">{formatLockout(lockout.secondsLeft)}</span>
                         </p>
                       </div>
                     )}
@@ -392,7 +392,7 @@ export default function LoginPage() {
                         maxLength={40}
                         value={twoFactorCode}
                         onChange={(e) => { setTwoFactorCode(e.target.value); if (twoFactorError) setTwoFactorError(''); }}
-                        className="input-trust mt-1 tracking-widest text-center text-lg"
+                        className="input-trust mt-1 tracking-widest text-center text-lg font-mono"
                         aria-label="6-digit authentication code or recovery code"
                         data-testid="twofa-login-code-input"
                         disabled={lockout.active}
@@ -400,7 +400,7 @@ export default function LoginPage() {
                     </div>
                     {twoFactorAttemptsLeft != null && (
                       <p className="text-xs text-muted-foreground" data-testid="twofa-login-attempts-left">
-                        {twoFactorAttemptsLeft} attempts left before a short cooldown
+                        <span className="font-mono">{twoFactorAttemptsLeft}</span> attempts left before a short cooldown
                       </p>
                     )}
                     <Button

@@ -108,7 +108,7 @@ export default function ContactPage() {
   // Success state
   if (submitted) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center p-4">
+      <div className="min-h-screen bg-subtle-bg flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="card-trust corner-mark text-center">
             <div className="w-16 h-16 bg-success/10 flex items-center justify-center mx-auto mb-6">
@@ -150,7 +150,7 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-subtle-bg">
       {/* Header */}
       <header className="bg-navy text-white py-4 px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between">

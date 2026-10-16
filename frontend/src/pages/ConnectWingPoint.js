@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Spinner from '@/components/Spinner';
 import { toast } from 'sonner';
 import { showError, reportErrorToBackend } from '@/utils/errors';
 import { is2faChallenge, login2fa, get2faRateLimitMessage, get2faAttemptsRemaining } from '@/utils/twoFactor';
@@ -355,7 +356,7 @@ export default function ConnectWingPoint() {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto mb-4"></div>
+          <Spinner size={32} className="mx-auto mb-4" />
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Loading</p>
         </div>
       </div>
@@ -389,7 +390,7 @@ export default function ConnectWingPoint() {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-navy border-t-transparent animate-spin mx-auto mb-4"></div>
+          <Spinner size={32} className="mx-auto mb-4" />
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
             Connecting to WingPoint…
           </p>
@@ -459,7 +460,7 @@ export default function ConnectWingPoint() {
                         <div className="p-3 bg-navy/5 border border-navy/20 flex items-center gap-2" role="status">
                           <AlertCircle className="w-4 h-4 text-navy flex-shrink-0" />
                           <p className="text-sm text-navy">
-                            You can try again in {formatLockout(lockout.secondsLeft)}
+                            You can try again in <span className="font-mono">{formatLockout(lockout.secondsLeft)}</span>
                           </p>
                         </div>
                       )}
@@ -484,7 +485,7 @@ export default function ConnectWingPoint() {
                           maxLength={40}
                           value={twoFACode}
                           onChange={(e) => { setTwoFACode(e.target.value); if (twoFAError) setTwoFAError(''); }}
-                          className="input-trust mt-1 tracking-widest text-center text-lg"
+                          className="input-trust mt-1 tracking-widest text-center text-lg font-mono"
                           aria-label="6-digit authentication code or recovery code"
                           data-testid="connect-wp-2fa-code-input"
                           disabled={lockout.active}
@@ -492,7 +493,7 @@ export default function ConnectWingPoint() {
                       </div>
                       {twoFAAttemptsLeft != null && (
                         <p className="text-xs text-muted-foreground">
-                          {twoFAAttemptsLeft} attempts left before a short cooldown
+                          <span className="font-mono">{twoFAAttemptsLeft}</span> attempts left before a short cooldown
                         </p>
                       )}
                       <Button
@@ -648,7 +649,7 @@ export default function ConnectWingPoint() {
         <div className="card-trust corner-mark relative">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center">
+            <div className="w-12 h-12 bg-gold/10 border border-gold/30 flex items-center justify-center">
               <ShieldCheck className="w-6 h-6 text-gold" />
             </div>
             <div>
