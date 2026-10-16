@@ -58,6 +58,8 @@ async def ctx(monkeypatch):
         successor.NOTIFIED.append((access_doc.get("use_count"),))
     monkeypatch.setattr(successor, "_notify_trustee_code_used", fake_notify)
     successor.NOTIFIED = []
+    # Module-level rate-limit state must not leak between tests.
+    successor._successor_notified_at = {}
     yield
 
 
@@ -267,6 +269,80 @@ async def test_review_endpoints_require_admin(ctx, owner_user):
     await _seed_trust()
     with pytest.raises(Exception):
         await successor.list_successor_claims(user=owner_user)
+
+
+# ==================== Successor update notifications (Jeff fixes 2026-10-16) ====================
+
+@pytest.mark.asyncio
+async def test_method_change_notifies_successor(ctx, owner_user, monkeypatch):
+    """Switching the method emails the successor so their email matches reality."""
+    await _seed_trust()
+    sent = {}
+    sent_calls = []
+
+    async def fake_send_templated(**kwargs):
+        sent_calls.append(kwargs)
+        sent.update(kwargs)
+        return {"status": "sent"}
+
+    monkeypatch.setattr(type(successor.email_service), "is_configured",
+                        property(lambda self: True), raising=False)
+    monkeypatch.setattr(successor.email_service, "send_templated_email", fake_send_templated)
+    successor.email_service.app_url = "https://app.trustoffice.test"
+
+    out = await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="death_cert"),
+                                               user=owner_user, _stepup=None)
+    assert out["successor_notified"] is True
+    assert len(sent_calls) == 1
+    assert sent["to_email"] == "sam@successor.com"
+    # The email describes the NEW process (death cert), not the old one
+    assert "death-certificate" in sent["template_data"]["method_block_text"].lower()
+    assert "access-code" not in sent["template_data"]["method_block_text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_generate_code_notifies_successor(ctx, owner_user, monkeypatch):
+    """Generating/rotating the code emails the successor that a code is active."""
+    await _seed_trust()
+    sent_calls = []
+
+    async def fake_send_templated(**kwargs):
+        sent_calls.append(kwargs)
+        return {"status": "sent"}
+
+    monkeypatch.setattr(type(successor.email_service), "is_configured",
+                        property(lambda self: True), raising=False)
+    monkeypatch.setattr(successor.email_service, "send_templated_email", fake_send_templated)
+    successor.email_service.app_url = "https://app.trustoffice.test"
+
+    out = await successor.generate_successor_code("t_succ", user=owner_user, _stepup=None)
+    assert out["successor_notified"] is True
+    assert len(sent_calls) == 1
+    assert sent_calls[0]["to_email"] == "sam@successor.com"
+    assert "code" in sent_calls[0]["template_data"]["method_block_text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_successor_notify_is_rate_limited(ctx, owner_user, monkeypatch):
+    """Rapid method flicking sends at most one email per 15-minute window."""
+    await _seed_trust()
+    sent_calls = []
+
+    async def fake_send_templated(**kwargs):
+        sent_calls.append(kwargs)
+        return {"status": "sent"}
+
+    monkeypatch.setattr(type(successor.email_service), "is_configured",
+                        property(lambda self: True), raising=False)
+    monkeypatch.setattr(successor.email_service, "send_templated_email", fake_send_templated)
+    successor.email_service.app_url = "https://app.trustoffice.test"
+
+    await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="death_cert"),
+                                         user=owner_user, _stepup=None)
+    out2 = await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="access_code"),
+                                                user=owner_user, _stepup=None)
+    assert out2["successor_notified"] is False   # inside the 15-min window → suppressed
+    assert len(sent_calls) == 1
 
 
 @pytest.mark.asyncio

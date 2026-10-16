@@ -232,7 +232,7 @@ const SuccessorPacketPage = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to send');
       if (data.status === 'sent') {
-        toast.success(`Packet sent to ${data.to_email}. They'll get a secure link valid for 30 days.`);
+        toast.success(`Packet sent to ${data.to_email}. The email explains how they'll get in — a secure link, valid for 30 days.`);
       } else if (data.status === 'not_sent') {
         toast.warning(data.message || 'Email service is not configured. The secure link was created but not sent.');
       }
@@ -256,7 +256,9 @@ const SuccessorPacketPage = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to generate code');
       setShowGeneratedCode(data.code);
-      toast.success('Access code ready. Copy it now — it is shown only this once.');
+      toast.success(data.successor_notified
+        ? 'Access code ready — copy it now, it is shown only this once. Your successor was emailed that a code is active.'
+        : 'Access code ready. Copy it now — it is shown only this once.');
       loadAccessStatus();
     } catch (e) {
       showError(toast, e, { operation: 'generate_successor_code', page: 'SuccessorPacket' });
@@ -298,9 +300,11 @@ const SuccessorPacketPage = () => {
       }));
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to update method');
+      const notifiedNote = data.successor_notified === false
+        ? '' : ` Your successor was emailed about this.`;
       toast.success(method === 'access_code'
-        ? 'Access code selected — your successor uses the code you share to open their packet.'
-        : 'Death-certificate verification selected — your successor submits documents and our team reviews before access.');
+        ? `Access code selected — your successor uses the code you share to open their packet.${notifiedNote}`
+        : `Death-certificate verification selected — your successor submits documents and our team reviews before access.${notifiedNote}`);
       loadAccessStatus();
     } catch (e) {
       showError(toast, e, { operation: 'set_successor_method', page: 'SuccessorPacket' });
@@ -404,8 +408,8 @@ const SuccessorPacketPage = () => {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       You share a one-time-shown code with your successor (in person, by phone, or with your papers).
-                      They enter it to view the packet instantly — no waiting, no paperwork. You're notified by email
-                      the moment it's used. Rotate or revoke anytime.
+                      They enter it to view the packet instantly — no waiting, no paperwork. You're emailed right away
+                      the first time it's used, and again if they keep using it. Rotate or revoke anytime.
                     </p>
                   </button>
                   <button

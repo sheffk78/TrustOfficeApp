@@ -440,10 +440,12 @@ async def generate_successor_code(trust_id: str, user: dict = Depends(require_wr
         user["user_id"], "successor_code_generated", "trust", trust_id,
         {"code_hint": code_hint, "rotated": True},
     )
+    successor_notified = await _notify_successor_update(trust, "access_code", "code_generated")
     return jsonable_encoder({
         "code": raw_code,           # shown once — never retrievable again
         "code_hint": code_hint,
         "method": "access_code",
+        "successor_notified": successor_notified,
     })
 
 
@@ -488,13 +490,115 @@ async def set_successor_method(trust_id: str, payload: SuccessorMethodUpdate,
         user["user_id"], "successor_method_changed", "trust", trust_id,
         {"from": previous, "to": method},
     )
-    return {"method": method, "previous": previous}
+    # Jeff fix 2026-10-16: the successor is told about the new process right away —
+    # the "Send Packet" email is no longer the only thing that explains the method.
+    trust_after = dict(trust)
+    trust_after["successor_access_method"] = method
+    successor_notified = await _notify_successor_update(
+        trust_after, method, "method_access_code" if method == "access_code" else "method_death_cert",
+    )
+    return {"method": method, "previous": previous, "successor_notified": successor_notified}
 
 
 # ==================== PUBLIC CLAIM ENDPOINTS ====================
 
 class SuccessorCodeClaim(BaseModel):
     code: str
+
+
+# Successor update notifications are rate-limited so a trustee flicking the method switch
+# back and forth can't spam their successor (Jeff fix 2026-10-16 — successor stays informed).
+SUCCESSOR_NOTIFY_MIN_INTERVAL_SECONDS = 15 * 60
+_successor_notified_at: dict = {}  # trust_id -> last datetime a method-update email went out
+
+
+async def _notify_successor_update(trust: dict, method: str, context: str) -> bool:
+    """Email the successor trustee a short note describing the process their trustee chose.
+
+    Called when the method changes or a new access code is generated, so the successor's
+    mental model always matches reality without waiting for the trustee to press
+    "Send Packet". Rate-limited to one email per trust per 15 minutes. Returns True
+    when an email actually went out.
+    """
+    try:
+        successor_email = (trust.get("successor_trustee_email") or "").strip()
+        if not successor_email or not email_service.is_configured:
+            return False
+        now = datetime.now(timezone.utc)
+        last = _successor_notified_at.get(trust["trust_id"])
+        if last and (now - last).total_seconds() < SUCCESSOR_NOTIFY_MIN_INTERVAL_SECONDS:
+            return False
+        _successor_notified_at[trust["trust_id"]] = now
+        await email_service.send_templated_email(
+            to_email=successor_email,
+            template_name="successor_packet",
+            template_data={
+                "successor_name": trust.get("successor_trustee_name") or "there",
+                "trust_name": trust.get("name") or "Trust",
+                "trustee_name": trust.get("trustee_names") or "The trustee",
+                "packet_url": f"{email_service.app_url}/successor-access",
+                "method_block_html": _method_update_block(context),
+                "method_block_text": _method_update_block_text(context),
+            },
+            to_name=trust.get("successor_trustee_name"),
+            tag="successor_packet_update",
+            metadata={"email_type": "successor_packet_update", "context": context},
+        )
+        return True
+    except Exception:
+        # Never let a notification failure break the trustee's action.
+        logger.exception("successor update email failed for trust %s", trust.get("trust_id"))
+        return False
+
+
+def _method_update_block(context: str) -> str:
+    """One-paragraph explanation of the newly active process (HTML), for update emails."""
+    if context == "code_generated":
+        return (
+            "<p><strong>Update:</strong> your access code was just generated or replaced. "
+            "Ask the trustee for the current code, then enter it on the Successor Access page — "
+            "the full packet opens instantly, any time.</p>"
+            "<p style=\"text-align: center; margin: 20px 0;\">"
+            "<a href=\"PLACEHOLDER_URL\" class=\"button\">Successor Access — Enter Your Code</a></p>"
+        )
+    if context == "method_access_code":
+        return (
+            "<p><strong>Update:</strong> the trustee has selected the <strong>access-code process</strong> "
+            "for your packet. They'll share a private access code with you. Enter it on the Successor "
+            "Access page and the full packet opens instantly — no paperwork, no waiting, any time.</p>"
+            "<p style=\"text-align: center; margin: 20px 0;\">"
+            "<a href=\"PLACEHOLDER_URL\" class=\"button\">Successor Access — Enter Your Code</a></p>"
+        )
+    return (
+        "<p><strong>Update:</strong> the trustee has selected the <strong>death-certificate "
+        "verification process</strong> for your packet. When the time comes, submit the death "
+        "certificate and your ID through the Successor Access page — our team reviews each request "
+        "personally, and you'll get your secure packet link by email once it's approved. Nothing is "
+        "visible to anyone until then.</p>"
+        "<p style=\"text-align: center; margin: 20px 0;\">"
+        "<a href=\"PLACEHOLDER_URL\" class=\"button\">Successor Access — Submit When Needed</a></p>"
+    )
+
+
+def _method_update_block_text(context: str) -> str:
+    if context == "code_generated":
+        return (
+            "Update: your access code was just generated or replaced. Ask the trustee for the "
+            "current code, then enter it on the Successor Access page - the full packet opens "
+            "instantly, any time."
+        )
+    if context == "method_access_code":
+        return (
+            "Update: the trustee has selected the access-code process for your packet. They'll "
+            "share a private access code with you. Enter it on the Successor Access page and the "
+            "full packet opens instantly - no paperwork, no waiting, any time."
+        )
+    return (
+        "Update: the trustee has selected the death-certificate verification process for your "
+        "packet. When the time comes, submit the death certificate and your ID through the "
+        "Successor Access page - our team reviews each request personally, and you'll get your "
+        "secure packet link by email once it's approved. Nothing is visible to anyone until then."
+    )
 
 
 async def _notify_trustee_code_used(access_doc: dict, trust: dict) -> None:
