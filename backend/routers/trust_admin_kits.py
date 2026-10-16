@@ -217,6 +217,10 @@ def _build_kit_system_prompt(kit_type: str, state_code: str) -> str:
     return (
         "You are a trust administration assistant. "
         f"Generate a detailed, state-specific kit for {kit_label} in the state with code '{state_code}'.\n\n"
+        "IMPORTANT: this kit is generated for the FILING state given above. For retitle/deed kits the "
+        "filing state is where the ASSET is currently titled/deeded, which may differ from the trust's "
+        "home jurisdiction (both appear in the trust_data/user_inputs). Generate all forms, fees, and "
+        "procedures for the FILING state; reference the trust exactly as named in trust_data. "
         "Use the provided trust data to pre-fill form fields. "
         "Research the specific forms, fees, and procedures for the user's state. "
         "If the state has special provisions (e.g. Montana's permanent registration for vehicles 11+ years old), include them.\n\n"
@@ -427,9 +431,25 @@ async def generate_kit(
             detail="This trust has no state_code set. Update the trust profile in Settings to include the trust's jurisdiction before generating a kit.",
         )
 
+    # Per-item filing state: for kits whose asset is ALREADY TITLED SOMEWHERE (vehicle retitle, deed
+    # transfer), the filing state is where the ASSET is titled — which can differ from the trust's
+    # home jurisdiction (e.g. NV-domiciled trust, CA-titled pickup). When the caller supplies an
+    # explicit title/deed state, that wins; the trust's state stays available as trust context
+    # in the payload so the AI references the trust correctly.
+    title_state_keys = ("current_title_state", "current_deed_state")
+    filing_state = None
+    for key in title_state_keys:
+        raw_val = user_inputs.get(key)
+        if isinstance(raw_val, str) and raw_val.strip():
+            candidate = raw_val.strip()
+            if len(candidate) == 2 and candidate.isalpha():
+                filing_state = candidate.upper()
+            break
+    effective_state = filing_state or state_code
+
     # Build AI prompt and call
     user_inputs = _sanitize_user_inputs(user_inputs)
-    system_prompt = _build_kit_system_prompt(kit_type, state_code)
+    system_prompt = _build_kit_system_prompt(kit_type, effective_state)
     user_content = _build_kit_user_content(kit_type, gathered, user_inputs)
 
     try:
