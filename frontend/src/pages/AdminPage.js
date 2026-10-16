@@ -971,19 +971,24 @@ export default function AdminPage() {
     setShowGrantAccessDialog(true);
   };
 
-  const handleDeleteFromCustomerDetail = (customer) => {
-    setSelectedCustomer(customer);
+  const handleDeleteFromCustomerDetail = () => {
+    // Bare-ref onClick handlers receive the click EVENT as arg — the Aug-5
+    // refactor wired onClick={onImpersonate}-style refs and the event leaked in
+    // as "customer", producing /admin/impersonate/undefined (2026-10-16, Gale).
+    // The dialog is only open when customerDetail is set — read state, never
+    // trust args.
+    setSelectedCustomer(customerDetail);
     setShowDeleteDialog(true);
   };
 
-  const handleImpersonateFromCustomerDetail = (customer) => {
-    setSelectedCustomer(customer);
+  const handleImpersonateFromCustomerDetail = () => {
+    setSelectedCustomer(customerDetail);
     setCustomerDetail(null);
     setShowImpersonateDialog(true);
   };
 
-  const handleGrantAccessFromCustomerDetail = (customer) => {
-    setSelectedCustomer(customer);
+  const handleGrantAccessFromCustomerDetail = () => {
+    setSelectedCustomer(customerDetail);
     setShowGrantAccessDialog(true);
   };
 
@@ -1211,12 +1216,12 @@ export default function AdminPage() {
               onClose={() => { setCustomerDetail(null); setSelectedCustomer(null); }}
               onImpersonate={handleImpersonateFromCustomerDetail}
               onGrantAccess={handleGrantAccessFromCustomerDetail}
-              onMakeAdmin={handleMakeAdmin}
-              onRemoveAdmin={handleRemoveAdmin}
-              onGrantStats={handleGrantStats}
-              onRevokeStats={handleRevokeStats}
-              onGrantLeads={handleGrantLeads}
-              onRevokeLeads={handleRevokeLeads}
+              onMakeAdmin={() => handleMakeAdmin(customerDetail?.user_id)}
+              onRemoveAdmin={() => handleRemoveAdmin(customerDetail?.user_id)}
+              onGrantStats={() => handleGrantStats(customerDetail?.user_id)}
+              onRevokeStats={() => handleRevokeStats(customerDetail?.user_id)}
+              onGrantLeads={() => handleGrantLeads(customerDetail?.user_id)}
+              onRevokeLeads={() => handleRevokeLeads(customerDetail?.user_id)}
               onDelete={handleDeleteFromCustomerDetail}
             />
 
