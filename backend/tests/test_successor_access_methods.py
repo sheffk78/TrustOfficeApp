@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 import pytest_asyncio
+from datetime import timedelta, timezone
 
 import database
 import dependencies
@@ -343,6 +344,60 @@ async def test_successor_notify_is_rate_limited(ctx, owner_user, monkeypatch):
                                                 user=owner_user, _stepup=None)
     assert out2["successor_notified"] is False   # inside the 15-min window → suppressed
     assert len(sent_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_successor_notify_window_expires(ctx, owner_user, monkeypatch):
+    """The 15-minute rate-limit WINDOW actually expires (fake clock, Jeff 2026-10-16).
+
+    Uses the module's real datetime through a frozen-then-advanced clock: after the window
+    passes, the next trustee action notifies the successor again.
+    """
+    await _seed_trust()
+    sent_calls = []
+
+    async def fake_send_templated(**kwargs):
+        sent_calls.append(kwargs)
+        return {"status": "sent"}
+
+    monkeypatch.setattr(type(successor.email_service), "is_configured",
+                        property(lambda self: True), raising=False)
+    monkeypatch.setattr(successor.email_service, "send_templated_email", fake_send_templated)
+    successor.email_service.app_url = "https://app.trustoffice.test"
+
+    real_dt = successor.datetime
+
+    advanced = {"value": real_dt.now(timezone.utc)}
+
+    class Clock:
+        """Stand-in for datetime in successor.py: reads mutable `advanced`, delegates the rest."""
+
+        @classmethod
+        def now(cls, tz=None):
+            return advanced["value"]
+
+        def __getattr__(self, name):
+            return getattr(real_dt, name)
+
+    monkeypatch.setattr(successor, "datetime", Clock())
+
+    await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="death_cert"),
+                                         user=owner_user, _stepup=None)
+    assert len(sent_calls) == 1
+
+    # +10 minutes: still inside the 15-min window → suppressed
+    advanced["value"] = real_dt.now(timezone.utc) + timedelta(minutes=10)
+    out = await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="access_code"),
+                                               user=owner_user, _stepup=None)
+    assert out["successor_notified"] is False
+    assert len(sent_calls) == 1
+
+    # +16 minutes from the original send: window expired → notifies again
+    advanced["value"] = real_dt.now(timezone.utc) + timedelta(minutes=16)
+    out = await successor.set_successor_method("t_succ", successor.SuccessorMethodUpdate(method="death_cert"),
+                                               user=owner_user, _stepup=None)
+    assert out["successor_notified"] is True
+    assert len(sent_calls) == 2
 
 
 @pytest.mark.asyncio

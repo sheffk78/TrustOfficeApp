@@ -16,7 +16,8 @@ jest.mock('@/utils/api', () => ({
   fetchWithAuth: (...args) => mockFetch(...args),
 }));
 
-jest.mock('sonner', () => ({ toast: { success: jest.fn(), warning: jest.fn(), error: jest.fn() } }));
+const mockToast = { success: jest.fn(), warning: jest.fn(), error: jest.fn() };
+jest.mock('sonner', () => ({ toast: { success: (...a) => mockToast.success(...a), warning: (...a) => mockToast.warning(...a), error: (...a) => mockToast.error(...a) } }));
 // Real runWithStepUp replays on 403; the hook mock drives the request like the real first attempt.
 jest.mock('@/hooks/use2faStepUp', () => () => ({
   stepUpOpen: false,
@@ -39,6 +40,9 @@ const accessStatusJson = (status) => ({ ok: true, json: async () => status });
 describe('Successor Access card (SuccessorPacketPage)', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    mockToast.success.mockClear();
+    mockToast.warning.mockClear();
+    mockToast.error.mockClear();
   });
 
   test('method card shows Access code as default-selected', async () => {
@@ -74,19 +78,60 @@ describe('Successor Access card (SuccessorPacketPage)', () => {
   });
 
   test('switching to death_cert shows review queue copy', async () => {
+    let methodState = 'access_code';
     mockFetch.mockImplementation((ep, opts) => {
       if (ep === '/trusts/t1') return Promise.resolve(okJson({ name: 'Family Trust', successor_trustee_email: 'sam@x.com' }));
+      if (ep === '/trusts/t1/successor/method' && opts?.method === 'POST') {
+        methodState = JSON.parse(opts.body).method;
+        return Promise.resolve(okJson({ method: 'death_cert', previous: 'access_code', successor_notified: true }));
+      }
       if (ep === '/trusts/t1/successor/access-status') {
-        if (opts && opts.method === 'POST') {
-          return Promise.resolve(okJson({ method: 'death_cert', previous: 'access_code' }));
-        }
-        return Promise.resolve(accessStatusJson({ method: 'death_cert', code_set: false, code_use_count: 0, pending_claims: 2 }));
+        return Promise.resolve(accessStatusJson({ method: methodState, code_set: false, code_use_count: 0, pending_claims: methodState === 'death_cert' ? 2 : 0 }));
       }
       return Promise.resolve(okJson([]));
     });
     render(<SuccessorPacketPage />);
     await screen.findByText('How your successor gets in');
-    fireEvent.click(screen.getByText(/Death-certificate verification/));
+    fireEvent.click(screen.getByText(/Death-certificate verification/).closest('button'));
     await waitFor(() => expect(screen.getByText(/2 claims awaiting review/)).toBeTruthy());
+    expect(mockToast.success).toHaveBeenCalled();
+  });
+
+  test('method switch toast confirms the successor was emailed', async () => {
+    let methodState = 'access_code';
+    mockFetch.mockImplementation((ep, opts) => {
+      if (ep === '/trusts/t1') return Promise.resolve(okJson({ name: 'Family Trust', successor_trustee_email: 'sam@x.com' }));
+      if (ep === '/trusts/t1/successor/method' && opts?.method === 'POST') {
+        methodState = JSON.parse(opts.body).method;
+        return Promise.resolve(okJson({ method: 'death_cert', previous: 'access_code', successor_notified: true }));
+      }
+      if (ep === '/trusts/t1/successor/access-status') {
+        return Promise.resolve(accessStatusJson({ method: methodState, code_set: false, code_use_count: 0, pending_claims: 0 }));
+      }
+      return Promise.resolve(okJson([]));
+    });
+    render(<SuccessorPacketPage />);
+    await screen.findByText('How your successor gets in');
+    fireEvent.click(screen.getByText(/Death-certificate verification/).closest('button'));
+    await waitFor(() => expect(mockToast.success).toHaveBeenCalledWith(
+      expect.stringMatching(/your successor was emailed about this/i)));
+  });
+
+  test('generate-code toast confirms the successor was emailed', async () => {
+    mockFetch.mockImplementation((ep, opts) => {
+      if (ep === '/trusts/t1') return Promise.resolve(okJson({ name: 'Family Trust', successor_trustee_email: 'sam@x.com' }));
+      if (ep === '/trusts/t1/successor/code' && opts?.method === 'POST') {
+        return Promise.resolve(okJson({ code: 'ABCD-EFGH-JKLM-NPQR', code_hint: 'ABCD-••••-••••-NPQR', method: 'access_code', successor_notified: true }));
+      }
+      if (ep === '/trusts/t1/successor/access-status') {
+        return Promise.resolve(accessStatusJson({ method: 'access_code', code_set: false, code_use_count: 0, pending_claims: 0 }));
+      }
+      return Promise.resolve(okJson([]));
+    });
+    render(<SuccessorPacketPage />);
+    await screen.findByText('How your successor gets in');
+    fireEvent.click(screen.getByText(/Generate access code/).closest('button'));
+    await waitFor(() => expect(mockToast.success).toHaveBeenCalledWith(
+      expect.stringMatching(/your successor was emailed that a code is active/i)));
   });
 });
