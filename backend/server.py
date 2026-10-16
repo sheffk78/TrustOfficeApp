@@ -992,13 +992,14 @@ async def startup_event():
         # benevolence_enabled + 508 tax status + their income-tax calendar entries purged,
         # matching what new provisions now receive at creation. Idempotent — no-ops after first run.
         try:
-            _wp = {"source": "wingpoint", "$or": [
-                {"benevolence_enabled": {"$ne": True}}, {"tax_status": {"$ne": "508"}}]}
+            _wp = {"source": "wingpoint", "benevolence_doctrine_applied": {"$ne": True}}
             updated = 0
             async for t in db.trusts.find(_wp, {"trust_id": 1}):
                 await db.trusts.update_one(
                     {"trust_id": t["trust_id"]},
-                    {"$set": {"benevolence_enabled": True, "tax_status": "508", "updated_at": datetime.now(timezone.utc).isoformat()}},
+                    {"$set": {"benevolence_enabled": True, "tax_status": "508",
+                              "benevolence_doctrine_applied": True,
+                              "updated_at": datetime.now(timezone.utc).isoformat()}},
                 )
                 await db.tax_calendar.delete_many({
                     "trust_id": t["trust_id"],
