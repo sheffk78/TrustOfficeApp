@@ -839,6 +839,10 @@ def _build_trust_doc(
         "has_certification": request.has_certification,
         "has_binder_kit": request.has_binder_kit,
         "source_package": request.source_package,
+        # WingPoint doctrine (Jeff 2026-10-16): every WingPoint trust arrives
+        # with benevolence mode ON and 508 church/religious status selected.
+        "benevolence_enabled": True,
+        "tax_status": "508",
         "created_at": now.isoformat(),
         "updated_at": now.isoformat()
     }
@@ -1934,6 +1938,9 @@ def _build_link_trust_doc(
         "has_certification": request.has_certification,
         "has_binder_kit": request.has_binder_kit,
         "source_package": request.source_package,
+        # WingPoint doctrine (Jeff 2026-10-16): benevolence ON + 508 at link time.
+        "benevolence_enabled": True,
+        "tax_status": "508",
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
     }
