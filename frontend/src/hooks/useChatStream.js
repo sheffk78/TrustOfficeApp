@@ -105,10 +105,13 @@ function finalizePlaceholder(setMessages, assistantId, updates) {
  * REPLACE the message state with undefined — then any later setMessages(prev =>
  * prev.map(...)) crashes the whole page with "Cannot read properties of
  * undefined (reading 'map')" (prod incident err_41422d53fd3a, 2026-10-16,
- * /trust-assistant: a interrupted stream → readLatest poisoned state → error
+ * /trust-assistant: an interrupted stream → readLatest poisoned state → error
  * path's .map blew up during render).
+ *
+ * Exported for the regression test (pure function, module-scope like its
+ * siblings — no React import needed).
  */
-function readLatestMessages(setMessages) {
+export function readLatestMessages(setMessages) {
   return new Promise(resolve => {
     setMessages(prev => {
       resolve(prev);

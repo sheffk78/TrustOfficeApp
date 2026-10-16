@@ -9,33 +9,31 @@
  * then threw "Cannot read properties of undefined (reading 'map')" and took
  * the whole page down during render.
  *
- * The fix: the updater resolves AND returns prev (pass-through).
+ * The fix: the updater resolves AND returns prev (pass-through). The production
+ * function is module-scope in useChatStream.js and exported for this test.
  */
-import { readLatestMessagesShim } from './readLatestMessages.shim';
+import { readLatestMessages } from '../useChatStream';
 
 describe('readLatestMessages — state pass-through (err_41422d53fd3a regression)', () => {
-  test('updater resolves with current state AND returns it — never poisons state to undefined', () => {
+  test('updater resolves with current state AND returns it — never poisons state to undefined', async () => {
     let state = [{ id: 'm1', content: 'hello' }];
     const setMessages = jest.fn(updater => {
-      state = updater(state); // React semantics: new state = updater's return
+      state = updater(state); // React semantics: new state = updater's return value
     });
 
-    const resolved = readLatestMessagesShim(setMessages);
+    const resolved = await readLatestMessages(setMessages);
 
-    return resolved.then(value => {
-      expect(value).toEqual([{ id: 'm1', content: 'hello' }]); // promise resolves with the array
-      expect(state).toEqual([{ id: 'm1', content: 'hello' }]); // state UNCHANGED — not undefined
-      // Any subsequent .map updater still works:
-      const safe = state.map(m => m.id);
-      expect(safe).toEqual(['m1']);
-    });
+    expect(resolved).toEqual([{ id: 'm1', content: 'hello' }]); // promise resolves with the array
+    expect(state).toEqual([{ id: 'm1', content: 'hello' }]);    // state UNCHANGED — not undefined
+    // Any subsequent .map updater still works — the crash that hit prod cannot recur:
+    expect(state.map(m => m.id)).toEqual(['m1']);
   });
 
-  test('pre-fix behavior is documented: bare resolve() would have nulled the state', () => {
-    let state = [{ id: 'm1', content: 'hello' }];
-    const poisoned = [{ id: 'x' }].map(() => undefined); // what resolve(prev) returns: undefined
-    state = undefined; // what React would store
-    expect(() => (state || []).map(m => m.id)).not.toThrow(); // codepaths that now guard
-    expect(poisoned[0]).toBeUndefined();
+  test('documents pre-fix behavior: bare resolve() would replace state with undefined', () => {
+    // Pre-fix updater shape: prev => resolve(prev) — resolve() returns undefined,
+    // so React stored undefined as the messages state.
+    const resolve = jest.fn();
+    const poisonedState = resolve(); // undefined
+    expect(poisonedState).toBeUndefined();
   });
 });
