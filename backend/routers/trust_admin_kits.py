@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import json
 import logging
+import re
 import uuid
 
 from database import db
@@ -218,9 +219,15 @@ def _build_kit_system_prompt(kit_type: str, state_code: str) -> str:
         "You are a trust administration assistant. "
         f"Generate a detailed, state-specific kit for {kit_label} in the state with code '{state_code}'.\n\n"
         "IMPORTANT: this kit is generated for the FILING state given above. For retitle/deed kits the "
-        "filing state is where the ASSET is currently titled/deeded, which may differ from the trust's "
+        "filing state is where the ASSET is titled/deeded, which may differ from the trust's "
         "home jurisdiction (both appear in the trust_data/user_inputs). Generate all forms, fees, and "
         "procedures for the FILING state; reference the trust exactly as named in trust_data. "
+        "PRIVACY — TRUST TERMS NEVER LEAVE THE PRIVATE SETTING: the ONLY trust document to reference, "
+        "pre-fill, or list under documents_to_bring is the CERTIFICATE OF TRUST (and the IRS EIN "
+        "confirmation letter where relevant). NEVER suggest, list, or pre-fill the Declaration of "
+        "Trust, full trust instrument, complete copy of the trust, or any document disclosing trust "
+        "terms/assets/beneficiaries for a DMV, bank teller, title company, or any public-facing "
+        "counter or clerk. Public parties never see more than the Certificate of Trust.\n"
         "Use the provided trust data to pre-fill form fields. "
         "Research the specific forms, fees, and procedures for the user's state. "
         "If the state has special provisions (e.g. Montana's permanent registration for vehicles 11+ years old), include them.\n\n"
@@ -298,6 +305,43 @@ def _build_kit_user_content(
         ),
     }
     return json.dumps(payload, indent=2, default=str)
+
+
+def _assert_no_private_trust_docs(content: Dict[str, Any]) -> None:
+    """
+    Privacy invariant (Jeff directive 2026-10-16): trust TERMS never leave the private setting.
+
+    The Certificate of Trust exists precisely so the Declaration of Trust / full trust
+    instrument is never shown at any public counter. If the AI ever suggests one of those
+    documents, refuse the kit rather than persist it.
+    """
+    forbidden = re.compile(
+        r"declaration of trust|full trust instrument|complete copy of the trust|"
+        r"copy of the trust instrument|entire trust document",
+        re.IGNORECASE,
+    )
+    def _walk(node: Any) -> Optional[str]:
+        if isinstance(node, dict):
+            for value in node.values():
+                hit = _walk(value)
+                if hit:
+                    return hit
+        elif isinstance(node, list):
+            for item in node:
+                hit = _walk(item)
+                if hit:
+                    return hit
+        elif isinstance(node, str) and forbidden.search(node):
+            return node[:160]
+        return None
+
+    hit = _walk(content)
+    if hit:
+        logger.error("AI kit suggested private trust document; blocking kit. Snippet: %s", hit)
+        raise HTTPException(
+            status_code=502,
+            detail="The generated kit suggested a document that discloses private trust terms. Please try generating the kit again.",
+        )
 
 
 def _parse_ai_kit_response(raw: str) -> Dict[str, Any]:
@@ -473,6 +517,10 @@ async def generate_kit(
         ) from e
 
     generated_content = _parse_ai_kit_response(raw_response)
+
+    # Reject any AI output suggesting private trust documents (Declaration of Trust,
+    # full instrument, etc.) — the Certificate of Trust is the only public-facing doc.
+    _assert_no_private_trust_docs(generated_content)
 
     # Validate AI output has the minimum required structure
     required_keys = {"kit_title", "summary", "instructions", "forms"}
