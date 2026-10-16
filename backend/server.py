@@ -998,11 +998,11 @@ async def startup_event():
             async for t in db.trusts.find(_wp, {"trust_id": 1}):
                 await db.trusts.update_one(
                     {"trust_id": t["trust_id"]},
-                    {"$set": {"benevolence_enabled": True, "tax_status": "508", "updated_at": now_iso()}},
+                    {"$set": {"benevolence_enabled": True, "tax_status": "508", "updated_at": datetime.now(timezone.utc).isoformat()}},
                 )
                 await db.tax_calendar.delete_many({
                     "trust_id": t["trust_id"],
-                    "deadline_type": {"$in": INCOME_TAX_DEADLINE_TYPES},
+                    "deadline_type": {"$in": sorted(INCOME_TAX_DEADLINE_TYPES)},
                 })
                 updated += 1
             if updated:
