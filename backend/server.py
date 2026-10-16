@@ -28,6 +28,8 @@ from starlette.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+from datetime import datetime, timezone
+from utils.tax_calendar_math import INCOME_TAX_DEADLINE_TYPES
 from pathlib import Path
 import jwt
 
@@ -986,6 +988,28 @@ async def startup_event():
         # Ensure primary admin account exists
         await ensure_primary_admin()
         
+        # Backfill [Jeff doctrine 2026-10-16]: pre-existing WingPoint-sourced trusts get
+        # benevolence_enabled + 508 tax status + their income-tax calendar entries purged,
+        # matching what new provisions now receive at creation. Idempotent — no-ops after first run.
+        try:
+            _wp = {"source": "wingpoint", "$or": [
+                {"benevolence_enabled": {"$ne": True}}, {"tax_status": {"$ne": "508"}}]}
+            updated = 0
+            async for t in db.trusts.find(_wp, {"trust_id": 1}):
+                await db.trusts.update_one(
+                    {"trust_id": t["trust_id"]},
+                    {"$set": {"benevolence_enabled": True, "tax_status": "508", "updated_at": now_iso()}},
+                )
+                await db.tax_calendar.delete_many({
+                    "trust_id": t["trust_id"],
+                    "deadline_type": {"$in": INCOME_TAX_DEADLINE_TYPES},
+                })
+                updated += 1
+            if updated:
+                logger.info(f"WingPoint doctrine backfill: {updated} trusts set to benevolence+508")
+        except Exception as e:
+            logger.error(f"WingPoint doctrine backfill failed (non-fatal): {e}")
+
         # Migrate onboarding state: rename old fields to new fields
         try:
             migrator = OnboardingMigration()
@@ -1024,7 +1048,7 @@ async def ensure_primary_admin():
     import uuid
     import bcrypt
     from datetime import datetime, timezone
-    
+
     primary_admin_email = "contact@trustoffice.app"
     default_password = os.environ.get('ADMIN_DEFAULT_PASSWORD')
     if not default_password:
