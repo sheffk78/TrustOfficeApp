@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
+import { isNonNegativeNumber, validateScheduleAForm } from '@/utils/formGuards';
 import PageHeader from '@/components/PageHeader';
 import { 
   Plus, 
@@ -162,14 +163,14 @@ export default function ScheduleAPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate date_conveyed is a real date
-    if (formData.date_conveyed) {
-      const parsed = new Date(formData.date_conveyed);
-      if (isNaN(parsed.getTime())) {
-        toast.error('Date Conveyed is not a valid date');
-        return;
-      }
+
+    // Pre-submit guard (TICKET-20261001-CLIENT-GUARDS): category required,
+    // description required (server model field), value non-negative, date
+    // parses — stops client-bad-input at the dialog instead of a 422.
+    const guardError = validateScheduleAForm(formData);
+    if (guardError) {
+      toast.error(guardError);
+      return;
     }
     
     const payload = {

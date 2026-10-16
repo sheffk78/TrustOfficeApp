@@ -27,6 +27,7 @@ import {
 import PageHeader from '@/components/PageHeader';
 import { fetchWithAuth } from '@/utils/api';
 import { showError, humanizeErrorCode } from '@/utils/errors';
+import { isValidEmail } from '@/utils/formGuards';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -449,6 +450,21 @@ export default function OrgConsolePage() {
   // ——— invite ———
   const sendInvite = async () => {
     if (!inviteOrg || !inviteEmail.trim()) return;
+    // Pre-submit guards (TICKET-20261001-CLIENT-GUARDS): bad email format and
+    // "already on the roster" stop at the dialog — the backend rejects both,
+    // but every rejected submit was landing in the error log as 422 noise.
+    const email = inviteEmail.trim();
+    if (!isValidEmail(email)) {
+      setInviteErr('Enter a valid email address to invite.');
+      return;
+    }
+    const alreadyOnRoster = (members[inviteOrg.org_id] || []).some(
+      m => (m.email || '').toLowerCase() === email.toLowerCase()
+    );
+    if (alreadyOnRoster) {
+      setInviteErr('That email is already on this org\'s roster.');
+      return;
+    }
     setInviting(true); setInviteErr('');
     try {
       const res = await fetchWithAuth(`/orgs/${inviteOrg.org_id}/invites`, {

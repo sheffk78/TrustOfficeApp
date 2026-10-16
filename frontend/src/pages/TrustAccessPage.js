@@ -17,6 +17,7 @@ import { fetchWithAuth } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
 import { useUpgradeModal } from '@/context/UpgradeModalContext';
 import { showError, humanizeErrorCode } from '@/utils/errors';
+import { isValidGrantMonths } from '@/utils/formGuards';
 import PageHeader from '@/components/PageHeader';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -108,6 +109,13 @@ export default function TrustAccessPage() {
       return;
     }
     if (!attested) { toast.error('Please confirm the attestation before granting.'); return; }
+    // Pre-submit guard (TICKET-20261001-CLIENT-GUARDS): mirror the backend's
+    // 365-day cap client-side so an out-of-range window stops at the dialog
+    // instead of returning expiry_exceeds_365_days / invalid_expires_at 422s.
+    if (!isValidGrantMonths(months)) {
+      toast.error('Access can be granted for up to 12 months.');
+      return;
+    }
     setSubmitting(true);
     try {
       const expires = new Date();

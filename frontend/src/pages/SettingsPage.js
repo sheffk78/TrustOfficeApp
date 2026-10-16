@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { showError } from '../utils/errors';
 import { fetchWithAuth } from '@/utils/api';
+import { validateTrustCreateForm, validateTrustUpdateForm } from '@/utils/formGuards';
 import PageHeader from '@/components/PageHeader';
 import Spinner from '@/components/Spinner';
 import EmailArchiveCard from '@/components/EmailArchiveCard';
@@ -707,6 +708,17 @@ export default function SettingsPage() {
     const day = Number(trustData.tax_year_end_day);
     const computedFiscalYear = (month && day) ? !(month === 12 && day === 31) : false;
 
+    // Pre-submit guard (TICKET-20261001-CLIENT-GUARDS): contact emails, EIN,
+    // and tax month/day checked against the same rules the backend's
+    // TrustCreate/TrustUpdate validators enforce — a bad value stops at the
+    // form instead of returning a 422. Full rule set: utils/formGuards.
+    const guardError = validateTrustUpdateForm(trustData);
+    if (guardError) {
+      toast.error(guardError);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       // Merge spending threshold into governance_settings so it persists on save
@@ -824,12 +836,11 @@ export default function SettingsPage() {
   };
 
   const handleCreateTrust = async () => {
-    if (!newTrustData.name.trim()) {
-      toast.error('Trust name is required');
-      return;
-    }
-    if (!newTrustData.jurisdiction.trim()) {
-      toast.error('Jurisdiction is required');
+    // Pre-submit guard (TICKET-20261001-CLIENT-GUARDS): full rule set lives in
+    // utils/formGuards.validateTrustCreateForm (mirrors backend TrustCreate).
+    const guardError = validateTrustCreateForm(newTrustData);
+    if (guardError) {
+      toast.error(guardError);
       return;
     }
 

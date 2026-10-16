@@ -86,6 +86,22 @@ export function useDashboardData() {
     }
   }, [selectedTrust, trusts, trustsLoading]);
 
+  // Stale-trust recovery (TICKET-20261001-CLIENT-GUARDS item 5): a 404
+  // "Trust not found" from a trust-scoped read means the selected trust no
+  // longer resolves under this session (deleted server-side, or cleared
+  // between sessions). That is not an application bug — don't toast or
+  // report it; reconcile the selection instead. AuthContext listens for
+  // `trust_selection_invalidated`, re-runs the reconcile, and falls back to
+  // a valid trust (or clears the selection cleanly).
+  const reconcileStaleTrust = (status) => {
+    const stillListed = (trusts || []).some(t => t && t.trust_id === selectedTrust?.trust_id);
+    if (status === 404 && !stillListed) {
+      window.dispatchEvent(new CustomEvent('trust_selection_invalidated'));
+      return true;
+    }
+    return false;
+  };
+
   const loadDashboardData = async () => {
     if (!selectedTrust) {
       setLoading(false);
@@ -100,6 +116,9 @@ export function useDashboardData() {
         const data = await response.json();
         setDashboard(data);
       } else {
+        // Stale-selection self-heal first (no-op unless 404 + trust gone from
+        // the fresh /trusts list); plain console.error otherwise.
+        reconcileStaleTrust(response.status);
         console.error('Failed to load dashboard');
       }
     } catch (error) {
@@ -123,6 +142,8 @@ export function useDashboardData() {
       if (response.ok) {
         const data = await response.json();
         setTaxDeadlines(data.upcoming || []);
+      } else {
+        reconcileStaleTrust(response.status);
       }
     } catch (error) {
       console.error('Failed to load tax deadlines:', error);
@@ -138,6 +159,8 @@ export function useDashboardData() {
       if (response.ok) {
         const data = await response.json();
         setWeeklyBriefing(data.briefing || []);
+      } else {
+        reconcileStaleTrust(response.status);
       }
     } catch (error) {
       // Silent fail — briefing is non-critical
