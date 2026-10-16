@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAnalysisPolling } from '@/hooks/useAnalysisPolling';
 import { toast } from 'sonner';
 import { showError } from '@/utils/errors';
+import { validateOnboardingTrustForm } from '@/utils/formGuards';
 import { xhrRequest } from './xhrRequest';
 import { validateDocFile } from './docValidation';
 import { uploadWithProgress } from '@/utils/uploadWithProgress';
@@ -148,6 +149,15 @@ export function useOnboardingWizard() {
     if (!createdTrustId) {
       toast.error('Something went wrong. Please go back and try again.');
       setStep(1);
+      return;
+    }
+
+    // Pre-submit guards (TICKET-20261001-CLIENT-GUARDS): EIN format + tax
+    // month/day bounds mirror the backend validators — stop bad values at the
+    // form instead of a 422. Contact-email fields aren't on this step.
+    const guardError = validateOnboardingTrustForm(trustData);
+    if (guardError) {
+      toast.error(guardError);
       return;
     }
 

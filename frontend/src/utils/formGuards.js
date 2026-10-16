@@ -123,3 +123,16 @@ export function validateScheduleAForm(form) {
   }
   return null;
 }
+
+// Onboarding confirm step (step 3 → PUT /trusts/:id): EIN + tax month/day only.
+// Name/jurisdiction are guarded in the component with flow-specific copy; when
+// tax month/day arrive empty ("" from the defaults 12/31 present) they're fine.
+export function validateOnboardingTrustForm(form) {
+  if ((form.ein || '').trim() && !isValidEin(form.ein)) {
+    return 'EIN must be 9 digits (format: XX-XXXXXXX).';
+  }
+  if (!isValidMonthDay(form.tax_year_end_month, form.tax_year_end_day)) {
+    return 'Tax year-end month must be 1–12 and day 1–31.';
+  }
+  return null;
+}
