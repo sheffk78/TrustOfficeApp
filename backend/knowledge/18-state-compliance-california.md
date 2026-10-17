@@ -6,7 +6,7 @@ California imposes a state income tax on trusts that have California nexus. A tr
 
 California's income tax rates for trusts are the same as those for individuals, ranging from 1% to 13.3% depending on taxable income. Trusts are taxed at the individual rate schedule, and the threshold for reaching the top bracket is quite low, meaning many trusts hit the maximum rate quickly. Fiduciaries should plan distributions carefully because California allows a deduction for income distributed to beneficiaries, which can shift the tax burden to beneficiaries who may be in lower brackets.
 
-Estimated tax payments are required if the trust expects to owe $1,000 or more in California tax for the year. Form 540ES is used to make quarterly estimated payments, with due dates on April 15, June 15, September 15, and January 15 of the following year. Penalties apply for underpayment.
+Estimated tax payments are required for estates and trusts if they expect to owe $500 or more in California tax for the year (Form 541 instructions, Section J). Form 541-ES, Estimated Tax for Fiduciaries, is used to make quarterly estimated payments, with due dates on April 15, June 15, September 15, and January 15 of the following year. Fiduciary installments are weighted 30%, 40%, 0%, and 30% of the required annual payment rather than uniform quarters. Penalties apply for underpayment.
 
 ## Filing Requirements
 
@@ -23,13 +23,13 @@ Court supervision of trusts in California is optional. A trust does not need to 
 ## Key State-Specific Rules
 
 - **Asset Protection:** California does not allow self-settled asset protection trusts. A grantor cannot place assets in a trust for their own benefit and shield those assets from creditors. The trust must be irrevocable and for the benefit of others for asset protection to apply.
-- **Perpetuity Period:** California has not abolished the rule against perpetuities. The default period is 90 years for trusts created after 2009, but California has not adopted the modern dynasty trust approach seen in other states.
+- **Perpetuity Period:** California has not abolished the rule against perpetuities. It adopted the Uniform Statutory Rule Against Perpetuities (Probate Code § 21205), under which a nonvested property interest is invalid unless it either vests or terminates within 90 years of its creation, or satisfies the common-law lives-in-being measure — not the modern dynasty-trust approach seen in other states.
 - **Community Property:** California is a community property state, meaning trusts involving married couples must carefully track separate versus community property, as this affects taxation and creditor access.
 - **Probate Code Compliance:** California has detailed trustee duties under Probate Code Sections 16000-16015, including the duty to account to beneficiaries at least annually unless waived.
 
 ## How TrustOffice Helps
 
-- **Tax Calendar** tracks Form 541 and 540ES quarterly estimated payment deadlines, so California trustees never miss a filing or payment date and avoid underpayment penalties.
+- **Tax Calendar** tracks Form 541 and 541-ES quarterly estimated payment deadlines, so California trustees never miss a filing or payment date and avoid underpayment penalties.
 - **Beneficiaries** module logs all beneficiary notices required under Probate Code 16061.7, including delivery dates and content, creating a defensible audit trail.
 - **Governance Calendar** schedules annual accountings and trustee duty reminders aligned with California Probate Code requirements.
 - **Defensibility Score** evaluates whether the trust's compliance posture meets California standards for recordkeeping, notice, and reporting, helping trustees identify gaps before they become legal problems.

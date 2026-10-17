@@ -226,15 +226,52 @@ async def delete_deadline(deadline_id: str, user_id: str) -> bool:
 
 # ==================== AUTO-GENERATION ====================
 
-def _standard_deadlines_for_year(year: int) -> List[dict]:
-    """Standard compliance deadlines for a tax year."""
+def _standard_deadlines_for_year(year: int, trust: Optional[dict] = None) -> List[dict]:
+    """Standard compliance deadlines for a tax year.
+
+    Trust-aware (audit fix 2026-10-18): fiscal-year trusts get IRS-shaped
+    dates — 1041/K-1 due the 15th day of the 4th month after the tax year
+    ends, estimated payments keyed to the fiscal year start — instead of the
+    calendar-year April-15 defaults. Governance cadence (quarterly/annual
+    reviews, compensation, insurance) stays calendar-anchored regardless.
+    Date math reuses tax_calendar_math (single source of truth).
+    """
+    import calendar as _calendar
+
+    def _fy_dates(fy_month: int, fy_day: int):
+        """(1041_due, estimated list) for a fiscal year labeled `year`."""
+        from utils.tax_calendar_math import _fy_start, _month_delta
+        last = _calendar.monthrange(year, fy_month)[1]
+        fy_end = date(year, fy_month, min(fy_day, last))
+        # 1041/K-1: 15th day of the 4th month after FY end
+        m = fy_end.month + 4
+        y = fy_end.year + (1 if m > 12 else 0)
+        m = m - 12 if m > 12 else m
+        due_1041 = date(y, m, 15).isoformat()
+        # Estimated: 15th of the 4th/6th/9th/12th month after FY START
+        fy_start = _fy_start(year, fy_month, fy_day)
+        est = [
+            _month_delta(fy_start, off).replace(day=15).isoformat()
+            for off in (3, 5, 8, 11)
+        ]
+        return due_1041, est
+
+    if trust and trust.get("is_fiscal_year") is True and \
+            trust.get("tax_year_end_month") and trust.get("tax_year_end_day"):
+        due_1041, est_dates = _fy_dates(
+            int(trust["tax_year_end_month"]), int(trust["tax_year_end_day"]))
+    else:
+        due_1041 = f"{year}-04-15"
+        est_dates = [f"{year}-04-15", f"{year}-06-15",
+                     f"{year}-09-15", f"{year + 1}-01-15"]
+
     return [
-        # Federal income tax (Form 1041) — April 15
+        # Federal income tax (Form 1041) — Apr 15 (calendar) or FYE + 4 months
         {
             "category": DeadlineCategory.tax_filing_1041,
             "title": f"Form 1041 Filing Deadline (TY{year - 1})",
             "description": f"Federal fiduciary income tax return for tax year {year - 1}.",
-            "due_date": f"{year}-04-15",
+            "due_date": due_1041,
             "priority": DeadlinePriority.critical,
             "recurrence": "annual",
             "is_statutory": True,
@@ -244,7 +281,7 @@ def _standard_deadlines_for_year(year: int) -> List[dict]:
             "category": DeadlineCategory.tax_filing_k1,
             "title": f"Schedule K-1 to Beneficiaries (TY{year - 1})",
             "description": f"Furnish beneficiary K-1s for tax year {year - 1}.",
-            "due_date": f"{year}-04-15",
+            "due_date": due_1041,
             "priority": DeadlinePriority.critical,
             "recurrence": "annual",
             "is_statutory": True,
@@ -254,7 +291,7 @@ def _standard_deadlines_for_year(year: int) -> List[dict]:
             "category": DeadlineCategory.estimated_tax_payment,
             "title": f"Q1 Estimated Tax Payment ({year})",
             "description": "First-quarter federal estimated tax payment.",
-            "due_date": f"{year}-04-15",
+            "due_date": est_dates[0],
             "priority": DeadlinePriority.high,
             "recurrence": "quarterly",
             "is_statutory": True,
@@ -263,7 +300,7 @@ def _standard_deadlines_for_year(year: int) -> List[dict]:
             "category": DeadlineCategory.estimated_tax_payment,
             "title": f"Q2 Estimated Tax Payment ({year})",
             "description": "Second-quarter federal estimated tax payment.",
-            "due_date": f"{year}-06-15",
+            "due_date": est_dates[1],
             "priority": DeadlinePriority.high,
             "recurrence": "quarterly",
             "is_statutory": True,
@@ -272,7 +309,7 @@ def _standard_deadlines_for_year(year: int) -> List[dict]:
             "category": DeadlineCategory.estimated_tax_payment,
             "title": f"Q3 Estimated Tax Payment ({year})",
             "description": "Third-quarter federal estimated tax payment.",
-            "due_date": f"{year}-09-15",
+            "due_date": est_dates[2],
             "priority": DeadlinePriority.high,
             "recurrence": "quarterly",
             "is_statutory": True,
@@ -281,7 +318,7 @@ def _standard_deadlines_for_year(year: int) -> List[dict]:
             "category": DeadlineCategory.estimated_tax_payment,
             "title": f"Q4 Estimated Tax Payment ({year})",
             "description": "Fourth-quarter federal estimated tax payment.",
-            "due_date": f"{year + 1}-01-15",
+            "due_date": est_dates[3],
             "priority": DeadlinePriority.high,
             "recurrence": "quarterly",
             "is_statutory": True,
@@ -378,7 +415,7 @@ async def auto_generate_deadlines(trust_id: str, user_id: str) -> List[dict]:
             DeadlineCategory.estimated_tax_payment.value,
         }
     specs = [
-        s for s in _standard_deadlines_for_year(year)
+        s for s in _standard_deadlines_for_year(year, trust=trust)
         if s["category"].value not in skip_categories
     ]
 

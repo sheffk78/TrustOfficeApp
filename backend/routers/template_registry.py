@@ -42,6 +42,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "adoption of declaration of trust, acknowledgment of fiduciary duties, "
             "authorization of bank accounts, fiscal year election, EIN confirmation, "
             "adoption of governance standards, and ratification of prior actions. "
+            "Use formal WHEREAS/RESOLVED structure for each action. "
             "Additional context: {additional_context}"
         ),
     },
@@ -443,7 +444,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Generate minutes for a HEMS distribution from {trust_name}. "
             "Meeting date: {meeting_date}. Trustees present: {participants}. "
             "Additional context: {additional_context}. "
-            "Include WHEREAS/RESOLVED language for HEMS distribution with beneficiary standard reference."
+            "Include WHEREAS/RESOLVED language for the distribution. State explicitly that the distribution is made for the beneficiary's health, education, maintenance, or support (the HEMS standard), identify which HEMS prong applies, and reference the standard objectively — the minutes record the trustees' process, they do not determine legal rights."
         ),
     },
 
@@ -661,7 +662,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
 
     "evaluate_distribution": {
         "display_name": "Evaluate Distribution Request",
-        "description": "Get an AI evaluation of whether a distribution request complies with your trust document and trust law",
+        "description": "Structure the facts the trustees should consider when evaluating a distribution request — a record-keeping aid, not legal advice",
         "icon": "scale",
         "category": "distributions",
         "fields": [
@@ -681,7 +682,7 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
              "placeholder": "Previous distributions for equity reference"},
         ],
         "ai_prompt_template": (
-            "Evaluate a distribution request for {trust_name}. "
+            "Summarize for the trustees' evaluation record a distribution request before {trust_name}. "
             "The meeting was held on {meeting_date}. Trustees present: {participants}. "
             "Beneficiary: {beneficiary_name}. Requested amount: {requested_amount}. "
             "Purpose: {request_purpose}. HEMS category: {hems_category}. "

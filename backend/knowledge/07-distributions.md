@@ -71,7 +71,7 @@ Distributions carry tax consequences for both the trust and the beneficiary:
 
 - **Income distributed to beneficiaries** is generally taxed to the beneficiary, not the trust. The trust gets a deduction for distributions of distributable net income (DNI).
 - **Principal distributions** are typically not taxable to the beneficiary, but they reduce the trust's assets and may have capital gains implications if the trust sells assets to fund the distribution.
-- **The trust's marginal tax rates** are compressed — meaning the trust pays high rates on relatively low amounts of retained income. Strategic distributions can reduce the overall tax burden.
+- **The trust's marginal tax rates** are compressed — meaning the trust pays high rates on relatively low amounts of retained income. Timing of distributions can materially change which taxpayers bear which income, which is why distribution decisions are usually made alongside qualified tax advice.
 
 This is general information only. Trustees should work with a tax professional to understand the specific tax consequences of distributions for their trust.
 

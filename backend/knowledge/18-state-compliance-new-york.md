@@ -12,11 +12,11 @@ A critical New York rule: a resident trust is exempt from New York income tax if
 
 New York fiduciary income tax is filed using Form IT-205, the Fiduciary Income Tax Return. The filing deadline is April 15 for calendar-year trusts, or the 15th day of the fourth month after the fiscal year-end. If the trust files federal Form 1041 on extension, the New York filing is automatically extended, but payment of tax is still due by the original deadline.
 
-Estimated tax payments are required if the trust expects to owe New York tax of $300 or more. Form IT-2105 is used for estimated payments, due quarterly on April 15, June 15, September 15, and January 15. Nonresident trusts with New York-source income file Form IT-205 as well, reporting only New York-source income.
+Estimated tax payments are required if the trust expects to owe New York State, New York City, or Yonkers tax of $300 or more. Form IT-2106, Estimated Income Tax Payment Voucher for Fiduciaries, is used for estimated payments, due quarterly on April 15, June 15, September 15, and January 15. (Form IT-2105 serves individuals and grantor-type payments, not fiduciaries.) Nonresident trusts with New York-source income file Form IT-205 as well, reporting only New York-source income.
 
 ## Beneficiary Notice Requirements
 
-New York does not have a single statutory beneficiary notice requirement identical to California's Probate Code 16061.7, but the New York Surrogate's Court Procedure Act and the Estates, Powers and Trusts Law (EPTL) impose trustee duties to account and inform beneficiaries. Under EPTL Section 7-2.4 and related provisions, trustees must provide accountings to beneficiaries, and beneficiaries have the right to request judicial settlement of accounts.
+New York does not have a single statutory beneficiary notice requirement identical to California's Probate Code 16061.7, but the New York Surrogate's Court Procedure Act and the Estates, Powers and Trusts Law (EPTL) impose trustee duties to account and inform beneficiaries. Trustee duties to account and inform run through EPTL § 7-2.7 and related provisions (EPTL § 7-2.4 addresses acts in contravention of the trust, not accounting), and beneficiaries may compel a fiduciary accounting through Surrogate's Court Procedure Act Article 22 or request judicial settlement of accounts.
 
 For trusts under court jurisdiction (typically testamentary trusts), the trustee must file annual accountings with the Surrogate's Court. For trusts not under court jurisdiction, the trustee should provide informal accountings to beneficiaries regularly. New York also requires that beneficiaries receive notice of certain trust events, including the right to receive a copy of the trust instrument upon request.
 
@@ -35,7 +35,7 @@ Court-supervised trusts involve annual or periodic accountings filed with the co
 
 ## How TrustOffice Helps
 
-- **Tax Calendar** tracks IT-205 filing deadlines and IT-2105 quarterly estimated payment dates, critical for avoiding New York's significant underpayment penalties.
+- **Tax Calendar** tracks IT-205 filing deadlines and IT-2106 quarterly estimated payment dates, critical for avoiding New York's significant underpayment penalties.
 - **Governance Calendar** schedules annual accountings for court-supervised trusts and informal accountings for unsupervised trusts, aligned with EPTL requirements.
 - **Minutes** documents trustee decisions and the rationale behind distributions, providing defensible records for potential Surrogate's Court proceedings.
 - **Defensibility Score** evaluates compliance with New York's dual system of court-supervised and unsupervised trusts, helping trustees identify gaps in accounting or notice obligations.

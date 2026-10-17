@@ -65,6 +65,6 @@ Good documentation is essential when making HEMS distributions. The trustee shou
 
 ## Why HEMS Matters
 
-The HEMS standard exists to balance two competing goals: preserving trust assets for the future and ensuring beneficiaries have what they need in the present. It also provides a legal framework that protects the trustee. If a trustee makes a distribution that fits clearly within HEMS and is well-documented, that trustee has a strong defense against claims of mismanagement.
+The HEMS standard exists to balance two competing goals: preserving trust assets for the future and ensuring beneficiaries have what they need in the present. It also provides a recognized framework trustees can point to when documenting decisions. When a distribution fits clearly within HEMS and is well-documented, the trustee's contemporaneous record shows the decision was made on the standard's own terms — the kind of record that is broadly helpful if a distribution decision is ever questioned. It is a record-keeping advantage, not a guarantee of legal outcome; specific disputes call for professional counsel.
 
 TrustOffice helps you evaluate distribution requests against the HEMS standard and maintain the documentation you need to support every decision.

@@ -2,11 +2,11 @@
 
 ## What Is the Defensibility Score?
 
-The Defensibility Score is TrustOffice's proprietary measure of how well-documented and defensible your trust administration is. It evaluates whether you're creating the kind of paper trail that would protect you if your decisions were ever questioned — by a beneficiary, a court, or any other interested party.
+The Defensibility Score is TrustOffice's proprietary measure of record-keeping completeness in your trust administration. It evaluates whether you're creating the kind of contemporaneous paper trail that supports your decisions if they're ever questioned — by a beneficiary, a court, or any other interested party.
 
-Think of it as a health check for your trust management. A high score means you're documenting decisions, keeping records, and following best practices. A low score means there are gaps that could leave you vulnerable.
+Think of it as a health check for your trust management. A high score means you're documenting decisions, keeping records, and following best practices. A low score means there are documentation gaps worth closing.
 
-The score isn't about whether your decisions are right or wrong — it's about whether you can *prove* you made them carefully and in good faith.
+The score measures your record-keeping, not the legal validity of your decisions — and it isn't a guarantee of any legal outcome. It's about whether you can *show* you made your decisions carefully and in good faith. Specific disputes or legal questions call for a qualified estate-planning attorney.
 
 ## What the Score Measures
 

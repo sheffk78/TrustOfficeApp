@@ -12,7 +12,7 @@ Utah fiduciary income tax is filed on Form TC-41 (Trust Tax), the fiduciary inco
 
 ## Beneficiary Notice Requirements
 
-Utah adopted the Uniform Trust Code in Title 75, Chapter 7 of the Utah Code (the Utah Uniform Trust Code). Under the trust code, a trustee has a duty to keep qualified beneficiaries reasonably informed of the trust's administration and must provide notice to qualified beneficiaries when a trust becomes irrevocable or when a change of trustee occurs. When a trust becomes irrevocable, the trustee generally must provide notice within 30 days of the event to the qualified beneficiaries, identifying the trust, the trustee, and the beneficiary's right to request information and accountings. Trustees should document notice delivery dates carefully.
+Utah adopted the Uniform Trust Code, recodified effective May 7, 2025 as Title 75B, Chapter 2 of the Utah Code (formerly Title 75, Chapter 7 — the Utah Uniform Trust Code). Under the trust code, a trustee has a duty to keep qualified beneficiaries reasonably informed of the trust's administration and must provide notice to qualified beneficiaries when a trust becomes irrevocable or when a change of trustee occurs. Under Utah Code § 75B-2-811 (formerly § 75-7-811), when a trust becomes irrevocable, the trustee must provide notice within 60 days after the trustee acquires knowledge of the event to the qualified beneficiaries, identifying the trust, the settlor, and the beneficiary's right to request a copy of the trust instrument and a trustee's report. The trustee must also notify qualified beneficiaries within 60 days after accepting a trusteeship. Trustees should document notice delivery dates carefully.
 
 ## Court Supervision
 
@@ -21,13 +21,13 @@ Court supervision of Utah trusts is optional, and a trust does not need to be re
 ## Key State-Specific Rules
 
 - **Flat Tax:** Utah applies a single flat income tax rate (4.55% for 2024, 4.5% for 2025 and later) to estates and trusts, simplifying rate planning.
-- **UTC Adoption:** Utah adopted the Uniform Trust Code in Title 75, Chapter 7, providing a comprehensive modern framework for trust duties, administration, and modification.
-- **30-Day Notice:** Upon a trust becoming irrevocable, notice to qualified beneficiaries is generally due within 30 days under the state's Uniform Trust Code provisions.
+- **UTC Adoption:** Utah adopted the Uniform Trust Code, recodified effective May 7, 2025 as Title 75B, Chapter 2 (formerly Title 75, Chapter 7), providing a comprehensive modern framework for trust duties, administration, and modification.
+- **60-Day Notice:** Upon a trust becoming irrevocable, notice to qualified beneficiaries is due within 60 days under Utah Code § 75B-2-811 (the state's Uniform Trust Code provisions).
 - **Removal Standard:** A trustee may be removed for breach of trust or where continued service would seriously impair the trust, following the Uniform Trust Code removal standard.
 
 ## How TrustOffice Helps
 
 - **Tax Calendar** tracks Form TC-41 and the quarterly estimated-payment deadlines, so Utah trustees never miss a filing or payment date and avoid penalties.
-- **Beneficiaries** module logs every qualified-beneficiary notice required under Utah's Uniform Trust Code, including the 30-day irrevocability window, with delivery dates and content for a defensible audit trail.
-- **Governance Calendar** schedules annual accountings and duty reminders aligned with Title 75, Chapter 7.
+- **Beneficiaries** module logs every qualified-beneficiary notice required under Utah's Uniform Trust Code, including the 60-day irrevocability window under § 75B-2-811, with delivery dates and content for a defensible audit trail.
+- **Governance Calendar** schedules annual accountings and duty reminders aligned with Title 75B, Chapter 2.
 - **Defensibility Score** evaluates the trust's notice, recordkeeping, and reporting posture against Utah's Uniform Trust Code standards, helping trustees identify gaps before they become legal problems.

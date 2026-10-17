@@ -28,7 +28,7 @@ Florida does have a voluntary court registration option for trusts, but this is 
 
 ## Key State-Specific Rules
 
-- **Asset Protection Trusts:** Florida enacted self-settled asset protection trust legislation, allowing grantors to create qualified trusts under Florida Statutes Chapter 736 that protect assets from creditors after a specified period, subject to conditions.
+- **Asset Protection Trusts:** Florida is generally understood NOT to have enacted a true self-settled (domestic asset protection) trust statute comparable to Nevada, Delaware, or South Dakota. Chapter 736 provides spendthrift and discretionary-trust protections (Part V), which shield a beneficiary's interest in certain circumstances, but a grantor cannot rely on Florida law to shield assets they retain benefit of — a misconception worth correcting proactively.
 - **Florida Trust Code:** Florida adopted a comprehensive trust code based on the Uniform Trust Code, providing clear statutory guidance on trustee duties, beneficiary rights, and trust administration.
 - **Homestead Protection:** Florida has strong homestead and creditor protection laws that interact with trust planning, particularly for primary residences.
 - **No Estate Tax:** Florida does not impose a state estate or inheritance tax, simplifying post-death administration.
