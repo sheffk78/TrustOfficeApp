@@ -72,6 +72,7 @@ from routers.benevolence_policy import router as benevolence_policy_router, ensu
 from services.class_member_indexes import ensure_class_member_indexes
 from routers.exports import router as exports_router
 from routers.full_export import router as full_export_router
+from routers.mcp_bridge import router as mcp_bridge_router
 from routers.expenses import router as expenses_router
 from routers.calendar import router as calendar_router
 from routers.trust_units import router as trust_units_router
@@ -356,6 +357,12 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         # Skip subscription check for fully exempt paths or external API (auth via API key)
         if path in SUBSCRIPTION_EXEMPT_PATHS or path.startswith("/api/external/") or path.startswith("/api/admin/notifications/") or not path.startswith("/api/"):
             return await call_next(request)
+
+        # MCP bridge: agent tokens carry their own subscription gate — the token
+        # is only issued to subscribed users (checked at issuance), and its tools
+        # are read-only. Agent traffic doesn't burn the user's read-only posture.
+        if path.startswith("/api/mcp/"):
+            return await call_next(request)
         
         # Skip for OPTIONS requests (CORS preflight)
         if method == "OPTIONS":
@@ -533,6 +540,7 @@ app.include_router(exports_enhanced_router, prefix="/api")
 app.include_router(subscriptions_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 app.include_router(full_export_router, prefix="/api")
+app.include_router(mcp_bridge_router, prefix="/api")
 app.include_router(expenses_router, prefix="/api")
 app.include_router(calendar_router, prefix="/api")
 app.include_router(preferences_router, prefix="/api")
