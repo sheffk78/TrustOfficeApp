@@ -454,3 +454,15 @@ def test_api_php_probe_is_scanner():
     # that never existed on this FastAPI service.
     assert classify(404, "Not Found", "/api.php") == "scanner"
     assert classify(404, "Not Found", "/wp-content/api.php") == "scanner"
+
+
+def test_health_405_misconfigured_monitor_is_scanner():
+    # 2026-10-17: a GET/PATCH-check uptime monitor PATCHes /health every few
+    # hours — FastAPI correctly 405s (health is GET-only infrastructure).
+    # Narrow exception carved from the 405-stays-real rule: /health paths
+    # carry no app contract, so a 405 there is never client drift.
+    assert classify(405, "Method Not Allowed", "/health") == "scanner"
+    assert classify(405, "Method Not Allowed", "/api/health") == "scanner"
+    # The drift detector itself stays untouched — every other 405 is real:
+    assert classify(405, "Method Not Allowed", "/api/auth/session") is None
+    assert classify(405, "Method Not Allowed", "/api/minutes/generate") is None

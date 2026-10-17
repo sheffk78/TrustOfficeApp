@@ -240,6 +240,13 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
     # the drift detector; the anon-probe 405 backlog gets cleared by
     # batch-resolve instead, and any future bot filter must key on
     # request signatures captured at capture time, not status+path alone.
+    # ONE narrow exception (2026-10-17 sweep): /health and /api/health are
+    # GET-only infrastructure probes with no app-facing contract — the SPA
+    # and the app's own monitors only ever GET them. A 405 there can only
+    # come from a misconfigured external monitor (the recurring PATCH sender
+    # of 2026-10-17), never from client drift. Everything else stays real.
+    if status_code == 405 and path_str.rstrip("/") in ("/health", "/api/health"):
+        return "scanner"
     if status_code == 404:
         if any(p.rstrip("/") == path_str.rstrip("/") for p in _TEST_404_PATHS):
             return "test_suite"
