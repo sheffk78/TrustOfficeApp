@@ -432,3 +432,25 @@ def test_structured_business_422_codes_client_validation():
     # enum-choice capture shape (viewer|preparer alternation in the pattern):
     assert classify(422, "2: Input should be 'viewer' or 'preparer'",
                     "/api/trusts/trust_x/parties") == "client_validation"
+
+
+# ---------------------------------------------------------------------------
+# 2026-10-17 error-sweep teachings (JOB-20261017-TO-ERROR-SWEEP)
+# ---------------------------------------------------------------------------
+def test_bare_field_required_422_on_auth_path_is_client_validation():
+    # Unattributed empty-body POSTs to /api/auth/register produced
+    # "?: Field required" (no field name at all) — probes posting empty or
+    # non-JSON bodies. Real register/login submits are form-guarded and always
+    # carry at least one parseable field, so a "?"-loc 422 is probe traffic.
+    assert classify(422, "?: Field required", "/api/auth/register") == "client_validation"
+    assert classify(422, "? : Field required", "/api/auth/register") == "client_validation"
+    # Real enum-drift 422s keep their pinned behavior — never match this shape:
+    assert classify(422, "status: Input should be a valid enumeration member",
+                    "/api/minutes-templates") is None
+
+
+def test_api_php_probe_is_scanner():
+    # Bare 404 on /api.php — PHP-era scanner tooling probing for endpoints
+    # that never existed on this FastAPI service.
+    assert classify(404, "Not Found", "/api.php") == "scanner"
+    assert classify(404, "Not Found", "/wp-content/api.php") == "scanner"

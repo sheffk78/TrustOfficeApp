@@ -67,6 +67,7 @@ _SCANNER_RE = re.compile(
     r"|/api/w/|/api/console|proc/self|/environ"
     r"|templates/preview"
     r"|credentials|secret|credential"
+    r"|\bapi\.php\b|\b.php\b"        # 2026-10-17: /api.php bare-404 probe (PHP-era tooling)
     r"|(sa|service|gcp|google|firebase)[-_]?(admin|account|credentials?)"
     r"|key\.json|sa\.json|config\.env"
     r"|dockerfile|serverless\.yaml|swagger\.json|\.gitlab-ci|\.github"
@@ -126,6 +127,13 @@ _CLIENT_422_NOISE_RE = (
     # and carry richer pydantic details on app paths; a bare Field-required
     # 422 on an auth path is probe traffic (API answer correct).
     re.compile(r"^(email|password|username)\s*:\s*Field required", re.IGNORECASE),
+    # Bare "?: Field required" 422 on an auth path (2026-10-17 sweep):
+    # unattributed empty-body POST with NO parseable fields at all — probes
+    # posting empty/non-JSON bodies. Real app flows are form-guarded and
+    # always carry at least one parseable field (matched by the patterns
+    # above), so a field-loc of "?"/empty with no field name can't be a
+    # real register/login submit. Real enum-drift 422s never look like this.
+    re.compile(r"^\??\s*:\s*Field required", re.IGNORECASE),
     re.compile(r"Input should be '(viewer|preparer)'", re.IGNORECASE),
     re.compile(r"Input should be '(real_property|personal_property)'\]", re.IGNORECASE),
     re.compile(r"^Trust not found\. Please refresh", re.IGNORECASE),
