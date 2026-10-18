@@ -29,6 +29,42 @@ motor.motor_asyncio.AsyncIOMotorClient = mongomock_motor.AsyncMongoMockClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Rebind database to the mock regardless of collection order. pytest collects
+# alphabetically, so another suite (e.g. test_mcp_bridge.py, whose `from server
+# import app` side effect builds the REAL Motor client) usually imports
+# database.py before this file; its mongomock class patch then arrives too
+# late and this suite silently runs on a real loop-bound client — every
+# TestClient request after the first dies with "Event loop is closed".
+# Two-layer fix: (1) new mock client on the database module, (2) rebind the
+# `from database import db` name in EVERY already-imported module that holds
+# a stale binding (routers, dependencies — they each captured the old object
+# at import time). Mock objects are loop-agnostic, so no per-loop issues.
+import database as _database_mod
+if not isinstance(_database_mod.client, mongomock_motor.AsyncMongoMockClient):
+    _mock_client = mongomock_motor.AsyncMongoMockClient(
+        os.environ["MONGO_URL"], serverSelectionTimeoutMS=5000, maxPoolSize=20)
+    _database_mod.client = _mock_client
+    _database_mod.db = _mock_client[os.environ["DB_NAME"]]
+_rebound = 0
+for _name, _mod in list(sys.modules.items()):
+    if not _name.startswith(("routers.", "dependencies", "server", "database")):
+        continue
+    if getattr(_mod, "__dict__", {}).get("db") is getattr(_database_mod, "db"):
+        continue
+    _cur = getattr(_mod, "__dict__", {}).get("db", None)
+    if _cur is None:
+        continue
+    try:
+        _real_db = _database_mod.db
+    except Exception:
+        continue
+    # rebind only if this module's db is NOT the new mock db (stale real binding)
+    if _cur is not _real_db:
+        _mod.db = _real_db
+        _rebound += 1
+print(f"[org_grant fixture] rebound {_rebound} stale db bindings to mongomock")
+
+
 import pytest
 import pytest_asyncio
 from datetime import datetime, timezone, timedelta
