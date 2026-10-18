@@ -185,6 +185,12 @@ class MinutesTemplateType(str, Enum):
     bill_of_sale = "bill_of_sale"
     assignment_of_personal_property = "assignment_of_personal_property"
     general_assignment = "general_assignment"
+    # Audit-flagged professional-trustee gaps (batch 3, 2026-10-18)
+    successor_trustee_acceptance = "successor_trustee_acceptance"
+    beneficiary_receipt_release = "beneficiary_receipt_release"
+    trustee_indemnification_release = "trustee_indemnification_release"
+    grantor_trust_election = "grantor_trust_election"
+    reserve_account_resolution = "reserve_account_resolution"
 
 class AssetStatus(str, Enum):
     active = "active"

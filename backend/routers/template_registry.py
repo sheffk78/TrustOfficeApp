@@ -188,6 +188,33 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
     },
 
+    "successor_trustee_acceptance": {
+        "display_name": "Successor Trustee Acceptance & Qualification",
+        "description": "Record a successor trustee's formal acceptance of trusteeship and qualification to serve",
+        "icon": "user-check-circle",
+        "category": "trustee_changes",
+        "fields": [
+            {"name": "successor_trustee_name", "label": "Successor Trustee Name", "type": "text", "required": True},
+            {"name": "qualifying_event", "label": "Qualifying Event", "type": "select", "required": True,
+             "options": ["prior trustee resignation", "prior trustee death", "prior trustee removal", "incapacity of prior trustee"]},
+            {"name": "acceptance_date", "label": "Date of Acceptance", "type": "date", "required": True},
+            {"name": "bonding_notes", "label": "Bonding / Qualification Notes", "type": "textarea", "required": False,
+             "placeholder": "e.g., bond requirement waived per trust instrument; letters of acceptance filed"},
+        ],
+        "ai_prompt_template": (
+            "Generate minutes recording the acceptance of trusteeship by {successor_trustee_name} for {trust_name}. "
+            "Meeting date: {meeting_date}. Trustees present: {participants}. "
+            "Qualifying event: {qualifying_event}. Acceptance date: {acceptance_date}. "
+            "Bonding/qualification notes: {bonding_notes}. "
+            "Additional context: {additional_context}. "
+            "Include WHEREAS/RESOLVED language: WHEREAS clauses recite the succession event under the trust "
+            "instrument and that {successor_trustee_name} accepts the office and qualifies to serve (including any "
+            "bonding notes as recorded); RESOLVED clauses record the acceptance, the commencement of authority "
+            "as of the acceptance date, and ratification of prior-trustee acts properly taken. "
+            "The minutes record the process and facts of succession; they do not determine any legal right."
+        ),
+    },
+
     # ─── Property & Assets ───────────────────────────────────
     "real_estate_purchase": {
         "display_name": "Real Estate Purchase",
@@ -457,8 +484,36 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "ai_prompt_template": (
             "Generate minutes for beneficiary loan from {trust_name}. "
             "Meeting date: {meeting_date}. Trustees present: {participants}. "
-            "Additional context: {additional_context}. "
             "Include WHEREAS/RESOLVED language for loan terms, repayment schedule, and authorization."
+        ),
+    },
+
+    "beneficiary_receipt_release": {
+        "display_name": "Beneficiary Receipt & Release",
+        "description": "Record a beneficiary's written acknowledgment of a distribution received",
+        "icon": "file-check",
+        "category": "distributions",
+        "fields": [
+            {"name": "beneficiary_name", "label": "Beneficiary Name", "type": "text", "required": True},
+            {"name": "distribution_amount", "label": "Amount Received", "type": "currency", "required": True},
+            {"name": "distribution_date", "label": "Date of Distribution", "type": "date", "required": True},
+            {"name": "distribution_form", "label": "Form of Distribution", "type": "select", "required": True,
+             "options": ["check", "ACH transfer", "wire", "in-kind asset"]},
+            {"name": "release_scope", "label": "Scope of Acknowledgment", "type": "textarea", "required": False,
+             "placeholder": "e.g., acknowledges receipt of the distribution described; no general release of trustee claims"},
+        ],
+        "ai_prompt_template": (
+            "Generate minutes recording the beneficiary receipt acknowledgment for {trust_name}. "
+            "Meeting date: {meeting_date}. Trustees present: {participants}. "
+            "Beneficiary: {beneficiary_name}. Amount: {distribution_amount}. "
+            "Distribution date: {distribution_date}. Form: {distribution_form}. "
+            "Scope acknowledged: {release_scope}. "
+            "Additional context: {additional_context}. "
+            "Include WHEREAS/RESOLVED language: WHEREAS clauses recite the distribution made under the trust's "
+            "distribution process and that the beneficiary acknowledges receipt of the stated property; RESOLVED "
+            "clauses record the acknowledgment for the trust's permanent records and direct its filing with the "
+            "trust's books. Keep the scope exactly as entered — the acknowledgment records receipt, and the "
+            "minutes do not determine any legal right or release beyond the scope stated."
         ),
     },
 
@@ -502,6 +557,34 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Meeting date: {meeting_date}. Trustees present: {participants}. "
             "Additional context: {additional_context}. "
             "Include WHEREAS/RESOLVED language describing the emergency, actions taken, and ratification."
+        ),
+    },
+
+    "trustee_indemnification_release": {
+        "display_name": "Trustee Indemnification & Release",
+        "description": "Document the trust's indemnification of a trustee and the scope of any release after a matter closes",
+        "icon": "shield",
+        "category": "legal_governance",
+        "fields": [
+            {"name": "affected_trustee_name", "label": "Trustee Name", "type": "text", "required": True},
+            {"name": "matter_summary", "label": "Matter Summary", "type": "textarea", "required": True,
+             "placeholder": "e.g., third-party claim regarding property repairs; matter concluded without finding of breach"},
+            {"name": "indemnification_scope", "label": "Indemnification Scope", "type": "textarea", "required": False,
+             "placeholder": "e.g., reasonable costs and expenses actually incurred, per the trust instrument's indemnification provision"},
+            {"name": "release_scope", "label": "Release Scope", "type": "textarea", "required": False,
+             "placeholder": "e.g., release limited to the matters described above; no release regarding future acts"},
+        ],
+        "ai_prompt_template": (
+            "Generate minutes recording trustee indemnification and release for {trust_name}. "
+            "Meeting date: {meeting_date}. Trustees present: {participants}. "
+            "Trustee: {affected_trustee_name}. Matter: {matter_summary}. "
+            "Indemnification scope: {indemnification_scope}. Release scope: {release_scope}. "
+            "Additional context: {additional_context}. "
+            "Include WHEREAS/RESOLVED language: WHEREAS clauses recite the matter, its conclusion, and the trust "
+            "instrument's indemnification provision; RESOLVED clauses record indemnification limited to the scope "
+            "as entered and any release limited to the matters described, and direct the resolution be filed with "
+            "the trust's books. Keep both scopes exactly as entered; the trustee's own interest requires recusal "
+            "acknowledgment, and the minutes record the trustees' process — they do not determine any legal right."
         ),
     },
 
@@ -587,6 +670,35 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "Meeting date: {meeting_date}. Trustees present: {participants}. "
             "Additional context: {additional_context}. "
             "Include WHEREAS/RESOLVED language for designation with units of beneficial interest."
+        ),
+    },
+
+    "grantor_trust_election": {
+        "display_name": "Grantor Trust / Entity Election",
+        "description": "Record the trustees' adoption of a tax-election position for the trust (e.g., check-the-box or an S-corp election for a held entity)",
+        "icon": "file-signature",
+        "category": "admin",
+        "fields": [
+            {"name": "election_type", "label": "Election Type", "type": "select", "required": True,
+             "options": ["grantor trust position (Rev. Rul. 85-13 framework)", "check-the-box entity classification (Form 8832)", "S-corporation election for a held entity (Form 2553)"]},
+            {"name": "related_entity", "label": "Related Entity (if any)", "type": "text", "required": False,
+             "placeholder": "e.g., ABC Holdings LLC, wholly owned by the trust"},
+            {"name": "election_reason", "label": "Reason for Election", "type": "textarea", "required": True},
+            {"name": "tax_advisor", "label": "Tax Advisor / Preparer", "type": "text", "required": False},
+        ],
+        "ai_prompt_template": (
+            "Generate minutes recording the trustees' adoption of a tax election for {trust_name}. "
+            "Meeting date: {meeting_date}. Trustees present: {participants}. "
+            "Election type: {election_type}. Related entity: {related_entity}. "
+            "Reason: {election_reason}. Tax advisor: {tax_advisor}. "
+            "Additional context: {additional_context}. "
+            "Include WHEREAS/RESOLVED language: WHEREAS clauses recite the trustees' duty to administer the "
+            "trust's tax affairs and that the election was reviewed with the trust's tax advisor ({tax_advisor}); "
+            "RESOLVED clauses record the trustees' adoption of the stated election position, authorize signature "
+            "and filing of the associated form by the designated officer or preparer, and direct retention of the "
+            "election records with the trust's tax files. Frame everything as the trustees' recorded "
+            "administrative adoption of a tax position developed with their tax advisor — the minutes record the "
+            "process; they do not determine the trust's tax treatment, and no tax advice is given in the minutes."
         ),
     },
 
@@ -734,6 +846,35 @@ TEMPLATE_REGISTRY: Dict[str, Dict[str, Any]] = {
             "trustee approval per the trust's governance policy. The RESOLVED clause should "
             "authorize the expenditure and confirm it is in the best interest of the trust "
             "and its beneficiaries."
+        ),
+    },
+
+    "reserve_account_resolution": {
+        "display_name": "Reserve Account / Corpus Preservation",
+        "description": "Establish or adjust a reserve policy preserving trust corpus against anticipated obligations",
+        "icon": "piggy-bank",
+        "category": "financial",
+        "fields": [
+            {"name": "reserve_purpose", "label": "Reserve Purpose", "type": "textarea", "required": True,
+             "placeholder": "e.g., property tax and insurance obligations on the Elm Street parcel; anticipated capital repairs"},
+            {"name": "reserve_amount", "label": "Reserve Amount / Target", "type": "currency", "required": True},
+            {"name": "reserve_source", "label": "Funded From", "type": "text", "required": False,
+             "placeholder": "e.g., trust checking account; monthly allocation from rental income"},
+            {"name": "review_cadence", "label": "Review Cadence", "type": "select", "required": False,
+             "options": ["quarterly", "semi-annual", "annual", "at each regular meeting"]},
+        ],
+        "ai_prompt_template": (
+            "Generate minutes establishing or adjusting the reserve policy for {trust_name}. "
+            "Meeting date: {meeting_date}. Trustees present: {participants}. "
+            "Reserve purpose: {reserve_purpose}. Amount/target: {reserve_amount}. "
+            "Funded from: {reserve_source}. Review cadence: {review_cadence}. "
+            "Additional context: {additional_context}. "
+            "Include WHEREAS/RESOLVED language: WHEREAS clauses recite the trustees' duty to preserve trust "
+            "corpus and administer the trust for the benefit of its beneficiaries, and the identified "
+            "obligations the reserve addresses; RESOLVED clauses record the reserve amount and funding source, "
+            "set the review cadence, and direct the reserve's accounting treatment be recorded in the trust's "
+            "books. The minutes record the trustees' preservation policy — corpus preservation serves the "
+            "beneficiaries; the minutes do not determine any legal right."
         ),
     },
 }

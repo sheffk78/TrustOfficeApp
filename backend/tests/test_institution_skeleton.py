@@ -33,6 +33,33 @@ from models import (
 db = database.db
 
 
+# True ambient toggle state (captured at MODULE import, before any test runs)
+# — the baseline every test is restored to. A per-test snapshot is NOT enough:
+# if test N leaks a toggle and never pops it, test N+1's "pre-test value" is
+# the LEAK, and per-test restore would preserve it forever (this exact failure
+# mode shipped in the first draft of this fixture).
+_AMBIENT_TOGGLES = {k: os.environ[k] for k in os.environ if k.startswith("TOGGLE_")}
+
+
+@pytest.fixture(autouse=True)
+def _restore_process_toggles():
+    """Env hygiene for the whole suite: many tests flip TOGGLE_INSTITUTION /
+    TOGGLE_TRUST_PARTIES to exercise toggle-paths and only some pop them at
+    the end. The toggles are process-global; a leaked "1" changes UNRELATED
+    suites that run later in the same pytest process (reproduced 2026-10-18:
+    a leaked TOGGLE_TRUST_PARTIES made repair_20260929's stranger test read
+    "Invalid transition" instead of "Minutes approval record not found").
+    Restore to the MODULE-IMPORT baseline after every test."""
+    for k in _AMBIENT_TOGGLES:
+        os.environ[k] = _AMBIENT_TOGGLES[k]
+    yield
+    for k in list(os.environ):
+        if k.startswith("TOGGLE_") and k not in _AMBIENT_TOGGLES:
+            del os.environ[k]
+    for k, v in _AMBIENT_TOGGLES.items():
+        os.environ[k] = v
+
+
 def _now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -122,6 +149,11 @@ class TestV1GuardExpiry:
     @pytest.mark.asyncio
     async def test_expired_party_grant_denied(self, seeded_db):
         os.environ["TOGGLE_TRUST_PARTIES"] = "1"
+        # Env hygiene: this toggle is process-global — pop it at test end or it
+        # leaks into every LATER suite in the same pytest process (flips
+        # transition_minutes onto the co-trustee fallback path; an unrelated
+        # B9 test then read "Invalid transition" instead of "record not
+        # found"). Other toggling tests here already pop; this one skipped it.
         owner = await _seed_user("own_v1p@example.com", "Owner")
         trust = await _seed_trust(owner)
         party_doc = {
@@ -144,6 +176,7 @@ class TestV1GuardExpiry:
             await require_trust_party_access(trust["trust_id"], PartyLevel.viewer, None, user_jane)
         assert exc.value.status_code == 403
         assert exc.value.detail["code"] == "party_access_denied"
+        os.environ.pop("TOGGLE_TRUST_PARTIES", None)  # env hygiene: don't leak into later suites
 
 
 # ======================================================================
