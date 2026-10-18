@@ -17,6 +17,23 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND)
 
 
+@pytest.fixture(autouse=True)
+def _restore_alerting_module():
+    """Reload error_alerting with the ambient env after every test. The suite
+    reloads the module under monkeypatched env vars, which leaves the module's
+    alert-gate state (e.g. _IS_TEST_ENV=True) poisoned for later suites running
+    in the same pytest process — restore the ambient env + recompute per test."""
+    ambient = {k: os.environ.get(k) for k in ("ENVIRONMENT", "HERMES_WEBHOOK_URL")}
+    yield
+    for k, v in ambient.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+    import error_alerting
+    importlib.reload(error_alerting)
+
+
 def _reload_with_env(monkeypatch, **env):
     for k, v in env.items():
         monkeypatch.setenv(k, v)
