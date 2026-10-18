@@ -137,6 +137,10 @@ NON_DATA_ROUTERS = {
 
 # Data routers not yet in ROUTE_MAP — explicit, visible debt (not silent gaps).
 KNOWN_GAPS = {
+    "mcp_bridge": "read-only agent bridge (787b15a): bearer-scope = the user, "
+                  "subscription-gated, every tools/call audited; tenant read "
+                  "scoping exercised in tests/test_mcp_bridge.py "
+                  "(test_data_isolation_between_users)",
     "assessments": "submit/report flow only, no GET-by-ID at suite creation",
     "binder": "query-style endpoints, no object-ID GET routes",
     "entities": "next pass",
