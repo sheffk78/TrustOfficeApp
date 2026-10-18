@@ -73,6 +73,7 @@ from services.class_member_indexes import ensure_class_member_indexes
 from routers.exports import router as exports_router
 from routers.full_export import router as full_export_router
 from routers.mcp_bridge import router as mcp_bridge_router
+from routers.bridge import router as bridge_router
 from routers.expenses import router as expenses_router
 from routers.calendar import router as calendar_router
 from routers.trust_units import router as trust_units_router
@@ -541,6 +542,7 @@ app.include_router(subscriptions_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 app.include_router(full_export_router, prefix="/api")
 app.include_router(mcp_bridge_router, prefix="/api")
+app.include_router(bridge_router, prefix="/api")
 app.include_router(expenses_router, prefix="/api")
 app.include_router(calendar_router, prefix="/api")
 app.include_router(preferences_router, prefix="/api")
@@ -763,6 +765,16 @@ async def startup_event():
         # Audit logs
         await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])
         await db.audit_logs.create_index("audit_id", unique=True)
+
+        # Agent Bridge indexes
+        await db.agent_tokens.create_index("token_hash", unique=True)
+        await db.agent_tokens.create_index("token_id", unique=True)
+        await db.agent_tokens.create_index([("customer_id", 1), ("status", 1)])
+        await db.agent_tokens.create_index("expires_at")
+        await db.bridge_audit.create_index("seq", unique=True)
+        await db.bridge_audit.create_index([("token_id", 1), ("seq", -1)])
+        await db.bridge_audit.create_index([("customer_id", 1), ("seq", -1)])
+        await db.bridge_audit.create_index("entry_hash")
 
         # One-time successor access links (MongoDB removes them after expiry)
         await db.successor_access.create_index("token_hash", unique=True)
