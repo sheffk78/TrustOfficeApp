@@ -365,6 +365,11 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         # are read-only. Agent traffic doesn't burn the user's read-only posture.
         if path.startswith("/api/mcp/"):
             return await call_next(request)
+
+        # Agent Bridge admin endpoints are admin-JWT only and do not use the
+        # paid-user subscription gate.
+        if path.startswith("/api/bridge/admin/"):
+            return await call_next(request)
         
         # Skip for OPTIONS requests (CORS preflight)
         if method == "OPTIONS":
@@ -773,11 +778,17 @@ async def startup_event():
         await db.agent_tokens.create_index("token_hash", unique=True)
         await db.agent_tokens.create_index("token_id", unique=True)
         await db.agent_tokens.create_index([("customer_id", 1), ("status", 1)])
+        await db.agent_tokens.create_index([("user_id", 1), ("status", 1)])
         await db.agent_tokens.create_index("expires_at")
         await db.bridge_audit.create_index("seq", unique=True)
         await db.bridge_audit.create_index([("token_id", 1), ("seq", -1)])
         await db.bridge_audit.create_index([("customer_id", 1), ("seq", -1)])
         await db.bridge_audit.create_index("entry_hash")
+        # Agent MCP audit log (same hash-chain structure)
+        await db.agent_audit_log.create_index("seq", unique=True)
+        await db.agent_audit_log.create_index([("token_id", 1), ("seq", -1)])
+        await db.agent_audit_log.create_index([("user_id", 1), ("seq", -1)])
+        await db.agent_audit_log.create_index("entry_hash")
 
         # One-time successor access links (MongoDB removes them after expiry)
         await db.successor_access.create_index("token_hash", unique=True)

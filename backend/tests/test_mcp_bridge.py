@@ -1,10 +1,12 @@
 # MCP bridge tests (JOB-20261018-TO-AGENT-BRIDGE) — in-process, real Mongo.
 # Covers: token lifecycle, JSON-RPC protocol shape, auth/revocation scoping,
 # per-user data isolation, audit log writes, UPL-note presence.
+import json
 import os
 import uuid
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
@@ -15,6 +17,7 @@ os.environ.setdefault("CORS_ORIGINS", "https://app.trustoffice.app")
 from server import app  # noqa: E402
 import database as _dbmod  # noqa: E402
 from dependencies import create_jwt_token  # noqa: E402
+import services.bridge_service as bridge_service  # noqa: E402
 
 
 def db():
@@ -26,8 +29,8 @@ def create_access_token(user_id: str) -> str:
     return create_jwt_token(user_id, f"{user_id}@test.local")
 
 
-@pytest.fixture(autouse=True)
-def _fresh_motor_connection():
+@pytest_asyncio.fixture(autouse=True)
+async def _fresh_motor_connection():
     """Each test gets a fresh Motor client + db object so no loop binding survives
     across tests (pytest-asyncio creates a new loop per test; Motor clients bind
     to the loop they first run on and 'Event loop is closed' otherwise)."""
@@ -36,10 +39,12 @@ def _fresh_motor_connection():
     import server as _srv
     import dependencies as _deps
     import routers.mcp_bridge as _bridge
+    import services.bridge_service as _bri_svc
     old_client, old_db = _dbmod.client, _dbmod.db
     old_srv_client, old_srv_db = _srv.client, _srv.db
     old_deps_db = _deps.db
     old_bridge_db = _bridge.db
+    old_bridge_svc_db = _bri_svc.db
     client = ma.AsyncIOMotorClient(
         os.environ["MONGO_URL"], serverSelectionTimeoutMS=5000, maxPoolSize=20,
     )
@@ -52,11 +57,21 @@ def _fresh_motor_connection():
     _srv.db = _dbmod.db
     _deps.db = _dbmod.db
     _bridge.db = _dbmod.db
+    _bri_svc.db = _dbmod.db
+    # Drop prior test run collections so the agent_audit_log hash chain migrates
+    # from a clean genesis every run (legacy rows are deterministic on first write).
+    await _dbmod.db.drop_collection("agent_tokens")
+    await _dbmod.db.drop_collection("agent_audit_log")
+    await _dbmod.db.drop_collection("users")
+    await _dbmod.db.drop_collection("subscriptions")
+    await _dbmod.db.drop_collection("trusts")
+    await _dbmod.db.drop_collection("documents")
     yield
     _dbmod.client, _dbmod.db = old_client, old_db
     _srv.client, _srv.db = old_srv_client, old_srv_db
     _deps.db = old_deps_db
     _bridge.db = old_bridge_db
+    _bri_svc.db = old_bridge_svc_db
     client.close()
 
 
@@ -97,6 +112,18 @@ async def test_token_lifecycle_and_rpc_flow():
         # plaintext token must NOT be stored
         stored = await db()["agent_tokens"].find_one({"token_id": token_id})
         assert stored["token_hash"] and "toag_" not in stored["token_hash"]
+        assert stored["status"] == "active"
+        assert stored["rate_limit"] == 60
+        from datetime import datetime, timezone
+        expires = stored["expires_at"]
+        if isinstance(expires, str):
+            expires = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        assert (expires - datetime.now(timezone.utc)).days >= 89
+        # hash-chained audit row for token issuance
+        audit = await db()["agent_audit_log"].find_one({"action": "token.issued", "token_id": token_id})
+        assert audit and audit.get("entry_hash") and audit.get("prev_hash")
 
         # 2. initialize handshake
         r = await c.post("/api/mcp", json={
@@ -124,6 +151,14 @@ async def test_token_lifecycle_and_rpc_flow():
             headers={"Authorization": f"Bearer {tok}"})
         assert r.status_code == 200
         assert r.json()["result"]["isError"] is False
+        result_payload = json.loads(r.json()["result"]["content"][0]["text"])
+        assert "as_of" in result_payload
+        assert "valid_until" in result_payload
+        assert "note" in result_payload
+
+        # 4b. hash-chained audit integrity for this token's trail
+        errors = await bridge_service.verify_agent_audit_chain()
+        assert not errors, errors
 
         # 5. audit log row written per tools/call (only tools/call calls are audited)
         rows = await db()["agent_audit_log"].count_documents({"user_id": uid})

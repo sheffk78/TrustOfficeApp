@@ -201,6 +201,8 @@ export default function AgentTokensCard() {
                   <p className="text-xs text-muted-foreground">
                     Added {relativeTime(t.created_at)} · last used {relativeTime(t.last_used_at)} ·
                     {' '}{t.call_count ?? 0} read{t.call_count === 1 ? '' : 's'}
+                    {t.expires_at ? ` · expires ${relativeTime(t.expires_at)}` : ''}
+                    {t.rate_limit ? ` · ${t.rate_limit}/hour` : ''}
                   </p>
                 </div>
                 {confirmRevoke === t.token_id ? (
