@@ -47,6 +47,7 @@ from .categories import router as categories_router
 from .beneficiaries import router as beneficiaries_router
 from .demo import router as demo_router
 from .ai import router as ai_router
+from .internal_agent import router as internal_agent_router
 
 __all__ = [
     "auth_router",
@@ -69,4 +70,5 @@ __all__ = [
     "beneficiaries_router",
     "demo_router",
     "ai_router",
+    "internal_agent_router",
 ]

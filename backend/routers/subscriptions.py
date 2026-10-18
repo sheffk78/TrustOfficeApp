@@ -1200,6 +1200,9 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
         "utm_medium": metadata.get("utm_medium"),
         "referrer": metadata.get("referrer"),
         "wp_ref": metadata.get("wp_ref"),
+        # Agent flags default to off; explicit opt-in required for any outbound action
+        "agent_enabled": False,
+        "agent_consent": False,
     })
 
     # Attribution stamp #1: link any matching lead to this new account so the

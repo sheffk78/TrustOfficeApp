@@ -255,6 +255,8 @@ class UserResponse(BaseModel):
     is_leads_user: bool = False
     wp_ref: Optional[str] = None
     is_wingpoint: bool = False
+    agent_enabled: Optional[bool] = False
+    agent_consent: Optional[bool] = False
 
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None

@@ -99,6 +99,7 @@ from routers.admin import router as admin_router
 from routers.trust_admin_service import router as trust_admin_service_router
 from routers.contact import router as contact_router
 from routers.admin_api import router as admin_api_router
+from routers.internal_agent import router as internal_agent_router
 from routers.stats import router as stats_router
 from routers.transactions import router as transactions_router
 from routers.alerts import router as alerts_router
@@ -556,6 +557,8 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(trust_admin_service_router, prefix="/api")
 app.include_router(contact_router, prefix="/api")
 app.include_router(admin_api_router, prefix="/api")
+# Internal agent API — separate auth namespace from customer-facing and admin-api routes
+app.include_router(internal_agent_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
@@ -986,6 +989,14 @@ async def startup_event():
         
         # Email→minutes capture indexes (slug lookup + MessageId dedup)
         await ensure_email_minutes_indexes()
+
+        # Internal agent indexes
+        await db.agent_activity.create_index([("customer_id", 1), ("ts", -1)])
+        await db.agent_activity.create_index("activity_id", unique=True)
+        await db.agent_activity.create_index("run_id")
+        await db.agent_communications.create_index([("customer_id", 1), ("ts", -1)])
+        await db.agent_communications.create_index("communication_id", unique=True)
+        await db.agent_communications.create_index("run_id")
 
         # Org activity feed indexes (item 5: org console activity panel)
         await db.org_activity.create_index([("org_id", 1), ("created_at", -1)])
