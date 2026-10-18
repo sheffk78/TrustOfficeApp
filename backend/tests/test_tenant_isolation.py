@@ -138,6 +138,9 @@ NON_DATA_ROUTERS = {
 
 # Data routers not yet in ROUTE_MAP — explicit, visible debt (not silent gaps).
 KNOWN_GAPS = {
+    "bridge": "read-only agent bridge v1 (2026-10-18): opaque per-customer tokens, "
+              "token-scoped to customer_id, tenant isolation exercised in tests/test_bridge.py "
+              "(test_tenant_isolation), no bulk/list-all endpoints",
     "mcp_bridge": "read-only agent bridge (787b15a): bearer-scope = the user, "
                   "subscription-gated, every tools/call audited; tenant read "
                   "scoping exercised in tests/test_mcp_bridge.py "
