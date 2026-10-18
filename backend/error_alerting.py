@@ -131,6 +131,36 @@ def _is_stale_bundle(stack_trace: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Local-dev traceback detection (2026-10-18)
+# ---------------------------------------------------------------------------
+# A deployed traceback lives inside the Railway container (/app/...). Paths
+# pointing at personal machines (/Users/<name>/, /home/<name>/, C:\Users\,
+# /opt/homebrew — macOS-only) mean the error fired on a local dev server
+# that loaded this module and shares prod Mongo + the webhook. Dev-machine
+# noise must never page agents or Discord as a production incident.
+# Verified 2026-10-18: a local bridge dev-server error paged six agent
+# sessions + ~5 Discord alerts while production was healthy the whole time.
+# Everything is still logged and stored (forensics intact) — only paging is
+# gated. 405-on-live-route drift detection is untouched: that gate keys on
+# status+message, this one on stack path provenance.
+_LOCAL_PATH_SIGNS = (
+    "/Users/",       # macOS home dirs
+    "/home/",        # Linux home dirs
+    "C:\\Users\\",   # Windows user dirs
+    "/opt/homebrew", # macOS ARM Homebrew (never exists in the Linux container)
+)
+
+
+def _is_local_dev_traceback(stack_trace: str) -> bool:
+    """True if the traceback's file paths come from a workstation, not the
+    deployed container. Conservative by design: only recognizable personal-
+    machine path prefixes count."""
+    if not stack_trace:
+        return False
+    return any(sign in stack_trace for sign in _LOCAL_PATH_SIGNS)
+
+
+# ---------------------------------------------------------------------------
 # Hermes webhook trigger (autonomous agent)
 # ---------------------------------------------------------------------------
 
@@ -437,6 +467,23 @@ async def report_error(
     if source == "frontend" and _is_stale_bundle(traceback_str or ""):
         logger.info(f"Suppressed stale-bundle error (bundle={bundle_hash}, current={_CURRENT_BUNDLE_HASH})")
         return {"alerted": False, "duplicate": False, "fingerprint": fp, "stale_bundle": True}
+
+    # Suppress agent/Discord paging for local dev-server errors (2026-10-18):
+    # tracebacks with workstation path prefixes fired on a local dev server,
+    # not the deployed container. Still logged + stored above/below — but a
+    # dev-machine bug is not a production incident, so it never pages.
+    if source == "server" and _is_local_dev_traceback(traceback_str or ""):
+        logger.info(
+            f"Suppressed local-dev traceback alert (fingerprint={fp[:8]}) — "
+            "paths point at a workstation, not the deployed container; "
+            "error stored in error_logs for forensics"
+        )
+        return {
+            "alerted": False,
+            "duplicate": False,
+            "fingerprint": fp,
+            "local_dev_traceback": True,
+        }
 
     # Trigger Hermes autonomous agent for real errors (no Discord ping needed)
     if alert and source in ("server", "frontend") and not _IS_TEST_ENV:

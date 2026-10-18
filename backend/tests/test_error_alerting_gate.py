@@ -97,3 +97,94 @@ async def test_report_error_test_env_no_fanout(monkeypatch):
     assert result["test_env_suppressed"] is True
     assert result["alerted"] is False
     assert called["notify"] == 0 and called["hermes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_local_dev_traceback_never_pages(monkeypatch):
+    """Local dev-server errors (workstation paths in the traceback) must log +
+    store but NEVER page agents/Discord (2026-10-18: one local bridge dev
+    error paged six agent sessions while production was healthy)."""
+    mod = _reload_with_env(monkeypatch)  # prod-like: alerting ON
+
+    called = {"notify": 0, "hermes": 0}
+
+    async def _no_notify(**kwargs):
+        called["notify"] += 1
+        return True
+
+    async def _no_hermes(payload):
+        called["hermes"] += 1
+        return True
+
+    monkeypatch.setattr(mod, "notify_alert", _no_notify)
+    monkeypatch.setattr(mod, "_trigger_hermes_agent", _no_hermes)
+
+    local_tb = (
+        "Traceback (most recent call last):\n"
+        '  File "/Users/socializerender/.openclaw/workspace/TrustOfficeApp/backend/routers/x.py", line 1\n'
+        '  File "/opt/homebrew/Cellar/python@3.14/3.14.7/.../asyncio/runners.py", line 205\n'
+        "RuntimeError: Event loop is closed"
+    )
+    result = await mod.report_error(
+        source="server",
+        error_type="RuntimeError",
+        error_message="Event loop is closed",
+        traceback_str=local_tb,
+        request_path="/api/bridge/admin/tokens",
+        alert=True,
+    )
+    assert result.get("local_dev_traceback") is True
+    assert result["alerted"] is False
+    assert called["notify"] == 0 and called["hermes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_container_traceback_still_pages(monkeypatch):
+    """Deployed-container tracebacks (/app/...) keep normal alerting — the
+    local-dev gate must not swallow real production incidents."""
+    mod = _reload_with_env(monkeypatch)
+
+    called = {"notify": 0, "hermes": 0}
+
+    async def _no_notify(**kwargs):
+        called["notify"] += 1
+        return True
+
+    async def _yes_hermes(payload):
+        called["hermes"] += 1
+        return True
+
+    monkeypatch.setattr(mod, "notify_alert", _no_notify)
+    monkeypatch.setattr(mod, "_trigger_hermes_agent", _yes_hermes)
+
+    container_tb = (
+        "Traceback (most recent call last):\n"
+        '  File "/app/backend/routers/x.py", line 1, in handler\n'
+        "TypeError: 'NoneType' object is not subscriptable"
+    )
+    result = await mod.report_error(
+        source="server",
+        error_type="TypeError",
+        error_message="real prod failure shape",
+        traceback_str=container_tb,
+        request_path="/api/trusts",
+        alert=True,
+    )
+    assert result.get("local_dev_traceback", False) is False
+    assert result.get("hermes_triggered") is True
+    assert called["hermes"] == 1
+
+
+def test_local_dev_detector_path_prefixes(monkeypatch):
+    tb_users = 'File "/Users/jeff/project/app.py", line 1'
+    tb_linux = 'File "/home/dev/project/app.py", line 1'
+    tb_win = 'File "C:\\Users\\dev\\project\\app.py", line 1'
+    tb_container = 'File "/app/backend/app.py", line 1'
+    tb_rel = 'File "app.py", line 1'
+    mod = _reload_with_env(monkeypatch)
+    assert mod._is_local_dev_traceback(tb_users) is True
+    assert mod._is_local_dev_traceback(tb_linux) is True
+    assert mod._is_local_dev_traceback(tb_win) is True
+    assert mod._is_local_dev_traceback(tb_container) is False
+    assert mod._is_local_dev_traceback(tb_rel) is False
+    assert mod._is_local_dev_traceback("") is False

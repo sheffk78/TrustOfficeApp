@@ -187,3 +187,13 @@ Health checks: api 200, app 200 post-deploy.
 **Symptom:** frontend/src/pages/ApprovalFlow.js:111 includes 'co_trustee' in the canApprove role list; backend ApprovalRole enum (backend/models.py:2170) = drafter|reviewer|approver only. A user whose workflow data carries user_role='co_trustee' passes the frontend check but the backend enum cannot represent the role.
 **Impact:** latent — no current workflow data uses co_trustee; becomes real the moment FS-style multi-trustee trusts exist.
 **Fix options:** (a) strip 'co_trustee' from the frontend list, or (b) add co_trustee to ApprovalRole + route in meeting_service _ACTION_MAP (option b is the FS bespoke prerequisite).
+
+## TO-2026-10-18-01 — Agent-bridge alert storm: local dev-server error paged 6 agent sessions (RESOLVED 2026-10-18)
+**Symptom:** 2026-10-18 ~15:00 UTC — "RuntimeError: Event loop is closed" at /api/bridge/admin/tokens paged the Hermes agent webhook + spawned six alert-webhook Discord sessions; ~5 Discord alerts. All tracebacks pointed at local Mac paths (/Users/socializerender/..., /opt/homebrew/...), not the deployed container.
+**Root cause:** local TrustOffice dev server (running during the day's bridge build) shares prod Mongo + the Hermes webhook; error_alerting had no way to tell a dev-machine traceback from a deployed one, so local noise paged as a prod incident. Secondary: the webhook sessions' own verification probes then generated 55 bare-404 rows on the pre-rename route (/api/bridge/admin/tokens — never shipped; the feature ships as /api/mcp/tokens), all classified http_4xx_rejection/unresolved.
+**Truth check:** the webhook sessions' "dict-style sort under pymongo 4.7+" theory was FALSE — zero `.sort({...})` exists anywhere in the repo (repo grep + git grep origin/main verified by Kit); no code fix was ever needed.
+**Fixes (commit b41cc1d):**
+1. error_alerting.py `_is_local_dev_traceback()` + gate in report_error(): server-source tracebacks containing workstation path signatures (/Users/, /home/, C:\Users\, /opt/homebrew) are logged + stored (forensics intact) but NEVER page agents/Discord. Container path /app/... keeps full alerting (regression-tested both ways).
+2. Prod data: 55 stale unresolved 404 rows batch-resolved with resolved_reason (verified 0 unresolved remain; countDocuments readback).
+3. Classifier left as-is: bare-404-in-/api scanner suppression already existed; 405 drift detection untouched.
+**Follow-ups:** (a) local dev servers should not point MONGO_URL at prod (root cause of the shared noise path) — env separation pending Jeff decision since dev-against-prod-data is sometimes deliberate; (b) deploy this gate with the agent-platform-consolidation branch.
