@@ -52,6 +52,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TRUST_PROTECTOR_POWERS } from './trustProtectorPowers';
 import { formatEIN } from '@/utils/formatters';
 import DevicesSessionsCard from '@/components/DevicesSessionsCard';
+import AgentTokensCard from '@/components/AgentTokensCard';
 import TwoFactorCard from '@/components/TwoFactorCard';
 import KeyCustodySuggestionCard from '@/components/KeyCustodySuggestionCard';
 
@@ -2607,6 +2608,9 @@ export default function SettingsPage() {
 
               {/* Devices & sessions (FEATURE 5 item 2) */}
               <DevicesSessionsCard />
+
+              {/* AI agent connections (read-only MCP bridge, JOB-20261018-TO-AGENT-BRIDGE) */}
+              <AgentTokensCard />
 
               {/* Data retention */}
               <div className="flex items-center justify-between p-4 border border-navy/10">
