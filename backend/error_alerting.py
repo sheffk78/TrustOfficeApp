@@ -143,6 +143,19 @@ _HERMES_WEBHOOK_SECRET = os.environ.get(
     "to-err-webhook-2026",
 ).strip()
 
+# Local-run gate (2026-10-18): local pytest runs fired real test-debt errors at
+# the Hermes webhook → Discord pings for things already tracked in the repo.
+# The webhook stays default-ON for prod (Railway never sets ENVIRONMENT=test);
+# tests/local dev opt out by setting ENVIRONMENT=test or HERMES_WEBHOOK_URL="".
+# Alerting correctness matters more than alert volume — when the gate is on,
+# report_error() still logs + stores in error_logs; only the webhook/Discord
+# fanout is skipped, so nothing is silently lost.
+_env_flag = os.environ.get("ENVIRONMENT", "").strip().lower()
+_webhook_unset = "HERMES_WEBHOOK_URL" not in os.environ
+_webhook_empty = (os.environ.get("HERMES_WEBHOOK_URL") or "").strip() == ""
+# unset → default prod URL applies (alerting ON); set-but-empty → explicit opt-out
+_IS_TEST_ENV = _env_flag in ("test", "testing", "ci") or (_webhook_empty and not _webhook_unset)
+
 
 def _build_hermes_payload(
     *,
@@ -426,7 +439,7 @@ async def report_error(
         return {"alerted": False, "duplicate": False, "fingerprint": fp, "stale_bundle": True}
 
     # Trigger Hermes autonomous agent for real errors (no Discord ping needed)
-    if alert and source in ("server", "frontend"):
+    if alert and source in ("server", "frontend") and not _IS_TEST_ENV:
         hermes_payload = _build_hermes_payload(
             source=source,
             error_type=error_type,
@@ -456,6 +469,10 @@ async def report_error(
         logger.warning("Hermes webhook failed — falling back to Discord ping")
 
     # Fallback: Discord alert (with Kit ping if it's a real error)
+    # Test-env gate: log + store only — no webhook, no Discord fanout at all.
+    if _IS_TEST_ENV:
+        logger.info(f"Alert suppressed (test env): {source}/{error_type} — stored in error_logs")
+        return {"alerted": False, "duplicate": False, "fingerprint": fp, "test_env_suppressed": True}
     should_ping_kit = alert and source in ("server", "frontend")
 
     try:
