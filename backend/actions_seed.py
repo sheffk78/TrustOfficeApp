@@ -1649,17 +1649,21 @@ async def _chat_class_beneficiary_removal(params: dict, ctx: ActionContext) -> d
     class_name = params.get("class_name", "")
     existing = None
     if class_name:
+        # Escape regex metacharacters: class_name arrives from LLM extraction
+        # (user-influenced text), and an unescaped interpolation could match a
+        # different class_beneficiaries record after approval. 2026-10-17 deep-audit C2.
+        safe_class_name = re.escape(class_name.rstrip("."))
         # The class "name" is stored in `description` (no class_name field on the doc).
         existing = await db.class_beneficiaries.find_one({
             "trust_id": ctx.trust_id,
             "user_id": ctx.user_id,
-            "description": {"$regex": f"^{class_name.rstrip('.')}$", "$options": "i"},
+            "description": {"$regex": f"^{safe_class_name}$", "$options": "i"},
         })
         if not existing:
             existing = await db.class_beneficiaries.find_one({
                 "trust_id": ctx.trust_id,
                 "user_id": ctx.user_id,
-                "class_name": {"$regex": f"^{class_name.rstrip('.')}$", "$options": "i"},
+                "class_name": {"$regex": f"^{safe_class_name}$", "$options": "i"},
             })
     if not existing and class_type:
         existing = await db.class_beneficiaries.find_one({

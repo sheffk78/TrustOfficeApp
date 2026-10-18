@@ -356,6 +356,12 @@ async def chat(
     from trust_retrieval import retrieve_for_message, inject_into_user_content
     retrieval_block = await retrieve_for_message(db, trust_id, user_id, intent, request.message)
 
+    # 5b. AI budget gate (2026-10-17 deep-audit C1): chat was the untracked AI
+    # spend hole — 120/hour + 200/day caps + monthly budget + usage recording now
+    # wrap every chat LLM call, batch and stream alike.
+    from ai_budget import guard_chat_ai_call, record_ai_usage
+    await guard_chat_ai_call(user_id)
+
     ai_response = await generate_response(
         intent=intent,
         entities=entities,
@@ -364,6 +370,7 @@ async def chat(
         conversation_history=history_for_ai,
         ai_client_module=None,
     )
+    await record_ai_usage(user_id, "chat")
 
     # 7. Build action card if applicable
     # Prod 500 fix (2026-09-22, error_logs 19:49+): OpenRouter occasionally
@@ -2384,6 +2391,11 @@ async def _chat_stream_generator(
         # injected detail rides in the user content for this turn only.
         from trust_retrieval import retrieve_for_message, inject_into_user_content
         retrieval_block = await retrieve_for_message(db, trust_id, user_id, intent, message)
+        # AI budget gate (2026-10-17 deep-audit C1): stream path shares the batch
+        # endpoint's caps — 120/hour + 200/day + monthly budget. Recorded after
+        # the stream completes, below.
+        from ai_budget import guard_chat_ai_call, record_ai_usage
+        await guard_chat_ai_call(user_id)
         stream_gen = generate_response_stream(
             intent=intent,
             entities=entities,
@@ -2448,6 +2460,12 @@ async def _chat_stream_generator(
 
         # 7. Build citations
         citation_note, unknown_note = build_citation_notes(trust_context, intent, user_message=message)
+
+        # 6b. Usage recording (2026-10-17 deep-audit C1): after a completed stream.
+        try:
+            await record_ai_usage(user_id, "chat")
+        except Exception as usage_err:
+            logger.warning(f"chat usage recording failed (non-fatal): {usage_err}")
 
         # 8. Determine caveat
         caveat = None

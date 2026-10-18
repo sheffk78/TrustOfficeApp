@@ -63,13 +63,19 @@ logger = logging.getLogger(__name__)
 # Ollama is essentially free; Claude is the fallback cost
 COST_PER_CALL_CENTS = {
     "minutes-draft": 0.5,        # essentially free via Ollama
-    "governance-suggestions": 0.1  # ditto
+    "governance-suggestions": 0.1,  # ditto
+    # 2026-10-17 deep-audit C1: chat was the untracked AI spend hole —
+    # 30 req/min middleware with no daily cap and no usage recording.
+    "chat": 0.05
 }
 
 # Daily caps per user (stored in MongoDB)
 DAILY_CAPS = {
     "minutes-draft": 30,
-    "governance-suggestions": 50
+    "governance-suggestions": 50,
+    # 2026-10-17 deep-audit C1: /chat + /chat/stream now carry a daily ceiling
+    # (200/day) instead of only the per-minute throughput limit.
+    "chat": 200
 }
 
 # Input size limit for minutes-draft (total chars across all fields)
@@ -93,7 +99,9 @@ _rate_limit_lock = asyncio.Lock()
 # Rate limits per hour
 RATE_LIMITS = {
     "minutes-draft": 10,      # Max 10 AI minutes drafts per user per hour
-    "governance-suggestions": 20  # Max 20 AI governance suggestions per user per hour
+    "governance-suggestions": 20,  # Max 20 AI governance suggestions per user per hour
+    # 2026-10-17 deep-audit C1: hourly ceiling for chat AI calls (batch + stream)
+    "chat": 120
 }
 
 

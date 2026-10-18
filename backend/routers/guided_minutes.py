@@ -169,7 +169,12 @@ async def create_guided_minutes_draft(
     )
     
     try:
+        # 2026-10-17 deep-audit C1: shared AI budget gates (hourly/daily/monthly
+        # + usage recording) — previously this endpoint bypassed routers/ai.py caps.
+        from ai_budget import enforce_ai_budget, record_ai_usage
+        await enforce_ai_budget(user_id, "minutes-draft")
         ai_response = await draft_minutes_from_structured_input(ai_request)
+        await record_ai_usage(user_id, "minutes-draft")
         
         # Format participants for display/storage
         participants_text = ", ".join(request.participants) if request.participants else ""

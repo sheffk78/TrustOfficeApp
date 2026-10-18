@@ -532,9 +532,21 @@ async def _build_attribution(user: dict, trust: dict) -> Optional[str]:
     return None
 
 
-async def _call_ai_draft(ai_request) -> "AiMinutesDraftResponse":
-    """Call the AI draft service, translating HTTPException re-raises and logging others as 500."""
+async def _call_ai_draft(ai_request, user_id: Optional[str] = None) -> "AiMinutesDraftResponse":
+    """Call the AI draft service, translating HTTPException re-raises and logging others as 500.
+
+    2026-10-17 deep-audit C1: every AI draft path now passes the shared AI budget
+    gates (hourly/daily/monthly + usage recording). Previously caps lived only in
+    routers/ai.py and this endpoint (plus guided_minutes) silently bypassed them.
+    """
     try:
+        if user_id:
+            from ai_budget import enforce_ai_budget, record_ai_usage
+            await enforce_ai_budget(user_id, "minutes-draft")
+            response = await draft_minutes_from_structured_input(ai_request)
+            await record_ai_usage(user_id, "minutes-draft")
+            return response
+        # No user context (legacy internal callers): still record, skip caps.
         return await draft_minutes_from_structured_input(ai_request)
     except HTTPException:
         raise
@@ -616,7 +628,7 @@ async def create_minutes_draft(
             beneficiary_standard=beneficiary_standard,
             additional_context=ai_context.get("additional_context", ""),
         )
-        ai_response = await _call_ai_draft(ai_request)
+        ai_response = await _call_ai_draft(ai_request, user_id=user_id)
     else:
         # ── Quick minutes / bullet-point mode ──
         decisions_outline = _build_quick_mode_outline(request)
@@ -633,7 +645,7 @@ async def create_minutes_draft(
             beneficiary_standard=beneficiary_standard,
             additional_context="\n".join(additional_context_parts),
         )
-        ai_response = await _call_ai_draft(ai_request)
+        ai_response = await _call_ai_draft(ai_request, user_id=user_id)
 
     # State Compliance Confirmation (template mode only): computed server-side
     # and appended to the AI draft so every generation path carries the block.
