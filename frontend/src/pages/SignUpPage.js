@@ -27,6 +27,9 @@ export default function SignUpPage() {
     if (ref) pricingParams.set('ref', ref);
     if (coupon) pricingParams.set('coupon', coupon);
     if (ref && ref.toLowerCase() === 'wp') pricingParams.set('wp', '1');
+    // WingPoint attribution beyond ref=wp: provisioned refs (WP-xxxx) and the
+    // wingpoint plan param both mean "this is a WP customer" — keep the flag.
+    if (wpRef || plan === 'wingpoint') pricingParams.set('wp', '1');
     if (plan) pricingParams.set('plan', plan);
 
     const qs = pricingParams.toString();

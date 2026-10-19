@@ -193,11 +193,14 @@ export default function PricingPage() {
     }
 
     // Logged out → guest checkout modal (collect email/name, then Stripe).
-    // WingPoint plan requires a provisioned WP account → log in first.
+    // WingPoint plan requires a provisioned WP account → log in first,
+    // carrying the full WP context so the flow resumes after authentication.
     if (!user) {
       if (planType === 'wingpoint') {
         toast.info('The WingPoint plan requires your WingPoint account. Please log in first.');
-        navigate('/login');
+        const loginRedirect = new URLSearchParams({ wp: '1', action: 'subscribe', plan: 'wingpoint', billing: period });
+        if (couponCode) loginRedirect.set('coupon', couponCode);
+        navigate(`/login?${loginRedirect.toString()}`);
         return;
       }
       setGuestCheckout({ planType, period });
