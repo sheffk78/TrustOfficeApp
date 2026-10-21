@@ -320,7 +320,9 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
         base = path_str.split("?")[0]
         if base == "/api" or base.startswith("/api/"):
             return "scanner"
-        if not base.startswith("/api"):
+        # Segment-boundary matters: "/api-2025.sql" (2026-10-20 dump-dump probe
+        # family) is NOT the /api namespace — a bare-404 on it is a probe too.
+        if not (base == "/api" or base.startswith("/api/")):
             return "scanner"
 
     return None
