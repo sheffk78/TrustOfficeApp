@@ -77,6 +77,12 @@ _SCANNER_RE = re.compile(
     r"|/_image|/__vite_rsc|/_fs/|@fs"
     r"|trust-admin-service"        # generic third-party path probe
     r"|/starter/|/jobs_u/"
+    # Backup-archive hunt (2026-10-20 wave 15:0x: /api-backup.{tgz,backup,rar,7z},
+    # /api.backup, /api.trustoffice.app.backup — archive extensions the scanner
+    # tries when hunting for leaked deployment backups; .bak was already covered
+    # but the packed-archive extensions were not)
+    r"|\.(tgz|tar|rar|7z|zip|gz|backup|bak|old|orig|save|swp)$"
+    r"|backup[-_.]?(api|db|sql|site|app)\b"
     r")"
 )
 
@@ -182,6 +188,11 @@ _KNOWN_DEAD_TRUST_IDS = _KNOWN_DEAD_TRUST_IDS + (
 # ---------------------------------------------------------------------------
 _BUSINESS_EMPTY_PATHS = (
     "/api/external/lookup-user",             # {"found": false} — WingPoint provisioning
+    # 2026-10-20: WingPoint's provisioning watchdog polls this endpoint every
+    # ~2min per in-flight trust; 404 ("No provision found") = "not provisioned
+    # yet", the documented polling state, not a defect. Was churning the error
+    # queue ~700+/day unclassified.
+    "/api/external/provision-trustoffice/status",
 )
 
 
@@ -309,7 +320,9 @@ def classify(status_code: int, detail: object, path: str) -> Optional[str]:
         base = path_str.split("?")[0]
         if base == "/api" or base.startswith("/api/"):
             return "scanner"
-        if not base.startswith("/api"):
+        # Segment-boundary matters: "/api-2025.sql" (2026-10-20 dump-dump probe
+        # family) is NOT the /api namespace — a bare-404 on it is a probe too.
+        if not (base == "/api" or base.startswith("/api/")):
             return "scanner"
 
     return None
