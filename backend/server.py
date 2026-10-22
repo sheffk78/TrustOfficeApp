@@ -119,6 +119,7 @@ from routers.vault import router as vault_router
 from routers.risk_dashboard import router as risk_dashboard_router
 from routers.binder import router as binder_router
 from routers.external import router as external_router
+from routers.wingpoint_connect import router as wingpoint_connect_router
 from routers.external_trust_docs import router as external_trust_docs_router
 from routers.courses import router as courses_router
 from routers.leads import router as leads_router
@@ -295,6 +296,13 @@ WRITE_EXEMPT_PATHS = {
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/auth/connect/wingpoint/confirm",
+    # WingPoint Connect Flow v2 — these run BEFORE a subscription exists
+    # (the member has no account yet, or an account with no plan). They must
+    # not be blocked by the paywall middleware.
+    "/api/wingpoint-connect/resolve",
+    "/api/wingpoint-connect/claim/request-code",
+    "/api/wingpoint-connect/claim/verify",
+    "/api/wingpoint-connect/signup",
     # 2FA login step is part of the login flow (write-exempt mid-login)
     "/api/auth/2fa/login",
     # Contact Memory — inbound email flow + interaction logging are write operations
@@ -583,6 +591,9 @@ app.include_router(risk_dashboard_router, prefix="/api")
 app.include_router(binder_router, prefix="/api")
 # External partner API — WingPoint provision endpoints (Emergent built)
 app.include_router(external_router, prefix="/api")
+# WingPoint Connect Flow v2 — scoped three-branch resolution at connect entry.
+# Public (member-facing) but requires a valid WP connect context on every call.
+app.include_router(wingpoint_connect_router, prefix="/api")
 # External partner API — WingPoint document delivery (Kit built)
 app.include_router(external_trust_docs_router)
 # Course routes
@@ -769,6 +780,12 @@ async def startup_event():
         # Password reset with TTL (auto-expire after 2 hours)
         await db.password_resets.create_index("token", unique=True)
         await db.password_resets.create_index("user_id", unique=True)
+
+        # WingPoint Connect Flow v2 — account-claim verification codes.
+        # One live code per email (the doc is replaced on each request).
+        await db.wingpoint_connect_codes.create_index("email", unique=True)
+        # Connect-flow rate-limit buckets (fixed-window counters).
+        await db.wingpoint_connect_rate_limits.create_index("bucket", unique=True)
         
         # Audit logs
         await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])

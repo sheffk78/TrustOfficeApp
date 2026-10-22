@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,22 @@ import { toast } from 'sonner';
 import { showError, reportErrorToBackend } from '@/utils/errors';
 import { is2faChallenge, login2fa, get2faRateLimitMessage, get2faAttemptsRemaining } from '@/utils/twoFactor';
 import { use2faLockout, formatLockout } from '@/hooks/use2faLockout';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, X, ShieldCheck, Shield, ArrowLeft } from 'lucide-react';
+import {
+  CONNECT_STATES,
+  CONNECT_STEPS,
+  readConnectContext,
+  isValidConnectContext,
+  resolveConnectState,
+  stepForState,
+  prefilledEmail,
+  buildResolveBody,
+  buildConnectHandoffUrl,
+  stashConnectResumeParams,
+  validateConnectPassword,
+  isValidConnectCode,
+  copyForState,
+} from '@/utils/wingpointConnect';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, X, ShieldCheck, Shield, ArrowLeft, KeyRound } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
@@ -84,20 +99,28 @@ export default function ConnectWingPoint() {
   const [searchParams] = useSearchParams();
   const { user, setUser, loadTrusts, loadSubscriptionState, loading } = useAuth();
 
-  // URL params from WingPoint
-  const redirectUrl = searchParams.get('redirect_url');
-  const wpRef = searchParams.get('wp_ref');
-  const trustName = searchParams.get('trust_name');
+  // Connect context from WingPoint (redirect_url, wp_ref, trust_name, email).
+  const context = readConnectContext(searchParams);
+  const { wpRef, trustName, redirectUrl } = context;
 
   // Local state
-  const [step, setStep] = useState('checking'); // 'checking' | 'login' | 'confirm' | 'redirecting'
+  const [step, setStep] = useState(CONNECT_STEPS.CHECKING); // 'checking' | 'login' | 'signup' | 'activate' | 'confirm' | 'redirecting'
+  const [connectState, setConnectState] = useState(CONNECT_STATES.NEW);
   const [email, setEmail] = useState('');
+  const [emailOverridden, setEmailOverridden] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+
+  // Account-claim state (never-activated branch).
+  const [claimCode, setClaimCode] = useState('');
+  const [claimCodeSent, setClaimCodeSent] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimError, setClaimError] = useState('');
 
   // 2FA (TOTP) challenge state — mirrors LoginPage's login flow so users with
   // two-factor enabled can complete their sign-in on the connect page.
@@ -110,6 +133,42 @@ export default function ConnectWingPoint() {
 
   // Validate we have a redirect_url — without it the flow is meaningless
   const hasRedirectUrl = !!redirectUrl;
+  // A usable WingPoint connect context (wp_ref + app_id + WingPoint redirect).
+  const hasValidContext = isValidConnectContext(context);
+  // Guards the one-time branch resolution on entry.
+  const autoResolvedRef = useRef(false);
+
+  // ── Resolve the connect branch (three branches, keyed on the member's
+  // WingPoint-known email + the state of their TrustOffice account) ────────
+  const resolveBranch = useCallback(async () => {
+    if (!hasValidContext) {
+      // No usable WP context — fall back to the plain login screen.
+      setStep(CONNECT_STEPS.LOGIN);
+      return;
+    }
+    const prefilled = prefilledEmail(context, emailOverridden);
+    if (!prefilled) {
+      // Cannot resolve without an email — let the member type one. The
+      // "Use a different email" escape always works.
+      setStep(CONNECT_STEPS.LOGIN);
+      return;
+    }
+    try {
+      const data = await xhrPost(
+        `${API_URL}/api/wingpoint-connect/resolve`,
+        buildResolveBody(context, prefilled),
+      );
+      const state = resolveConnectState(data);
+      setConnectState(state);
+      setStep(stepForState(state));
+    } catch (error) {
+      // Resolution is best-effort — on failure show the login screen rather
+      // than dead-ending the member (this is the pre-v2 behavior).
+      console.warn('WingPoint connect resolve failed:', error?.message);
+      setStep(CONNECT_STEPS.LOGIN);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context.wpRef, context.appId, context.redirectUrl, context.email, emailOverridden, hasValidContext]);
 
   // Determine step based on auth state once loading completes
   useEffect(() => {
@@ -117,15 +176,203 @@ export default function ConnectWingPoint() {
 
     // If we have a stored token AND a user object from context, go to confirm
     if (hasStoredToken() && user) {
-      setStep('confirm');
+      setStep(CONNECT_STEPS.CONFIRM);
     } else if (hasStoredToken() && !user) {
       // Token exists but user didn't load — token may be invalid/expired.
       // Treat as not logged in so they can log in fresh.
-      setStep('login');
-    } else {
-      setStep('login');
+      setStep(CONNECT_STEPS.LOGIN);
+    } else if (!autoResolvedRef.current) {
+      // Resolve the branch exactly once on entry. Later changes to the
+      // context (e.g. "Use a different email") must NOT re-trigger this —
+      // re-resolution happens explicitly via handleEmailBlur().
+      autoResolvedRef.current = true;
+      resolveBranch();
     }
-  }, [loading, user]);
+  }, [loading, user, resolveBranch]);
+
+  // Stash the connect params so the pricing page can send the member back to
+  // the WingPoint connect callback after Stripe checkout. The pricing page
+  // reads these from sessionStorage to build its post-payment success URL.
+  useEffect(() => {
+    if (!hasRedirectUrl) return;
+    stashConnectResumeParams(searchParams.toString());
+  }, [hasRedirectUrl, searchParams]);
+
+  // Prefill the email field once we know the WingPoint-known address.
+  useEffect(() => {
+    if (emailOverridden) return;
+    const prefilled = prefilledEmail(context, false);
+    if (prefilled && !email) setEmail(prefilled);
+  }, [context.email, emailOverridden, email]);
+
+  // ── "Use a different email" escape hatch (both prefilled screens) ────────
+  // The member stays on whichever screen they were on — only the prefill is
+  // cleared and the field becomes editable.
+  const handleUseDifferentEmail = () => {
+    setEmailOverridden(true);
+    setEmail('');
+    setClaimCodeSent(false);
+    setClaimCode('');
+    setClaimError('');
+    setLoginError('');
+  };
+
+  // Re-resolve the branch when the member types their own email.
+  const handleEmailBlur = () => {
+    if (!email.trim()) return;
+    if (!emailOverridden && email.trim() === (context.email || '').trim()) return;
+    resolveBranch();
+  };
+
+  // ── Account claim: request the emailed verification code ────────────────
+  const handleRequestClaimCode = async () => {
+    if (claimLoading) return;
+    if (!email.trim()) {
+      setClaimError('Please enter your email address.');
+      return;
+    }
+    setClaimLoading(true);
+    setClaimError('');
+    try {
+      await xhrPost(
+        `${API_URL}/api/wingpoint-connect/claim/request-code`,
+        buildResolveBody(context, email),
+      );
+      setClaimCodeSent(true);
+      toast.success('Check your email for your verification code');
+    } catch (error) {
+      const msg = error.message || 'Could not send the verification code.';
+      setClaimError(msg);
+      toast.error(msg);
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  // ── Account claim: verify the code + set the password on the EXISTING
+  // account (never creates a second account) ──────────────────────────────
+  const handleClaimVerify = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (claimLoading) return;
+
+    setClaimError('');
+
+    if (!email.trim()) {
+      setClaimError('Please enter your email address.');
+      return;
+    }
+    if (!isValidConnectCode(claimCode)) {
+      setClaimError('Enter the 6-digit code from your email.');
+      return;
+    }
+    const pwError = validateConnectPassword(password);
+    if (pwError) {
+      setClaimError(pwError);
+      return;
+    }
+
+    setClaimLoading(true);
+    try {
+      const data = await xhrPost(
+        `${API_URL}/api/wingpoint-connect/claim/verify`,
+        {
+          ...buildResolveBody(context, email),
+          code: claimCode.trim(),
+          new_password: password,
+        },
+      );
+
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      if (data.user) {
+        setUser(data.user);
+      }
+
+      await Promise.all([
+        loadTrusts(),
+        loadSubscriptionState(data.user?.email || data.user?.name),
+      ]);
+
+      toast.success('Your account is ready');
+      setStep(CONNECT_STEPS.CONFIRM);
+    } catch (error) {
+      const msg = error.message || 'Could not activate your account.';
+      setClaimError(msg);
+      toast.error(msg);
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  // ── Signup (no-account branch): create the account, then go to payment ──
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (loginLoading) return;
+
+    setLoginError('');
+
+    if (!email.trim()) {
+      setLoginError('Please enter your email address.');
+      return;
+    }
+    const pwError = validateConnectPassword(password);
+    if (pwError) {
+      setLoginError(pwError);
+      return;
+    }
+
+    setLoginLoading(true);
+    try {
+      const data = await xhrPost(
+        `${API_URL}/api/wingpoint-connect/signup`,
+        {
+          ...buildResolveBody(context, email),
+          name: name.trim(),
+          password,
+        },
+      );
+
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      if (data.user) {
+        setUser(data.user);
+      }
+
+      await Promise.all([
+        loadTrusts(),
+        loadSubscriptionState(data.user?.email || data.user?.name),
+      ]);
+
+      toast.success('Account created');
+
+      // Straight to payment with the chosen plan, carrying the WP context so
+      // the trust stays attached and the connect completes afterwards.
+      const handoff = buildConnectHandoffUrl(
+        { ...context, email: email.trim() },
+        context.plan,
+        context.billing,
+      );
+      // Keep the post-checkout return path pointing at this connect context.
+      stashConnectResumeParams(handoff);
+      window.location.href = `/pricing?${handoff}`;
+    } catch (error) {
+      const rawMsg = error.message || 'Could not create your account.';
+      let friendlyMsg = rawMsg;
+      if (rawMsg.includes('409')) {
+        friendlyMsg = 'An account already exists for this email. Please sign in instead.';
+      } else if (rawMsg.includes('Network error')) {
+        friendlyMsg = 'Unable to connect to the server. Please check your internet connection and try again.';
+      }
+      setLoginError(friendlyMsg);
+      toast.error(friendlyMsg);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   // ── Login handler (inline login — doesn't navigate away) ──────────────────
   const handleLogin = async (e) => {
@@ -177,7 +424,7 @@ export default function ConnectWingPoint() {
       ]);
 
       toast.success('Welcome back');
-      setStep('confirm');
+      setStep(CONNECT_STEPS.CONFIRM);
     } catch (error) {
       const rawMsg = error.message || 'Login failed';
 
@@ -253,7 +500,7 @@ export default function ConnectWingPoint() {
       ]);
 
       toast.success('Welcome back');
-      setStep('confirm');
+      setStep(CONNECT_STEPS.CONFIRM);
     } catch (error) {
       const rawMsg = error.message || 'Verification failed';
       const rateMsg = get2faRateLimitMessage(error);
@@ -281,7 +528,7 @@ export default function ConnectWingPoint() {
     if (confirmLoading) return;
     if (!user) {
       setConfirmError('Your session has expired. Please log in again.');
-      setStep('login');
+      setStep(CONNECT_STEPS.LOGIN);
       return;
     }
     if (!hasRedirectUrl) {
@@ -326,7 +573,7 @@ export default function ConnectWingPoint() {
         callback.searchParams.set('connect_token', data.connect_token);
       }
 
-      setStep('redirecting');
+      setStep(CONNECT_STEPS.REDIRECTING);
       // Small delay so the user sees the redirecting state
       setTimeout(() => {
         window.location.href = callback.toString();
@@ -339,7 +586,7 @@ export default function ConnectWingPoint() {
         // Send them back to the login step
         localStorage.removeItem('auth_token');
         setUser(null);
-        setStep('login');
+        setStep(CONNECT_STEPS.LOGIN);
       } else if (rawMsg.includes('Network error')) {
         friendlyMsg = 'Unable to reach TrustOffice. Please check your connection and try again.';
       }
@@ -352,7 +599,7 @@ export default function ConnectWingPoint() {
   };
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (step === 'checking' || loading) {
+  if (step === CONNECT_STEPS.CHECKING || loading) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
@@ -364,7 +611,7 @@ export default function ConnectWingPoint() {
   }
 
   // ── Missing redirect_url — show error ─────────────────────────────────────
-  if (!hasRedirectUrl && step !== 'login') {
+  if (!hasRedirectUrl && step !== CONNECT_STEPS.LOGIN) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center p-6">
         <div className="w-full max-w-md card-trust corner-mark relative text-center">
@@ -386,7 +633,7 @@ export default function ConnectWingPoint() {
   }
 
   // ── Redirecting state ──────────────────────────────────────────────────────
-  if (step === 'redirecting') {
+  if (step === CONNECT_STEPS.REDIRECTING) {
     return (
       <div className="min-h-screen bg-subtle-bg flex items-center justify-center">
         <div className="text-center">
@@ -399,8 +646,355 @@ export default function ConnectWingPoint() {
     );
   }
 
+  // ── Signup step (no account) ──────────────────────────────────────────────
+  if (step === CONNECT_STEPS.SIGNUP) {
+    const copy = copyForState(CONNECT_STATES.NEW);
+    return (
+      <div className="min-h-screen flex" data-testid="connect-wp-signup">
+        <div className="hidden lg:flex lg:w-1/2 login-texture relative">
+          <div className="absolute inset-0 login-overlay flex flex-col justify-center items-center p-12">
+            <img
+              src="/assets/trustoffice-logo-vertical.svg?v=3"
+              alt="TrustOffice"
+              className="w-48 mb-8"
+            />
+            <p className="text-white/80 font-mono text-xs uppercase tracking-widest text-center max-w-md">
+              Trust Governance Workspace
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-8 bg-subtle-bg">
+          <div className="w-full max-w-md">
+            <div className="lg:hidden mb-12 text-center">
+              <img
+                src="/assets/trustoffice-logo.svg?v=3"
+                alt="TrustOffice"
+                className="h-10 mx-auto"
+              />
+            </div>
+
+            <div className="mb-6 bg-gold/10 border border-gold/30 p-4 text-navy">
+              <p className="text-sm">
+                <strong>Your trust is ready.</strong> Create your TrustOffice
+                account to start managing it.
+              </p>
+            </div>
+
+            <div className="card-trust corner-mark relative">
+              <h1 className="font-serif text-3xl text-navy mb-2">{copy.heading}</h1>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
+                {copy.subheading}
+              </p>
+
+              <form onSubmit={handleSignup}>
+                <div className="space-y-4">
+                  {loginError && (
+                    <div className="p-3 bg-error/10 border border-error/20 flex items-start gap-2" data-testid="connect-wp-signup-error">
+                      <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-error">Could not create your account</p>
+                        <p className="text-xs text-error/80 mt-0.5">{loginError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Create a Password
+                    </Label>
+                    <div className="relative mt-1">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => { setPassword(e.target.value); if (loginError) setLoginError(''); }}
+                        className="pl-10 pr-10 input-trust"
+                        placeholder="At least 8 characters"
+                        aria-label="Password"
+                        required
+                        data-testid="connect-wp-signup-password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Email Address
+                    </Label>
+                    <div className="relative mt-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => { setEmail(e.target.value); if (loginError) setLoginError(''); }}
+                        onBlur={handleEmailBlur}
+                        className="pl-10 input-trust"
+                        placeholder="your@email.com"
+                        aria-label="Email address"
+                        required
+                        readOnly={!emailOverridden}
+                        data-testid="connect-wp-signup-email"
+                      />
+                    </div>
+                    {!emailOverridden && (
+                      <button
+                        type="button"
+                        onClick={handleUseDifferentEmail}
+                        className="text-xs text-navy hover:text-navy/70 underline mt-1"
+                        data-testid="connect-wp-use-different-email"
+                      >
+                        Use a different email
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Full Name
+                    </Label>
+                    <Input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="input-trust mt-1"
+                      placeholder="Your full name"
+                      aria-label="Full name"
+                      data-testid="connect-wp-signup-name"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={loginLoading}
+                    className="w-full h-12 uppercase tracking-wider text-xs"
+                    data-testid="connect-wp-signup-submit"
+                  >
+                    {loginLoading ? 'Creating account…' : copy.submitLabel}
+                  </Button>
+                </div>
+              </form>
+
+              <p className="text-center text-xs text-muted-foreground mt-6">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setStep(CONNECT_STEPS.LOGIN)}
+                  className="text-navy hover:text-navy/70 underline"
+                  data-testid="connect-wp-switch-to-login"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Activation step (account exists, never activated) ────────────────────
+  if (step === CONNECT_STEPS.ACTIVATE) {
+    const copy = copyForState(CONNECT_STATES.NEEDS_ACTIVATION);
+    return (
+      <div className="min-h-screen flex" data-testid="connect-wp-activate">
+        <div className="hidden lg:flex lg:w-1/2 login-texture relative">
+          <div className="absolute inset-0 login-overlay flex flex-col justify-center items-center p-12">
+            <img
+              src="/assets/trustoffice-logo-vertical.svg?v=3"
+              alt="TrustOffice"
+              className="w-48 mb-8"
+            />
+            <p className="text-white/80 font-mono text-xs uppercase tracking-widest text-center max-w-md">
+              Trust Governance Workspace
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-8 bg-subtle-bg">
+          <div className="w-full max-w-md">
+            <div className="lg:hidden mb-12 text-center">
+              <img
+                src="/assets/trustoffice-logo.svg?v=3"
+                alt="TrustOffice"
+                className="h-10 mx-auto"
+              />
+            </div>
+
+            <div className="mb-6 bg-gold/10 border border-gold/30 p-4 text-navy">
+              <p className="text-sm">
+                <strong>Your trust is already in TrustOffice.</strong> Set a
+                password to activate your account — you will not create a second one.
+              </p>
+            </div>
+
+            <div className="card-trust corner-mark relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gold/10 border border-gold/30 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5 text-gold" />
+                </div>
+                <h1 className="font-serif text-2xl text-navy">{copy.heading}</h1>
+              </div>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-8">
+                {copy.subheading}
+              </p>
+
+              <form onSubmit={handleClaimVerify}>
+                <div className="space-y-4">
+                  {claimError && (
+                    <div className="p-3 bg-error/10 border border-error/20 flex items-start gap-2" data-testid="connect-wp-claim-error">
+                      <AlertCircle className="w-4 h-4 text-error flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-error">Could not activate your account</p>
+                        <p className="text-xs text-error/80 mt-0.5">{claimError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Email Address
+                    </Label>
+                    <div className="relative mt-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => { setEmail(e.target.value); if (claimError) setClaimError(''); }}
+                        onBlur={handleEmailBlur}
+                        className="pl-10 input-trust"
+                        placeholder="your@email.com"
+                        aria-label="Email address"
+                        required
+                        readOnly={!emailOverridden}
+                        data-testid="connect-wp-claim-email"
+                      />
+                    </div>
+                    {!emailOverridden && (
+                      <button
+                        type="button"
+                        onClick={handleUseDifferentEmail}
+                        className="text-xs text-navy hover:text-navy/70 underline mt-1"
+                        data-testid="connect-wp-use-different-email"
+                      >
+                        Use a different email
+                      </button>
+                    )}
+                  </div>
+
+                  {!claimCodeSent ? (
+                    <Button
+                      type="button"
+                      onClick={handleRequestClaimCode}
+                      disabled={claimLoading}
+                      className="w-full h-12 uppercase tracking-wider text-xs"
+                      data-testid="connect-wp-request-code"
+                    >
+                      {claimLoading ? 'Sending…' : 'Email me a verification code'}
+                    </Button>
+                  ) : (
+                    <>
+                      <div>
+                        <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                          Verification Code
+                        </Label>
+                        <Input
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          value={claimCode}
+                          onChange={(e) => { setClaimCode(e.target.value); if (claimError) setClaimError(''); }}
+                          className="input-trust mt-1 tracking-widest text-center text-lg font-mono"
+                          placeholder="123456"
+                          maxLength={6}
+                          aria-label="6-digit verification code"
+                          required
+                          data-testid="connect-wp-claim-code"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          We emailed a 6-digit code. It expires in 20 minutes.
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                          Create a Password
+                        </Label>
+                        <div className="relative mt-1">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => { setPassword(e.target.value); if (claimError) setClaimError(''); }}
+                            className="pl-10 pr-10 input-trust"
+                            placeholder="At least 8 characters"
+                            aria-label="Password"
+                            required
+                            data-testid="connect-wp-claim-password"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={claimLoading}
+                        className="w-full h-12 uppercase tracking-wider text-xs"
+                        data-testid="connect-wp-claim-submit"
+                      >
+                        {claimLoading ? 'Activating…' : copy.submitLabel}
+                      </Button>
+
+                      <button
+                        type="button"
+                        onClick={handleRequestClaimCode}
+                        disabled={claimLoading}
+                        className="w-full text-xs text-navy hover:text-navy/70 underline"
+                        data-testid="connect-wp-resend-code"
+                      >
+                        Send a new code
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+
+              <p className="text-center text-xs text-muted-foreground mt-6">
+                Already set a password?{' '}
+                <button
+                  type="button"
+                  onClick={() => setStep(CONNECT_STEPS.LOGIN)}
+                  className="text-navy hover:text-navy/70 underline"
+                  data-testid="connect-wp-switch-to-login"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Login step ─────────────────────────────────────────────────────────────
-  if (step === 'login') {
+  if (step === CONNECT_STEPS.LOGIN) {
     return (
       <div className="min-h-screen flex" data-testid="connect-wp-login">
         {/* Left side - Texture with overlay (matches LoginPage) */}
@@ -536,9 +1130,21 @@ export default function ConnectWingPoint() {
                   )}
 
                   <div>
-                    <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                      Email Address
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Email Address
+                      </Label>
+                      {context.email && !emailOverridden && (
+                        <button
+                          type="button"
+                          onClick={handleUseDifferentEmail}
+                          className="text-xs text-navy hover:text-navy/70 underline"
+                          data-testid="connect-wp-use-different-email"
+                        >
+                          Use a different email
+                        </button>
+                      )}
+                    </div>
                     <div className="relative mt-1">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -549,7 +1155,9 @@ export default function ConnectWingPoint() {
                         placeholder="your@email.com"
                         aria-label="Email address"
                         required
-                        autoFocus
+                        readOnly={!emailOverridden}
+                        onBlur={handleEmailBlur}
+                        data-testid="connect-wp-login-email"
                       />
                     </div>
                   </div>
@@ -742,7 +1350,7 @@ export default function ConnectWingPoint() {
             onClick={() => {
               localStorage.removeItem('auth_token');
               setUser(null);
-              setStep('login');
+              setStep(CONNECT_STEPS.LOGIN);
             }}
             className="text-navy hover:text-navy/70 underline"
           >
