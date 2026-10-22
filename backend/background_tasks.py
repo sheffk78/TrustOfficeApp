@@ -802,13 +802,17 @@ class BackgroundTaskRunner:
 
             emails_sent = 0
             course_url = f"{email_service.app_url}/trustee-101"
+            # 2026-10-22 (Jeff directive): reengagement email must carry the
+            # book-a-call invite — same CTA the welcome email uses.
+            booking_url = "https://trustoffice.app/book-a-call/"
 
             for lead in leads:
                 try:
                     await email_service.send_lead_reengagement(
                         to_email=lead["email"],
                         name=lead.get("name", ""),
-                        course_url=course_url
+                        course_url=course_url,
+                        booking_url=booking_url
                     )
 
                     # Mark re-engagement as sent

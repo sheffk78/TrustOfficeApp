@@ -270,6 +270,8 @@ The TrustOffice Team
 
             <p>If you have questions or need help getting started, just reply to this email.</p>
 
+            {_booking_cta_html(data.get('booking_url', ''), data.get('phone_request', True))}
+
             <p>Best regards,<br>The TrustOffice Team</p>
         """),
         "text": lambda data: f"""
@@ -288,6 +290,7 @@ Here's a quick preview:
 - Why trustees have legal duties — and what they are
 - How to avoid the most common trustee mistakes
 
+{_booking_cta_text(data.get('booking_url', ''), data.get('phone_request', True))}
 Best regards,
 The TrustOffice Team
 """,
