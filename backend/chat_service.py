@@ -52,6 +52,13 @@ with open(os.path.join(PROMPTS_DIR, "chat_system_actions.md"), "r") as f:
 with open(os.path.join(PROMPTS_DIR, "chat_system_escalation.md"), "r") as f:
     CHAT_SYSTEM_ESCALATION = f.read()
 
+# Practice core (fiduciary frame + event map + capability index + jurisdiction
+# guard) — loaded on EVERY intent, not gated on ACTION_INTENTS. A member
+# asking "what are my duties as trustee?" (ask_knowledge) needs the fiduciary
+# frame exactly as much as one asking for an action card. (P1, 2026-10-23)
+with open(os.path.join(PROMPTS_DIR, "chat_system_practice.md"), "r") as f:
+    CHAT_SYSTEM_PRACTICE = f.read()
+
 # Legacy full prompt kept for backward compatibility (unused in split mode)
 with open(os.path.join(PROMPTS_DIR, "chat_system.md"), "r") as f:
     CHAT_SYSTEM_PROMPT = f.read()
@@ -534,6 +541,46 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
         }
     else:
         context["trust"] = {"name": "Unknown Trust"}
+
+    # 1b. State compliance facts (one indexed find on the state's profile).
+    # The jurisdiction guard in the practice core needs utc_adopted /
+    # accounting_frequency / notice_required to speak conditionally instead of
+    # asserting a state-law rule from memory. The profile is keyed by state
+    # code, so this is a single indexed lookup, and it is fetched on every
+    # intent (including the lightweight path) because the guard is always-on.
+    # (P1, 2026-10-23)
+    state_code = (trust or {}).get("state_code", "") if trust else ""
+    if state_code:
+        try:
+            profile = await db.state_compliance_profiles.find_one(
+                {"_id": str(state_code).upper()},
+                {"_id": 0, "state_name": 1, "utc_adopted": 1,
+                 "accounting_frequency": 1, "notice_required": 1,
+                 "notice_timing_days": 1},
+            )
+        except Exception as e:  # never let a compliance lookup break the turn
+            logger.warning(f"state_compliance_profiles lookup failed for {state_code}: {e}")
+            profile = None
+        if profile:
+            context["state_compliance"] = {
+                "state_code": str(state_code).upper(),
+                "state_name": profile.get("state_name", ""),
+                "utc_adopted": profile.get("utc_adopted", ""),
+                "accounting_frequency": profile.get("accounting_frequency", ""),
+                "notice_required": profile.get("notice_required"),
+            }
+        else:
+            # Trust has a state on file but no compliance profile — the guard
+            # must treat this as "unknown adoption status", not as "full".
+            context["state_compliance"] = {
+                "state_code": str(state_code).upper(),
+                "state_name": "",
+                "utc_adopted": "",
+                "accounting_frequency": "",
+                "notice_required": None,
+            }
+    else:
+        context["state_compliance"] = {}
 
     # 2. Defensibility Score (always included — one query, cheap)
     health = await db.health_score_snapshots.find_one(
@@ -1473,6 +1520,9 @@ def _build_system_prompt(
     # Core is always loaded (~3K chars).
     # Actions section loaded for action intents (~5K chars).
     # Escalation section loaded for any intent touching fiduciary decisions (~2K chars).
+    # Practice core (fiduciary frame + event map + capability index + jurisdiction
+    # guard) is ALWAYS loaded — it is the frame for every turn, not a section
+    # that only matters for writes. (P1, 2026-10-23)
     # Uses module-level ACTION_INTENTS and ESCALATION_INTENTS (unified). (MEDIUM-2 fix)
 
     system_prompt_base = CHAT_SYSTEM_CORE
@@ -1480,6 +1530,7 @@ def _build_system_prompt(
         system_prompt_base += "\n\n" + CHAT_SYSTEM_ACTIONS
     if intent in ESCALATION_INTENTS:
         system_prompt_base += "\n\n" + CHAT_SYSTEM_ESCALATION
+    system_prompt_base += "\n\n" + CHAT_SYSTEM_PRACTICE
 
     # Approval-response guidance: the model should never re-ask for approval.
     # When the deterministic interception didn't fire (no pending card found),
