@@ -328,6 +328,10 @@ async def gather_risk_findings(
                 "module": "benevolence",
                 "deeplink": "/benevolence/policy",
             })
+        elif policy.get("current_version_status") == "declined":
+            # Deliberate trustee decision to not maintain a written policy.
+            # A documented election is NOT a missing document — no finding.
+            pass
         elif policy.get("current_version_status") == "draft":
             risks.append({
                 "type": "policy_not_published",

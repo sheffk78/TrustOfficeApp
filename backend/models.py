@@ -1109,13 +1109,33 @@ class BenevolencePolicyUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class BenevolencePolicyStatus(str, Enum):
+    """Lifecycle states of the policy container's current version.
+
+    'declined' (2026-10-23) records a deliberate trustee decision NOT to
+    maintain a written policy — it is a governance-grade record, not a
+    missing document.
+    """
+    draft = "draft"
+    published = "published"
+    superseded = "superseded"
+    declined = "declined"
+
+
+class BenevolencePolicyDecline(BaseModel):
+    """Body for POST /benevolence/policy/decline and /undecline."""
+    trust_id: str
+    notes: str = ""            # optional trustee rationale
+
+
 class BenevolencePolicyResponse(BaseModel):
     policy_id: str                         # unique ID for the policy (one per trust)
     trust_id: str
     user_id: str
     current_version_id: str                # policy_version_id of the active version
     current_version_label: str
-    current_version_status: str            # "draft" | "published" | "superseded"
+    current_version_status: str            # "draft" | "published" | "superseded" | "declined"
+    declined_at: Optional[str] = None      # set when current_version_status == "declined"
     created_at: str
     updated_at: Optional[str] = None
 
