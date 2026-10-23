@@ -225,7 +225,7 @@ async def _get_dismissed_risk_types(trust_id: str, user_id: str) -> set:
         {"_id": 0, "criterion_name": 1},
     ).to_list(1000)
     return {
-        d["criterion_name"][len("risk:"):]
+        d["criterion_name"].removeprefix("risk:")
         for d in dismissed
         if d.get("criterion_name", "").startswith("risk:")
     }

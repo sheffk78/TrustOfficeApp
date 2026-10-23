@@ -213,10 +213,6 @@ async def gather_risk_findings(
         {"trust_id": trust_id, "status": "active"},
         {"_id": 0, "category": 1, "approximate_value": 1},
     ).to_list(1000)
-    item_categories = [
-        (item.get("category") or "other_property")
-        for item in schedule_a_items
-    ]
 
     # Rule A: Trust has assets on Schedule A but zero investments recorded
     if total_investments == 0 and len(schedule_a_items) > 0:
@@ -229,8 +225,11 @@ async def gather_risk_findings(
             # Investor Rule framing is a false alarm for those trusts, so it
             # drops to an advisory low-severity note. Any financial-category
             # item keeps the original high-severity finding.
-            financial_categories = [c for c in item_categories if c in FINANCIAL_ASSET_CATEGORIES]
-            if financial_categories:
+            has_financial = any(
+                (item.get("category") or "other_property") in FINANCIAL_ASSET_CATEGORIES
+                for item in schedule_a_items
+            )
+            if has_financial:
                 risks.append({
                     "type": "uninvested_assets",
                     "severity": "high",
@@ -318,6 +317,7 @@ async def gather_risk_findings(
             {"trust_id": trust_id, "user_id": trust.get("user_id")},
             {"_id": 0}
         )
+        policy_status = (policy or {}).get("current_version_status")
         if not policy:
             risks.append({
                 "type": "no_benevolence_policy",
@@ -328,11 +328,11 @@ async def gather_risk_findings(
                 "module": "benevolence",
                 "deeplink": "/benevolence/policy",
             })
-        elif policy.get("current_version_status") == "declined":
-            # Deliberate trustee decision to not maintain a written policy.
-            # A documented election is NOT a missing document — no finding.
+        elif policy_status == "declined":
+            # Deliberate trustee decision to not maintain a written policy —
+            # a documented election, not a missing document. No finding.
             pass
-        elif policy.get("current_version_status") == "draft":
+        elif policy_status == "draft":
             risks.append({
                 "type": "policy_not_published",
                 "severity": "medium",
