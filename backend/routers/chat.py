@@ -945,12 +945,63 @@ async def _exec_minutes(mapped_data: dict, trust_id: str, user_id: str) -> dict:
     from routers.minutes import create_minutes as _create_minutes
     from models import MinutesCreate, MinutesType
     from fastapi import BackgroundTasks
+    from minutes_type_normalizer import (
+        resolve_minutes_type,
+        build_type_fallback_caveat,
+        GENERAL as _GENERAL_TYPE,
+    )
 
-    minutes_type_val = mapped_data.pop("minutes_type", "general")
+    # ── 1. TYPE NORMALIZATION (2026-10-23) ────────────────────────────────
+    # The intent-extractor LLM emits human wording ("Quarterly Review",
+    # "annual meeting"). MinutesType(value) raised ValueError on those and
+    # the old code SILENTLY downgraded to general — the member asked for
+    # quarterly minutes and got a generic shell (Jerel Kratt, 2026-10-23).
+    # Now: normalize + alias-map; if it still fails, do NOT quietly drop it.
+    raw_minutes_type = mapped_data.pop("minutes_type", None)
+    context_text = " ".join(
+        str(mapped_data.get(k, "") or "")
+        for k in ("notes", "decisions_text", "participants_text", "trust_name")
+    )
+    valid_types = tuple(m.value for m in MinutesType)
+    resolved_type, type_caveat = resolve_minutes_type(
+        raw_minutes_type,
+        context_text=context_text,
+        valid_types=valid_types,
+    )
+    if resolved_type is None:
+        # Unresolvable type. Preferred behavior per the fix spec: use an
+        # intent-derived fallback BUT attach a caveat so the member sees the
+        # substitution. We never silently save a "general" record without
+        # telling the member.
+        resolved_type = _GENERAL_TYPE
+        type_caveat = build_type_fallback_caveat(raw_minutes_type, resolved_type)
+        logger.warning(
+            "MINUTES_TYPE_FALLBACK | trust=%s user=%s raw=%r -> %r | %s",
+            trust_id, user_id, raw_minutes_type, resolved_type, type_caveat,
+        )
+    elif type_caveat:
+        logger.warning(
+            "MINUTES_TYPE_NORMALIZED | trust=%s user=%s raw=%r -> %r | %s",
+            trust_id, user_id, raw_minutes_type, resolved_type, type_caveat,
+        )
     try:
-        minutes_type_enum = MinutesType(minutes_type_val)
+        minutes_type_enum = MinutesType(resolved_type)
     except ValueError:
-        minutes_type_enum = MinutesType.general
+        # Defensive: the normalizer only returns valid enum values, but if the
+        # enum changes underneath us, fail loudly instead of downgrading.
+        logger.error(
+            "MINUTES_TYPE_INVALID_ENUM | trust=%s user=%s raw=%r resolved=%r",
+            trust_id, user_id, raw_minutes_type, resolved_type,
+        )
+        return {
+            "success": False,
+            "error": (
+                f"I could not determine the type of minutes to create "
+                f"(received '{raw_minutes_type}'). Please edit the action card "
+                f"and choose a minutes type, or ask for the meeting type by name."
+            ),
+            "endpoint": "minutes",
+        }
 
     participants_text = mapped_data.get("participants_text", "")
     if isinstance(participants_text, list):
@@ -960,13 +1011,38 @@ async def _exec_minutes(mapped_data: dict, trust_id: str, user_id: str) -> dict:
     if isinstance(decisions_text, list):
         decisions_text = "; ".join(decisions_text)
 
+    meeting_date = mapped_data.get("meeting_date") or ""
+
+    # ── 2. PREFILL from trust data on file (2026-10-23) ───────────────────
+    # "fill out with my information on file" must produce a real draft, not
+    # an empty shell. For non-general types we load the trust document and
+    # generate the template document through the existing minutes template
+    # engine (routers/minutes.generate_template_document).
+    prefill = await _build_minutes_prefill(
+        trust_id=trust_id,
+        user_id=user_id,
+        minutes_type=resolved_type,
+        meeting_date=meeting_date,
+        participants_text=participants_text,
+        decisions_text=decisions_text,
+    )
+    if prefill.get("participants_text"):
+        participants_text = prefill["participants_text"]
+    if prefill.get("meeting_date"):
+        meeting_date = prefill["meeting_date"]
+    if prefill.get("decisions_text"):
+        decisions_text = prefill["decisions_text"]
+
     minutes_create = MinutesCreate(
         trust_id=trust_id,
         minutes_type=minutes_type_enum,
-        meeting_date=mapped_data.get("meeting_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+        meeting_date=meeting_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         participants_text=participants_text,
         decisions_text=decisions_text,
         status="draft",  # Fix 4b: draft, not finalized
+        template_type=prefill.get("template_type"),
+        sections=prefill.get("sections") or [],
+        template_data=prefill.get("template_data") or {},
     )
     user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     if not user_doc:
@@ -984,13 +1060,298 @@ async def _exec_minutes(mapped_data: dict, trust_id: str, user_id: str) -> dict:
         await auto_update_onboarding(user_id, trust_id)
     except Exception:
         pass
-    return {
+    out = {
         "success": True,
         "record_id": result.minutes_id,
         "endpoint": "minutes",
         "status": "draft",
-        "review_link": f"/minutes/{result.minutes_id}/edit",
+        "minutes_type": resolved_type,
+        # NOTE: the review link points at the minutes DETAIL route, which is
+        # the page that renders the draft, its sections, and the "Edit Draft"
+        # button. The old "/minutes/{id}/edit" path has no frontend route
+        # (App.js defines /minutes/:minutesId only) — linking to it sent
+        # members to a 404 page, which is part of why the draft was never
+        # found (Jerel Kratt, 2026-10-23).
+        "review_link": f"/minutes/{result.minutes_id}",
     }
+    if type_caveat:
+        out["caveat"] = type_caveat
+    if prefill.get("prefilled"):
+        out["prefilled"] = True
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Minutes prefill from trust data on file (2026-10-23)
+# ─────────────────────────────────────────────────────────────────────────────
+# The minutes_type -> template_type map. The template registry
+# (routers/template_registry.py) keys templates by template_type; the
+# MinutesType enum carries both canonical types (quarterly, annual) and the
+# template aliases (quarterly_review, annual_review, general_meeting).
+_MINUTES_TYPE_TO_TEMPLATE = {
+    "quarterly": "quarterly_review",
+    "quarterly_review": "quarterly_review",
+    "annual": "annual_review",
+    "annual_review": "annual_review",
+    "general_meeting": "general_meeting",
+    "initial_trustee_meeting": "initial_trustee_meeting",
+    "trustee_compensation": "trustee_compensation",
+    "compensation": "trustee_compensation",
+    "distribution": "distribution_to_beneficiaries",
+    "distribution_to_beneficiaries": "distribution_to_beneficiaries",
+}
+
+
+async def _next_relevant_meeting_date(trust_id: str, user_id: str, minutes_type: str) -> str:
+    """
+    Pick the most sensible meeting date when the card did not carry one.
+
+    Preference order:
+      1. The next upcoming quarterly/annual governance deadline on file.
+      2. The next upcoming deadline of any kind for this trust.
+      3. Today (the caller supplies the final default).
+    """
+    try:
+        from datetime import date as _date
+        today = _date.today()
+        query = {
+            "trust_id": trust_id,
+            "user_id": user_id,
+            "status": {"$ne": "completed"},
+        }
+        docs = await db.deadlines.find(query, {"_id": 0}).to_list(200)
+        quarterly_cats = {"quarterly_review", "annual_review", "annual_meeting"}
+        candidates = []
+        for d in docs:
+            due = d.get("due_date")
+            if not due:
+                continue
+            try:
+                due_date = due if isinstance(due, _date) else _date.fromisoformat(str(due)[:10])
+            except (ValueError, TypeError):
+                continue
+            if due_date < today:
+                continue
+            is_primary = str(d.get("category", "")) in quarterly_cats
+            candidates.append((0 if is_primary else 1, due_date, due))
+        if candidates:
+            candidates.sort(key=lambda x: (x[0], x[1]))
+            return candidates[0][2]
+    except Exception as e:  # noqa: BLE001 — prefill date is best-effort
+        logger.warning("minutes prefill: next-relevant-date lookup failed: %s", e)
+    return ""
+
+
+async def _build_minutes_prefill(
+    trust_id: str,
+    user_id: str,
+    minutes_type: str,
+    meeting_date: str = "",
+    participants_text: str = "",
+    decisions_text: str = "",
+) -> dict:
+    """
+    Build a populated draft from the trust's own data ("my information on file").
+
+    Returns a dict with any of:
+      template_type   — the minutes template matching the type
+      sections        — [{title, template_type, content}] rendered from the
+                       trust document via the minutes template engine
+      template_data   — the template engine's context dict
+      participants_text / meeting_date / decisions_text — resolved values
+
+    Never raises: any failure degrades to an un-prefilled draft so the
+    member still gets a record they can open.
+    """
+    out = {"prefilled": False}
+    if minutes_type in ("general", ""):
+        # "general" has no template in the registry; leave the draft as-is.
+        return out
+
+    template_type = _MINUTES_TYPE_TO_TEMPLATE.get(minutes_type)
+    if not template_type:
+        return out
+
+    try:
+        from routers.minutes import generate_template_document
+        from routers.template_registry import get_template_definition
+    except Exception as e:  # noqa: BLE001
+        logger.warning("minutes prefill: template engine unavailable: %s", e)
+        return out
+
+    # --- trust document on file ---
+    trust = await db.trusts.find_one({"trust_id": trust_id, "user_id": user_id}, {"_id": 0})
+    if not trust:
+        trust = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0})
+    if not trust:
+        logger.info("minutes prefill: no trust doc for %s — skipping prefill", trust_id)
+        return out
+
+    trust_name = trust.get("name") or ""
+    trustee_names = _trust_trustee_names(trust)
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0}) or {}
+
+    # --- participants: card value wins, else the trustees on record ---
+    resolved_participants = participants_text or ""
+    if not resolved_participants:
+        resolved_participants = ", ".join(trustee_names)
+    if not resolved_participants:
+        resolved_participants = user_doc.get("name") or ""
+
+    # --- meeting date: card value wins, else next relevant date on file ---
+    resolved_date = meeting_date or ""
+    if not resolved_date:
+        resolved_date = await _next_relevant_meeting_date(trust_id, user_id, minutes_type)
+    if not resolved_date:
+        resolved_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # --- template_data: the context the template engine consumes ---
+    # Key names mirror the canonical template form
+    # (frontend/src/pages/minutesTemplateForm/templateDataBuilders.js ->
+    # buildBaseData) so a chat-created draft renders identically to one
+    # created through the Minutes -> New Minutes form.
+    template_data = {
+        "minute_number": f"{datetime.now(timezone.utc).year}-001",
+        "meeting_date": resolved_date,
+        "meeting_time": "10:00",
+        "meeting_type": "unanimous_written_consent",
+        "meeting_location": "",
+        "trustees_present": trustee_names or ([resolved_participants] if resolved_participants else ["[Trustee Name]"]),
+        "trust_formation_date": trust.get("start_date") or "",
+        # Additive context (not consumed by the base renderer, but preserved
+        # so the member's own words and the trust identity travel with the
+        # draft).
+        "trust_name": trust_name,
+        "participants": resolved_participants,
+        "agenda_items": decisions_text or "",
+        "key_decisions": decisions_text or "",
+        "additional_notes": "",
+        "additional_context": decisions_text or "",
+    }
+    if minutes_type in ("quarterly", "quarterly_review"):
+        template_data.setdefault("quarter", _current_quarter())
+        template_data.setdefault("year", str(datetime.now(timezone.utc).year))
+    if minutes_type in ("annual", "annual_review"):
+        template_data.setdefault("fiscal_year", str(datetime.now(timezone.utc).year - 1))
+
+    # --- render the document through the existing template engine ---
+    content = ""
+    try:
+        content = generate_template_document(trust, template_type, template_data) or ""
+    except Exception as e:  # noqa: BLE001 — prefill is best-effort
+        logger.warning("minutes prefill: template generation failed for %s: %s", template_type, e)
+        content = ""
+
+    if not content:
+        # The template engine produced nothing for this type — fall back to a
+        # trust-data summary so the draft is still not an empty shell.
+        content = _fallback_prefill_content(
+            trust_name=trust_name,
+            trustee_names=trustee_names,
+            meeting_date=resolved_date,
+            minutes_type=minutes_type,
+            decisions_text=decisions_text,
+        )
+
+    definition = None
+    try:
+        definition = get_template_definition(template_type)
+    except Exception:  # noqa: BLE001
+        definition = None
+    display_name = (definition or {}).get("display_name") or template_type.replace("_", " ").title()
+
+    out.update({
+        "prefilled": True,
+        "template_type": template_type,
+        "sections": [{
+            "title": display_name,
+            "template_type": template_type,
+            "content": content,
+        }],
+        "template_data": template_data,
+        "participants_text": resolved_participants,
+        "meeting_date": resolved_date,
+        "decisions_text": content,
+    })
+    logger.info(
+        "minutes prefill: built %s draft from trust data (trust=%s, sections=%d)",
+        template_type, trust_id, len(out["sections"]),
+    )
+    return out
+
+
+def _trust_trustee_names(trust: dict) -> list:
+    """Trustee names from the trust document (handles list and CSV string)."""
+    try:
+        from trustee_utils import parse_trustees
+    except Exception:  # noqa: BLE001
+        parse_trustees = None
+    raw = trust.get("trustees") or trust.get("trustee_names") or ""
+    if isinstance(raw, list):
+        return [str(n).strip() for n in raw if str(n).strip()]
+    if isinstance(raw, str) and raw.strip():
+        if parse_trustees:
+            try:
+                return [str(n).strip() for n in parse_trustees(raw) if str(n).strip()]
+            except Exception:  # noqa: BLE001
+                pass
+        return [part.strip() for part in raw.split(",") if part.strip()]
+    return []
+
+
+def _current_quarter() -> str:
+    month = datetime.now(timezone.utc).month
+    return f"Q{((month - 1) // 3) + 1}"
+
+
+def _fallback_prefill_content(
+    trust_name: str,
+    trustee_names: list,
+    meeting_date: str,
+    minutes_type: str,
+    decisions_text: str,
+) -> str:
+    """Minimal but real minutes body built from trust data on file."""
+    trustees = ", ".join(trustee_names) if trustee_names else "[Trustee Name]"
+    label = minutes_type.replace("_", " ").title()
+    lines = [
+        f"TRUST MINUTES — {label}",
+        "",
+        f"Trust Name: {trust_name or '[Trust Name]'}",
+        f"Date of Meeting: {meeting_date}",
+        "",
+        "TRUSTEES PRESENT",
+        "",
+    ]
+    for t in trustee_names or ["[Trustee Name]"]:
+        lines.append(f"• {t}, Trustee")
+    lines += [
+        "",
+        "Quorum: YES",
+        "",
+        "MATTERS CONSIDERED AND RESOLUTIONS ADOPTED",
+        "",
+    ]
+    if decisions_text:
+        lines.append(decisions_text)
+    else:
+        lines.append(
+            "The Trustees convened to conduct the business of the Trust, review "
+            "its records, and confirm its compliance with the Declaration of "
+            "Trust and applicable state law."
+        )
+    lines += [
+        "",
+        "ADJOURNMENT",
+        "",
+        "There being no further business, the meeting was adjourned.",
+        "",
+        "CERTIFICATION",
+        "",
+        "The undersigned Trustee(s) hereby certify that the foregoing Minutes "
+        "constitute a true, accurate, and complete record of the meeting.",
+    ]
+    return "\n".join(lines)
 
     
 
@@ -1157,7 +1518,7 @@ async def _exec_contribute_asset(mapped_data: dict, trust_id: str, user_id: str)
         "minutes_id": minutes_result.minutes_id,
         "endpoint": "contribute_asset",
         "status": "draft",
-        "review_link": f"/minutes/{minutes_result.minutes_id}/edit",
+        "review_link": f"/minutes/minutes_result.minutes_id",
     }
 
     
@@ -2193,6 +2554,18 @@ async def confirm_action(
     }
     if execution_result:
         response["execution_result"] = execution_result
+        # 2026-10-23 (Jerel Kratt): the button-approval path returned a bare
+        # "Action approved" with no link to the record it created. Now the
+        # same success message the text-approval path uses is returned, so
+        # BOTH approval surfaces carry the review link.
+        if execution_result.get("success"):
+            try:
+                from approval_handler import _friendly_summary, build_success_message
+                response["message"] = build_success_message(
+                    _friendly_summary(action_card), execution_result
+                )
+            except Exception as e:  # noqa: BLE001 — never fail the approval
+                logger.warning("confirm_action: could not build success message: %s", e)
 
     return response
 

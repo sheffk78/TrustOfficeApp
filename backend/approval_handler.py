@@ -137,6 +137,30 @@ def _friendly_summary(card: dict) -> str:
     return f"{label}{(': ' + str(name)) if name else ''}"
 
 
+def build_success_message(summary: str, result: dict) -> str:
+    """
+    Build the assistant's post-approval confirmation text.
+
+    2026-10-23 (Jerel Kratt): the confirmation text never carried the link
+    to the record that was just created, so the member could not find the
+    draft ("there is no drafts tab", "nothing is showing anywhere"). Every
+    successful action reply that carries a review_link now ends with the
+    link, and any caveat (e.g. a substituted minutes type) is surfaced too.
+    """
+    text = f"Done — {summary} has been created."
+    if summary.startswith("distribution"):
+        text += " To finalize it, confirm solvency and recusal on the Distributions page."
+    elif summary.startswith("minutes"):
+        text += " It's saved as a draft — review and finalize on the Minutes page."
+    review_link = (result.get("review_link") or "").strip()
+    if review_link:
+        text += f" Open it: {review_link}"
+    caveat = (result.get("caveat") or "").strip()
+    if caveat:
+        text += f" Note: {caveat}"
+    return text
+
+
 async def handle_text_approval(
     conversation_id: str,
     message_index: int,
@@ -188,11 +212,7 @@ async def handle_text_approval(
 
     summary = _friendly_summary(action_card)
     if result.get("success"):
-        text = f"Done — {summary} has been created."
-        if summary.startswith("distribution"):
-            text += " To finalize it, confirm solvency and recusal on the Distributions page."
-        elif summary.startswith("minutes"):
-            text += " It's saved as a draft — review and finalize on the Minutes page."
+        text = build_success_message(summary, result)
         return {"success": True, "message": text, "execution_result": result}
     else:
         err = result.get("error", "the system reported an error")

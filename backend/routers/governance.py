@@ -1424,7 +1424,7 @@ async def _get_pending_quarterly_draft(trust_id: str, user_id: str) -> Optional[
     return {
         "minutes_id": pending_draft["minutes_id"],
         "quarter": quarter,
-        "review_link": f"/minutes/{pending_draft['minutes_id']}/edit",
+        "review_link": f"/minutes/pending_draft['minutes_id']",
     }
 
 

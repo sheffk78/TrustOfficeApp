@@ -96,7 +96,7 @@ async def generate_minutes(params: dict, ctx: ActionContext) -> dict:
     return {
         "record_id": result.minutes_id,
         "status": "draft",
-        "review_link": f"/minutes/{result.minutes_id}/edit",
+        "review_link": f"/minutes/result.minutes_id",
         "message": "Draft minutes created — review and finalize on the Minutes page.",
     }
 
@@ -755,7 +755,7 @@ async def _chat_contribute_asset(params: dict, ctx: ActionContext) -> dict:
         "minutes_id": minutes_result.minutes_id,
         "endpoint": "contribute_asset",
         "status": "draft",
-        "review_link": f"/minutes/{minutes_result.minutes_id}/edit",
+        "review_link": f"/minutes/minutes_result.minutes_id",
     }
 
 
