@@ -1,5 +1,5 @@
 # Schedule A router - handles trust asset ledger (Schedule A)
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -318,8 +318,39 @@ async def update_schedule_a_item(item_id: str, update: ScheduleAItemUpdate, user
     return ScheduleAItemResponse(**updated_item)
 
 @router.delete("/schedule-a/{item_id}")
-async def delete_schedule_a_item(item_id: str, user: dict = Depends(require_write_access)):
-    """Delete a Schedule A item"""
+async def delete_schedule_a_item(
+    item_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete a Schedule A item.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits (actor, impersonation attribution, record
+    type/id, timestamp, snapshot summary). HARD delete — schedule_a_items
+    is read from a small, well-understood set of sites, and the audit row
+    preserves the evidence.
+    """
+    from exec_hardening import audit_member_deletion
+
+    item = await db.schedule_a_items.find_one(
+        {"item_id": item_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="schedule_a_items",
+        record_id=item_id,
+        record=item,
+        trust_id=item.get("trust_id", ""),
+        request=request,
+        action="schedule_a_item_deleted",
+    )
+
     result = await db.schedule_a_items.delete_one({"item_id": item_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Asset not found")

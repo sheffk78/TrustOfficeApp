@@ -1,5 +1,5 @@
 # Distributions router - handles distribution records and benevolence log
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Request
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -672,8 +672,21 @@ async def attach_minutes_to_distribution(
 
 
 @router.delete("/distributions/{distribution_id}")
-async def delete_distribution(distribution_id: str, user: dict = Depends(require_write_access)):
-    """Delete a distribution record"""
+async def delete_distribution(
+    distribution_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete a distribution record.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: the pre-existing
+    log_audit_event row is kept, and a fuller audit_logs row (actor,
+    impersonation attribution, record type/id, timestamp, snapshot summary)
+    is written BEFORE the delete commits.
+    """
+    from exec_hardening import audit_member_deletion
+
     dist = await db.distribution_records.find_one(
         {"distribution_id": distribution_id},
         {"_id": 0}
@@ -681,6 +694,17 @@ async def delete_distribution(distribution_id: str, user: dict = Depends(require
     if not dist:
         raise HTTPException(status_code=404, detail="Distribution not found. It may have been already deleted. Please refresh the page and try again.")
     user = await require_org_grant(dist["trust_id"], min_level=GrantLevel.preparer, user=user)
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="distribution_records",
+        record_id=distribution_id,
+        record=dist,
+        trust_id=dist.get("trust_id", ""),
+        request=request,
+        action="distribution_deleted",
+    )
 
     result = await db.distribution_records.delete_one({
         "distribution_id": distribution_id,

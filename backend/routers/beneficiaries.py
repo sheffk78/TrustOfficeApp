@@ -3,7 +3,7 @@ Beneficiaries router - Beneficiary dashboard for trust unit allocations
 Migrated from server.py
 """
 import re
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
@@ -120,6 +120,7 @@ async def list_class_beneficiaries(
 @router.delete("/class-beneficiaries/{class_beneficiary_id}")
 async def delete_class_beneficiary(
     class_beneficiary_id: str,
+    request: Request = None,
     user: dict = Depends(require_write_access)
 ):
     """
@@ -131,7 +132,13 @@ async def delete_class_beneficiary(
     Classes (the pool container) are hard-deletable; NAMED MEMBERS are not —
     their audit trail lands in the append-only ledger before the docs go.
     Route signature and response contract unchanged ({status: deleted}).
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the cascade delete commits (actor, impersonation attribution,
+    record type/id, timestamp, snapshot summary).
     """
+    from exec_hardening import audit_member_deletion
+
     user_id = user["user_id"]
 
     class_doc = await db.class_beneficiaries.find_one(
@@ -139,6 +146,17 @@ async def delete_class_beneficiary(
     )
     if not class_doc:
         raise HTTPException(status_code=404, detail="Class beneficiary not found")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user_id,
+        record_type="class_beneficiaries",
+        record_id=class_beneficiary_id,
+        record=class_doc,
+        trust_id=class_doc.get("trust_id", ""),
+        request=request,
+        action="class_beneficiary_deleted",
+    )
 
     members = await db.class_beneficiary_members.find(
         {"class_beneficiary_id": class_beneficiary_id, "user_id": user_id}, {"_id": 0, "class_member_id": 1, "name": 1, "member_status": 1}
@@ -1247,6 +1265,7 @@ async def update_beneficiary(
 @router.delete("/{beneficiary_id}")
 async def delete_beneficiary(
     beneficiary_id: str,
+    request: Request = None,
     user: dict = Depends(require_write_access)
 ):
     """Remove (deactivate) a beneficiary.
@@ -1254,7 +1273,15 @@ async def delete_beneficiary(
     Marks the underlying trust unit certificate as inactive rather than
     deleting the record, preserving an audit trail. The trust_id is
     derived from the certificate record itself.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the deactivation commits (actor, impersonation attribution,
+    record type/id, timestamp, snapshot summary). This route is a SOFT
+    delete: the document survives with status=inactive and the audit row
+    records the deactivation.
     """
+    from exec_hardening import audit_member_deletion
+
     user_id = user["user_id"]
 
     existing = await db.trust_unit_certificates.find_one(
@@ -1269,6 +1296,18 @@ async def delete_beneficiary(
         raise HTTPException(status_code=404, detail="Beneficiary certificate not found")
 
     trust_id = existing.get("trust_id")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user_id,
+        record_type="trust_unit_certificates",
+        record_id=beneficiary_id,
+        record=existing,
+        trust_id=trust_id,
+        request=request,
+        action="beneficiary_deactivated",
+        extra={"delete_mode": "soft"},
+    )
 
     await db.trust_unit_certificates.update_one(
         {"certificate_id": beneficiary_id, "user_id": user_id, "trust_id": trust_id},

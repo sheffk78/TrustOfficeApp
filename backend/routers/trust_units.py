@@ -1,5 +1,5 @@
 # Trust Units router - handles trust unit certificates, transfers, and settings
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -754,15 +754,36 @@ async def revoke_unit_certificate(
 @router.delete("/trust-units/certificates/{certificate_id}")
 async def delete_unit_certificate(
     certificate_id: str,
-    user: dict = Depends(require_write_access)
+    request: Request = None,
+    user: dict = Depends(require_write_access),
 ):
-    """Delete a unit certificate and remove any auto-linked entity relationships."""
+    """
+    Delete a unit certificate and remove any auto-linked entity relationships.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits (actor, impersonation attribution, record
+    type/id, timestamp, snapshot summary). HARD delete — the audit row is
+    the compensating control.
+    """
+    from exec_hardening import audit_member_deletion
+
     cert = await db.trust_unit_certificates.find_one(
         {"certificate_id": certificate_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="trust_unit_certificates",
+        record_id=certificate_id,
+        record=cert,
+        trust_id=cert.get("trust_id", ""),
+        request=request,
+        action="trust_unit_certificate_deleted",
+    )
 
     # Delete the certificate
     await db.trust_unit_certificates.delete_one(

@@ -570,17 +570,41 @@ async def bulk_delete_documents(
 # NOTE: this {doc_id} route must stay AFTER the literal /vault/documents/bulk
 # route so "bulk" is matched as a literal segment, not captured as a doc_id.
 @router.delete("/vault/documents/{doc_id}")
-async def delete_document(doc_id: str, user: dict = Depends(require_write_access)):
-    """Remove a document from vault (and its file content)."""
+async def delete_document(
+    doc_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Remove a document from vault (and its file content).
+
+    2026-10-23 council P0 — DELETE PROVENANCE: the pre-existing
+    log_audit_event row is kept, and a fuller audit_logs row (actor,
+    impersonation attribution, record type/id, timestamp, snapshot
+    summary) is written BEFORE the delete commits.
+    """
+    from exec_hardening import audit_member_deletion
+
     doc = await db.vault_documents.find_one({"doc_id": doc_id, "user_id": user["user_id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found. It may have been already deleted. Please refresh the vault and try again.")
 
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="vault_documents",
+        record_id=doc_id,
+        record=doc,
+        trust_id=doc.get("trust_id", ""),
+        request=request,
+        action="vault_delete",
+    )
+
     await db.vault_documents.delete_one({"doc_id": doc_id, "user_id": user["user_id"]})
-    
+
     # Log vault deletion for audit trail
     await log_audit_event(user["user_id"], "vault_delete", "vault_document", doc_id, {"title": doc.get("title", ""), "category": doc.get("category", ""), "trust_id": doc.get("trust_id", "")})
-    
+
     return {"message": "Document removed from vault"}
 
 

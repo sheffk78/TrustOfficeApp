@@ -1,5 +1,5 @@
 # Tasks router - handles governance task management
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import uuid
@@ -208,12 +208,42 @@ async def uncomplete_task(task_id: str, user: dict = Depends(require_write_acces
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_task(task_id: str, user: dict = Depends(require_write_access)):
-    """Delete a task"""
+async def delete_task(
+    task_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete a task.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits (actor, impersonation attribution, record
+    type/id, timestamp, snapshot summary). HARD delete — the audit row is
+    the compensating control.
+    """
+    from exec_hardening import audit_member_deletion
+
+    task = await db.governance_tasks.find_one(
+        {"task_id": task_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found. It may have been already deleted. Please refresh the task list and try again.")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="governance_tasks",
+        record_id=task_id,
+        record=task,
+        trust_id=task.get("trust_id", ""),
+        request=request,
+        action="governance_task_deleted",
+    )
+
     result = await db.governance_tasks.delete_one({"task_id": task_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Task not found. It may have been already deleted. Please refresh the task list and try again.")
-    
+
     return {"message": "Task deleted"}
 
 

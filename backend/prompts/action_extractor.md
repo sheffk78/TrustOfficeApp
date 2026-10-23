@@ -8,7 +8,7 @@ Only extract when the user is clearly making a request that would create, update
 
 ### Create Requests
 - A distribution request → extract amount, beneficiary, purpose, date
-- A minutes request → extract meeting date, participants, decisions, trust name
+- A minutes request → extract meeting date, participants, decisions, trust name. `minutes_type` MUST be one of the canonical enum ids listed in the Minutes Type Contract below — use the lowercase enum id, not human wording.
 - An asset request → extract asset type, value, description, date acquired
 - A new beneficiary request → extract name, contact info
 - A class beneficiary request → extract class_type (children/descendants/issue/heirs/blood_relatives/etc.), description, percentage, notes
@@ -250,6 +250,29 @@ For `class_beneficiary_removal` intents, `extracted` MUST use the key `class_nam
   "suggested_clarification": null
 }
 ```
+
+## Minutes Type Contract
+
+When you extract `minutes_type`, output the **lowercase enum id** exactly as written below — never the human wording, never title case, never a synonym you invented. The backend normalizes human wording downstream, but a canonical id is always correct and never produces a substitution caveat.
+
+Canonical `minutes_type` values:
+
+| enum id | when to use it |
+|---|---|
+| `annual` | annual meeting, annual review, yearly meeting |
+| `quarterly` | quarterly meeting, quarterly review, Q1–Q4 |
+| `compensation` | trustee compensation approval, compensation review |
+| `distribution` | distribution approval, distribution minutes |
+| `solvency` | solvency certification, solvency review |
+| `general` | a generic meeting with no more specific type |
+| `initial_trustee_meeting` | the FIRST / initial / organizational trustee meeting of a new trust |
+| `appointment_additional_trustee` | minutes appointing an additional trustee |
+| `trustee_resignation` | minutes recording a trustee's resignation |
+| `real_estate_purchase` | minutes approving the purchase of real estate |
+
+Rules:
+- Use the lowercase enum id; human wording is normalized downstream. Emit `quarterly`, never "Quarterly Review" or "quarterly_review".
+- If the user's request does not clearly map to one of the values above, use `general` — do not invent an id. A wrong-but-valid id is worse than `general`, because `general` produces a plain record while an invented id produces a record the member did not ask for.
 
 ## Strong Clarification Rules
 When `missing_required` is non-empty, the `suggested_clarification` MUST be a natural, conversational question, not a technical field request:

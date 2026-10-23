@@ -545,9 +545,39 @@ async def get_conversation(
 @router.delete("/chat/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
+    request: Request = None,
     user: dict = Depends(require_write_access),
 ):
-    """Delete a conversation."""
+    """
+    Delete a conversation.
+
+    2026-10-23 council P0 — DELETE PROVENANCE. A conversation deletion used
+    to be completely unlogged: the document disappeared with no trace of who
+    removed it. An audit_logs row is now written BEFORE the delete commits,
+    carrying the actor, the impersonation attribution, the record type/id,
+    the timestamp and a snapshot summary (title, trust, message count).
+    """
+    from exec_hardening import audit_member_deletion
+
+    conv = await db.chat_conversations.find_one(
+        {"conversation_id": conversation_id, "user_id": user["user_id"]},
+        {"_id": 0},
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Audit BEFORE the delete commits.
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="chat_conversations",
+        record_id=conversation_id,
+        record=conv,
+        trust_id=conv.get("trust_id", ""),
+        request=request,
+        action="chat_conversation_deleted",
+    )
+
     result = await db.chat_conversations.delete_one({
         "conversation_id": conversation_id,
         "user_id": user["user_id"],
@@ -844,8 +874,10 @@ async def _exec_asset(mapped_data: dict, trust_id: str, user_id: str) -> dict:
     try:
         from dependencies import auto_update_onboarding
         await auto_update_onboarding(user_id, trust_id)
-    except Exception:
-        pass
+    except Exception as e:
+        # 2026-10-23 council P0: a swallowed onboarding failure left the
+        # member's checklist silently out of date with no trace anywhere.
+        logger.warning(f"auto_update_onboarding failed after action (user={user_id}, trust={trust_id}): {e}")
     return {"success": True, "record_id": result.item_id, "endpoint": "schedule-a"}
 
     
@@ -1058,8 +1090,10 @@ async def _exec_minutes(mapped_data: dict, trust_id: str, user_id: str) -> dict:
     try:
         from dependencies import auto_update_onboarding
         await auto_update_onboarding(user_id, trust_id)
-    except Exception:
-        pass
+    except Exception as e:
+        # 2026-10-23 council P0: a swallowed onboarding failure left the
+        # member's checklist silently out of date with no trace anywhere.
+        logger.warning(f"auto_update_onboarding failed after action (user={user_id}, trust={trust_id}): {e}")
     out = {
         "success": True,
         "record_id": result.minutes_id,
@@ -1509,8 +1543,10 @@ async def _exec_contribute_asset(mapped_data: dict, trust_id: str, user_id: str)
     try:
         from dependencies import auto_update_onboarding
         await auto_update_onboarding(user_id, trust_id)
-    except Exception:
-        pass
+    except Exception as e:
+        # 2026-10-23 council P0: a swallowed onboarding failure left the
+        # member's checklist silently out of date with no trace anywhere.
+        logger.warning(f"auto_update_onboarding failed after action (user={user_id}, trust={trust_id}): {e}")
 
     return {
         "success": True,
@@ -1561,8 +1597,8 @@ async def _exec_beneficiary(mapped_data: dict, trust_id: str, user_id: str) -> d
         try:
             from dependencies import auto_update_onboarding
             await auto_update_onboarding(user_id, trust_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"auto_update_onboarding failed after action (user={user_id}, trust={trust_id}): {e}")
         return {"success": True, "record_id": result.certificate_id, "endpoint": "trust-units/certificates"}
     except HTTPException as e:
         return {"success": False, "error": e.detail}
@@ -1921,8 +1957,8 @@ async def _exec_investment(mapped_data: dict, trust_id: str, user_id: str) -> di
         try:
             from dependencies import auto_update_onboarding
             await auto_update_onboarding(user_id, trust_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"auto_update_onboarding failed after action (user={user_id}, trust={trust_id}): {e}")
         return {
             "success": True,
             "record_id": result["investment_id"],
@@ -2032,8 +2068,8 @@ async def _exec_transaction(mapped_data: dict, trust_id: str, user_id: str) -> d
         try:
             from dependencies import auto_update_onboarding
             await auto_update_onboarding(user_id, trust_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"auto_update_onboarding failed after action (user={user_id}, trust={trust_id}): {e}")
         return {
             "success": True,
             "record_id": result.transaction_id,
@@ -2301,29 +2337,22 @@ async def _exec_class_beneficiary_removal(mapped_data: dict, trust_id: str, user
     
 
 
-ACTION_DISPATCH = {
-    "distribution": _exec_distribution,
-    "asset": _exec_asset,
-    "asset_update": _exec_asset_update,
-    "minutes": _exec_minutes,
-    "contribute_asset": _exec_contribute_asset,
-    "beneficiary": _exec_beneficiary,
-    "beneficiary_update": _exec_beneficiary_update,
-    "beneficiary_removal": _exec_beneficiary_removal,
-    "send_certificate": _exec_send_certificate,
-    "distribution_cancel": _exec_distribution_cancel,
-    "document_upload": _exec_document_upload,
-    "compensation_plan": _exec_compensation_plan,
-    "compensation_payment": _exec_compensation_payment,
-    "investment": _exec_investment,
-    "task": _exec_task,
-    "transaction": _exec_transaction,
-    "entity": _exec_entity,
-    "settings_update": _exec_settings_update,
-    "alert_dismiss": _exec_alert_dismiss,
-    "class_beneficiary": _exec_class_beneficiary,
-    "class_beneficiary_removal": _exec_class_beneficiary_removal,
-}
+# 2026-10-23 council P0 (code hygiene): ACTION_DISPATCH was a DEAD dict.
+# It was extracted from _execute_approved_action in commit c4dd789, then the
+# whole execution path was unified onto the shared action layer in 70acc62
+# (action_layer.call_action + ACTION_EXECUTION_MAP). ACTION_DISPATCH was
+# left behind: nothing referenced it anywhere in the repo (verified by
+# grep across the backend including tests), so it only confused maintainers
+# into thinking there were two dispatch tables. It is aliased to
+# ACTION_EXECUTION_MAP so any external caller importing the old name still
+# resolves, and so the intent is documented in one place.
+#
+# NOTE: ACTION_EXECUTION_MAP maps card type -> {endpoint_type, field_map};
+# the old ACTION_DISPATCH mapped endpoint_type -> handler function. The
+# handler functions themselves (_exec_*) are still live — _exec_minutes is
+# called directly by the minutes branch of _execute_approved_action and by
+# the test suite. Only the dispatch TABLE was dead.
+ACTION_DISPATCH = ACTION_EXECUTION_MAP
 
 async def _execute_approved_action(
     action_card: dict,
@@ -2400,16 +2429,36 @@ async def _execute_approved_action(
     # appear as a handler param (validate_params rejects unknown fields).
     mapped_data.pop("trust_id", None)
 
+    # 2026-10-23 council P0 — READ-BACK VERIFICATION.
+    # Every exec result the member sees is read back from Mongo by its
+    # primary key. A handler that reports success but wrote nothing flips
+    # to success=false ("record not found after write") and fires a Discord
+    # alert. See exec_hardening.verify_exec_write.
+    from exec_hardening import verify_exec_write
+
+    async def _verified(result: dict) -> dict:
+        if not result:
+            return result
+        return await verify_exec_write(
+            db,
+            endpoint_type=endpoint_type,
+            result=result,
+            user_id=user_id,
+            trust_id=trust_id,
+            action_type=card_type or endpoint_type,
+        )
+
     if endpoint_type == "minutes":
         # Chat minutes cards carry participants_text / decisions_text and
         # status=draft — a different shape from the seed generate-minutes
         # action — so this intent keeps its dedicated handler (which itself
         # routes through the real minutes router).
         try:
-            return await _exec_minutes(mapped_data, trust_id, user_id)
+            result = await _exec_minutes(mapped_data, trust_id, user_id)
         except Exception as e:
             logger.error(f"Action execution error: {type(e).__name__}: {e}")
             return {"success": False, "error": str(e)}
+        return await _verified(result)
 
     from actions_seed import get_chat_intent_action
     from action_layer import call_action
@@ -2448,7 +2497,7 @@ async def _execute_approved_action(
     if outcome.get("ok"):
         result = outcome.get("result") or {}
         result.setdefault("success", True)
-        return result
+        return await _verified(result)
     err = outcome.get("error")
     if not err:
         err = (outcome.get("result") or {}).get("error")
@@ -2562,7 +2611,9 @@ async def confirm_action(
             try:
                 from approval_handler import _friendly_summary, build_success_message
                 response["message"] = build_success_message(
-                    _friendly_summary(action_card), execution_result
+                    _friendly_summary(action_card),
+                    execution_result,
+                    execution_result.get("endpoint_type", ""),
                 )
             except Exception as e:  # noqa: BLE001 — never fail the approval
                 logger.warning("confirm_action: could not build success message: %s", e)
@@ -2624,6 +2675,10 @@ async def _chat_stream_generator(
     - done: final metadata (action_card, citations, caveat)
     - error: error message
     """
+    # 2026-10-23 council P0: start the response-time clock here so the
+    # streaming route can log the same response_time_s the non-streaming
+    # route logs (the streaming path had NO telemetry at all).
+    stream_start_time = datetime.now(timezone.utc)
     try:
         # 1. Get active trust
         trust_id_resolved, trust_name = await _get_active_trust(user_id, trust_id)
@@ -2911,6 +2966,38 @@ async def _chat_stream_generator(
         )
 
         logger.info(f"CHAT_STREAM | user={user_id} | conversation={conv_id} | intent={intent} | response_len={len(full_response_text)}")
+
+        # --- Measurement framework telemetry (#7) ---
+        # 2026-10-23 council P0: the streaming route is the ONLY route members
+        # actually use, and it wrote NO telemetry — the sole insert lived in
+        # the non-streaming chat() path. Every member turn was therefore
+        # invisible to the measurement framework. This insert mirrors the
+        # non-streaming schema (chat.py L466-480) field for field.
+        # Failure is logged at WARNING (not debug): a silent telemetry gap
+        # is exactly the kind of invisible failure this bundle exists to kill.
+        try:
+            msg_count = conversation.get("message_count", 0) if conversation else 0
+            is_first_message = msg_count == 0
+            health_total = (trust_context or {}).get("health_score", {}).get("total", 0)
+            response_time = (datetime.now(timezone.utc) - stream_start_time).total_seconds()
+
+            await db.chat_telemetry.insert_one({
+                "timestamp": now,
+                "user_id": user_id,
+                "trust_id": trust_id_resolved,
+                "conversation_id": conv_id,
+                "intent": intent,
+                "response_time_s": round(response_time, 2),
+                "has_action_card": action_card is not None,
+                "action_card_type": action_card.get("type") if action_card else None,
+                "is_first_message": is_first_message,
+                "health_score": health_total,
+                "message_length": len(message),
+                # For fallback-rate tracking: we log whether the user subsequently
+                # visits a Dashboard page after this chat message (joined at query time)
+            })
+        except Exception as e:
+            logger.warning(f"Telemetry write failed on streaming route: {e}", exc_info=True)
 
     except Exception as e:
         logger.error(f"Chat stream error: {type(e).__name__}: {e}", exc_info=True)
