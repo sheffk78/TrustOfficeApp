@@ -1287,6 +1287,7 @@ class HealthScoreResponse(BaseModel):
     criteria: List[HealthScoreCriterion]
     risk_findings: List[RiskFinding] = []
     risk_penalty_breakdown: Optional[RiskPenaltyBreakdown] = None
+    dismissed_risk_types: List[str] = []   # risk finding types the user dismissed
     calculated_at: str
 
 
