@@ -359,7 +359,11 @@ async def get_stats_dashboard(
     monthly_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "monthly"})
     annual_active = await db.subscriptions.count_documents({"status": "active", "plan_type": "annual"})
 
-    # Monthly: $79/mo, Annual: $790/yr ≈ $65.83/mo
+    # Grandfathered legacy plan_types: 'monthly' $79/mo, 'annual' $790/yr
+    # ≈ $65.83/mo. 2026-10-23: only the legacy plan_types use these rates —
+    # the current tiers (trustee/estate/advisor/wingpoint) are billed at
+    # $99/$189/$499/$119 per month and are counted in admin.py's
+    # MRR_RATES_CENTS table.
     mrr_cents = (monthly_active * 7900) + (annual_active * 6583)
     arr_cents = mrr_cents * 12
 

@@ -1265,16 +1265,37 @@ def _fetch_stripe_all_time_revenue():
     return total_revenue_cents, total_transactions, customer_ids
 
 
+# 2026-10-23 pricing fix: these rate tables were still using the
+# pre-2026-09-08 prices for the CURRENT tiers (trustee 79, estate 149,
+# advisor 399), so the admin dashboard under-reported MRR for every
+# subscriber on a current-rate plan. They now match the real prices the
+# backend charges (backend/routers/subscriptions.py PLAN_AMOUNTS):
+#   trustee $99/mo, estate $189/mo, advisor $499/mo, wingpoint $119/mo
+#   annual: trustee $948/yr ($79/mo), estate $1,788/yr ($149/mo),
+#           advisor $4,788/yr ($399/mo)
+# The legacy 'monthly'/'annual' plan_types are grandfathered subscribers
+# still billed at $79/mo and $790/yr — those rates stay.
+MRR_RATES_CENTS = {
+    # Current tiers
+    "trustee": 9900,   # $99/mo
+    "estate": 18900,   # $189/mo
+    "advisor": 49900,  # $499/mo
+    "wingpoint": 11900,  # $119/mo
+    # Grandfathered legacy plan_types
+    "monthly": 7900,   # $79/mo
+    "annual": 6583,    # $790/yr ~ $65.83/mo
+}
+
+
 def _compute_revenue_estimate(sub_counts: dict) -> float:
     """Compute rough monthly revenue estimate from subscription plan counts."""
-    rates = {"monthly": 79, "annual": 790 / 12, "trustee": 79, "estate": 149, "advisor": 399, "wingpoint": 99}
+    rates = {plan: cents / 100 for plan, cents in MRR_RATES_CENTS.items()}
     return sum(sub_counts.get(plan, 0) * rate for plan, rate in rates.items())
 
 
 def _compute_mrr_cents(sub_counts: dict) -> int:
     """Compute MRR in cents from subscription plan counts."""
-    rates = {"monthly": 7900, "annual": 6583, "trustee": 7900, "estate": 14900, "advisor": 39900, "wingpoint": 9900}
-    return sum(sub_counts.get(plan, 0) * rate for plan, rate in rates.items())
+    return sum(sub_counts.get(plan, 0) * rate for plan, rate in MRR_RATES_CENTS.items())
 
 
 @router.get("/stats", response_model=SystemStats)

@@ -674,6 +674,32 @@ async def startup_event():
     """Start background task runner and create indexes on app startup"""
     startup_errors = []
 
+    # ---- Alert-webhook assertion (2026-10-23) ----------------------------
+    # The leads pipeline monitor posts its RED alert to Discord. Both alert
+    # webhook env vars were UNSET on the production service, so every RED
+    # alert was silently discarded and the monitoring layer went dark for
+    # weeks with no trace. Assert loudly at startup so this can never
+    # happen unnoticed again: log at ERROR and surface it in the startup
+    # error summary.
+    try:
+        from discord_service import missing_alert_webhook_env
+        _missing_alert_env = missing_alert_webhook_env()
+        if _missing_alert_env:
+            logger.error(
+                "ALERT WEBHOOK MISCONFIGURATION - the monitoring layer can go "
+                f"dark silently. Missing env var(s): {', '.join(_missing_alert_env)}. "
+                "Set them on the service (Railway: TrustOfficeApp-backend-v2) "
+                "so RED pipeline alerts are delivered. A hard-coded fallback "
+                "webhook is used in the meantime, but the env vars are the "
+                "source of truth."
+            )
+            startup_errors.append(f"alert_webhooks_missing: {_missing_alert_env}")
+        else:
+            logger.info("Alert webhook configuration OK (both env vars set)")
+    except Exception as e:
+        logger.error(f"Failed to assert alert webhook configuration: {e}")
+        startup_errors.append(f"alert_webhook_check: {e}")
+
     # Shared action layer: import seed actions so their @action decorators
     # run before the API serves any traffic (fail-soft: registry stays
     # empty rather than crashing the app if a seed module breaks).

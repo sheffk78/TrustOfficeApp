@@ -86,8 +86,13 @@ const TIER_PRICES = {
   trustee: { monthly: 99, annual: 948 },
   estate: { monthly: 189, annual: 1788 },
   advisor: { monthly: 499, annual: 4788 },
-  wingpoint: { annual: 1188 }, // WingPoint is annual-only
-  // Grandfathered (pre-2026-09-08) Trustee rates
+  wingpoint: { monthly: 119, annual: 1188 },
+  // Grandfathered (pre-2026-09-08) Trustee rates.
+  // These are the real amounts grandfathered subscribers are billed by
+  // Stripe (backend PLAN_AMOUNTS: ("trustee","legacy-monthly")=79.00,
+  // ("trustee","legacy-annual")=790.00) and they are what the backend
+  // reports as `price_amount` for those subscribers. Keeping them here
+  // makes GA4 revenue match what was actually charged.
   monthly: { monthly: 79, annual: 790 },
   annual: { monthly: 79, annual: 790 },
 };
@@ -99,7 +104,12 @@ const TIER_PRICES = {
  * @returns {number} Price in USD
  */
 const getTierPrice = (planType, billingPeriod) => {
-  return TIER_PRICES[planType]?.[billingPeriod || 'monthly'] || 79;
+  // 2026-10-23: the old fallback was 79, which silently mis-valued every
+  // event for a plan type we did not recognise (and WingPoint monthly,
+  // which is 119). Fall back to the Trustee MONTHLY rate (99) only when
+  // nothing matches, and never below it.
+  const price = TIER_PRICES[planType]?.[billingPeriod || 'monthly'];
+  return price ?? TIER_PRICES.trustee.monthly;
 };
 
 /**

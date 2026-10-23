@@ -11,9 +11,13 @@ import re
 from collections import defaultdict
 import time
 
+import os
+
 from database import db
 from email_service import email_service
 from routers.admin import require_admin
+from discord_service import notify_new_lead
+from routers.notifications import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +88,147 @@ def check_rate_limit(ip: str) -> bool:
     return False
 
 
+# Recipient for the human-facing new-lead email notification. Discord is
+# not the only rail a lead should travel on (2026-10-23 directive: remove
+# Discord as the single human-facing rail).
+NEW_LEAD_NOTIFICATION_EMAIL = os.environ.get(
+    "NEW_LEAD_NOTIFICATION_EMAIL", "kenneth@agentictrust.app"
+)
+
+
+async def _upsert_lead_from_contact(
+    name: str,
+    email: str,
+    message: str,
+    company: Optional[str] = None,
+) -> Optional[str]:
+    """Create/update the CRM lead for a contact-form submission.
+
+    Mirrors routers/leads.py capture_lead: same lead document shape, same
+    duplicate-check-on-email semantics, same Discord + in-app notification
+    fan-out. Returns the lead_id, or None if the lead could not be written.
+
+    The contact_submissions write is kept separately — the message body has
+    no home in the lead schema, so it stays on the submission doc.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+
+    existing = await db.leads.find_one({"email": email})
+    if existing:
+        lead_id = existing.get("lead_id")
+        # Preserve the lead's immutable origin (same rule as capture_lead):
+        # the first source that created the lead stays authoritative.
+        await db.leads.update_one(
+            {"email": email},
+            {"$set": {
+                "name": name,
+                "updated_at": now_iso,
+                "last_contact_message": message,
+            }},
+        )
+        logger.info(f"Contact submission matched existing lead {lead_id} — {email}")
+        return lead_id
+
+    lead_id = f"lead_{uuid.uuid4().hex[:12]}"
+    lead_doc = {
+        "lead_id": lead_id,
+        "email": email,
+        "name": name,
+        "source": "contact-page",
+        "origin_source": "contact-page",
+        "phone": None,
+        "lead_type": "contact_form",
+        "company": company,
+        "utm_source": None,
+        "utm_campaign": None,
+        "utm_medium": None,
+        "referrer": None,
+        "stage": "new",
+        "manual_stage_override": False,
+        "nurture_step_sent": 0,
+        "lessons_watched": 0,
+        "subscription_status": None,
+        "last_login": None,
+        "notes": "",
+        "next_action": "Reply to contact form inquiry",
+        "score": 50,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.leads.insert_one(lead_doc)
+
+    # Discord notification (same call shape as capture_lead).
+    try:
+        notify_result = await notify_new_lead(
+            name=name,
+            email=email,
+            source="contact-page",
+            lead_stage="new",
+        )
+        if not (isinstance(notify_result, dict) and notify_result.get("success")):
+            logger.error(
+                f"Discord new-lead notification FAILED for contact-page lead {lead_id}: "
+                f"{notify_result.get('error') if isinstance(notify_result, dict) else notify_result}"
+            )
+    except Exception as e:
+        logger.error(f"Discord new-lead notification raised for contact-page lead {lead_id}: {e}")
+
+    # In-app notification.
+    try:
+        await create_notification(
+            type="new_lead",
+            title=f"New lead: {name}",
+            body="Source: contact-page · Score: 50",
+            lead_id=lead_id,
+            lead_email=email,
+            lead_name=name,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create in-app notification for contact-page lead {lead_id}: {e}")
+
+    # Email rail: a human-facing notification that is not Discord.
+    try:
+        await email_service.send_email(
+            to_email=NEW_LEAD_NOTIFICATION_EMAIL,
+            subject=f"New TrustOffice lead: {name}",
+            html_body=(
+                "<p><strong>New TrustOffice lead</strong> from the contact page.</p>"
+                "<ul>"
+                f"<li><strong>Name:</strong> {name}</li>"
+                f"<li><strong>Email:</strong> {email}</li>"
+                f"<li><strong>Company:</strong> {company or 'Not provided'}</li>"
+                "<li><strong>Source:</strong> contact-page</li>"
+                f"<li><strong>Lead ID:</strong> {lead_id}</li>"
+                "</ul>"
+                "<p><strong>Message:</strong></p>"
+                f"<p style=\"white-space: pre-wrap;\">{message}</p>"
+            ),
+            text_body=(
+                "New TrustOffice lead from the contact page.\n\n"
+                f"Name: {name}\n"
+                f"Email: {email}\n"
+                f"Company: {company or 'Not provided'}\n"
+                "Source: contact-page\n"
+                f"Lead ID: {lead_id}\n\n"
+                f"Message:\n{message}\n"
+            ),
+            tag="new-lead-notification",
+        )
+        logger.info(
+            f"New-lead email notification sent to {NEW_LEAD_NOTIFICATION_EMAIL} for {lead_id}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to send new-lead email notification for {lead_id}: {e}")
+
+    logger.info(f"Contact submission captured as lead {lead_id} — {email} via contact-page")
+    return lead_id
+
+
 @router.post("")
 async def submit_contact_form(submission: ContactSubmission, request: Request):
     """
@@ -121,11 +266,43 @@ async def submit_contact_form(submission: ContactSubmission, request: Request):
         "user_agent": request.headers.get("User-Agent", ""),
         "status": "new",
         "created_at": now.isoformat(),
-        "responded_at": None
+        "responded_at": None,
+        # Back-reference to the CRM lead created from this submission.
+        "lead_id": None,
     }
     
     await db.contact_submissions.insert_one(contact_doc)
     logger.info(f"Contact submission saved: {submission_id} from {submission.email}")
+
+    # Create/upsert the CRM lead so the contact page feeds the same pipeline
+    # as every other lead entry point. The message body stays on the
+    # submission doc (the lead schema has no field for it).
+    lead_id = None
+    try:
+        lead_id = await _upsert_lead_from_contact(
+            name=submission.name,
+            email=submission.email,
+            message=submission.message,
+            company=submission.company,
+        )
+    except Exception as e:
+        # The submission is already stored — a lead-pipeline failure must not
+        # lose the inquiry. Log loudly and keep serving the submission.
+        logger.error(
+            f"Failed to create lead from contact submission {submission_id}: {e}",
+            exc_info=True,
+        )
+
+    if lead_id:
+        try:
+            await db.contact_submissions.update_one(
+                {"submission_id": submission_id},
+                {"$set": {"lead_id": lead_id}},
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to back-reference lead {lead_id} onto submission {submission_id}: {e}"
+            )
     
     # Send notification email to team
     if email_service.is_configured:
@@ -280,7 +457,8 @@ Reference: {submission_id}
     return {
         "success": True,
         "message": "Thank you for your message. We'll be in touch soon!",
-        "submission_id": submission_id
+        "submission_id": submission_id,
+        "lead_id": lead_id,
     }
 
 

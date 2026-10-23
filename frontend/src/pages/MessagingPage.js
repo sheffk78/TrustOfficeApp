@@ -124,7 +124,7 @@ function TrustEmailCard({ trustId, trustName }) {
             </p>
             <div className="bg-amber-50 border border-amber-200 px-3 py-2 inline-block">
               <p className="text-sm text-amber-800">
-                Available on <strong>Estate ($149/mo)</strong> and <strong>Advisor ($399/mo)</strong> plans.
+                Available on <strong>Estate ($189/mo)</strong> and <strong>Advisor ($499/mo)</strong> plans.
               </p>
             </div>
           </div>

@@ -364,7 +364,7 @@ export default function PricingPage() {
           <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8 items-stretch">
-                {/* Card 1: Trustee Plan — $99/mo, or $79/mo with annual (1 trust) */}
+                {/* Card 1: Trustee Plan — $99/mo, or $948/yr annual ($79/mo equivalent, 1 trust) */}
                 <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-mono uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     1 Trust
@@ -687,8 +687,8 @@ export default function PricingPage() {
       <section className="pb-12 px-8">
         <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
           Subscribe to start — <span className="font-mono">$99/month</span> for Trustee, <span className="font-mono">$189/month</span> for Estate, or <span className="font-mono">$499/month</span> for Advisor,
-          or lock in the lower annual rate: <span className="font-mono">$79/mo</span> Trustee (billed <span className="font-mono">$948/yr</span>), <span className="font-mono">$149/mo</span> Estate (billed <span className="font-mono">$1,788/yr</span>),
-          or <span className="font-mono">$399/mo</span> Advisor (billed <span className="font-mono">$4,788/yr</span>) — save 20% with annual billing.
+          or lock in the lower annual rate: <span className="font-mono">$948/yr</span> Trustee ($79/mo equivalent), <span className="font-mono">$1,788/yr</span> Estate ($149/mo equivalent),
+          or <span className="font-mono">$4,788/yr</span> Advisor ($399/mo equivalent) — save 20% with annual billing.
           The trust pays for governance tools the same way it pays for legal counsel.
         </p>
       </section>

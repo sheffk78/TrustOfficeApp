@@ -6,7 +6,7 @@ import { WINGPOINT_TIER, TRUSTEE_TIER } from './pricingConfig';
 
 // WingPoint-exclusive purchase section — only shown to WingPoint customers
 // (user.is_wingpoint). Renders BOTH options Jeff requires:
-//   (a) Trustee — $99/mo (legacy grandfathered $79/mo) · annual $948/yr
+//   (a) Trustee — $99/mo · annual $948/yr ($79/mo equivalent)
 //   (b) WingPoint — $99/mo  (annual $1,188/yr)
 //
 // Each card carries its own Monthly/Annual toggle. Because the backend only
@@ -247,8 +247,8 @@ function WingPointOptionCard({ onSubscribe, processing, isTargetPlan, cardRef })
 
 // ── Combined WingPoint purchase section ────────────────────────
 // Replaces the previous single WingPointPlanCard. Renders the two options
-// Jeff requires side by side so a WingPoint customer sees both a $79/mo
-// (annual) Trustee plan and a $99 WingPoint plan, each with a
+// Jeff requires side by side so a WingPoint customer sees both a $948/yr
+// (annual) Trustee plan and a $99/mo-equivalent WingPoint plan, each with a
 // monthly/annual billing toggle.
 export default function WingPointPlanCard({
   onSubscribe,

@@ -63,7 +63,7 @@ export const TIERS = [
 // NOT added to the public TIERS array to prevent it leaking to non-WingPoint users.
 //
 // Jeff's requirement: WingPoint customers must be given TWO options:
-//   (a) $79/month  → maps to the existing 'trustee' tier (monthly 79, annual 790)
+//   (a) Trustee tier — $99/month, or $948/yr annual ($79/mo equivalent)
 //   (b) WingPoint plan → unlimited trusts at a discounted rate
 //       Monthly: $119/mo   (new — price-conscious customers)
 //       Annual:  $1,188/yr ($99/mo equivalent — best value, annual commitment)
