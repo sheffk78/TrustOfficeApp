@@ -6,6 +6,20 @@ from datetime import date, datetime, timezone, timedelta
 from typing import List
 
 
+# Schedule A categories that represent FINANCIAL holdings. A Schedule A made
+# up entirely of other categories (real estate, vehicles, personal property,
+# collectibles) means the trust simply does not hold securities — it does not
+# mean assets are sitting uninvested. Category values come from the
+# AssetCategory enum in models.py (mirrored in schedule_a.py CATEGORY_ORDER
+# and the Schedule A frontend picker).
+FINANCIAL_ASSET_CATEGORIES = {
+    "financial_accounts",
+    "business_interests",
+    "notes_receivable",
+    "digital_assets",
+}
+
+
 async def gather_risk_findings(
     trust_id: str,
     trust: dict,
@@ -199,20 +213,43 @@ async def gather_risk_findings(
         {"trust_id": trust_id, "status": "active"},
         {"_id": 0, "category": 1, "approximate_value": 1},
     ).to_list(1000)
+    item_categories = [
+        (item.get("category") or "other_property")
+        for item in schedule_a_items
+    ]
 
     # Rule A: Trust has assets on Schedule A but zero investments recorded
     if total_investments == 0 and len(schedule_a_items) > 0:
         total_schedule_a_value = sum(item.get("approximate_value", 0) or 0 for item in schedule_a_items)
         if total_schedule_a_value > 0:
-            risks.append({
-                "type": "uninvested_assets",
-                "severity": "high",
-                "title": "Trust assets may be uninvested",
-                "detail": f"No investment holdings tracked. Schedule A shows ${total_schedule_a_value:,.0f} in assets — review for idle cash exposure under the Prudent Investor Rule.",
-                "action": "Add investment holdings or document why assets are held in cash",
-                "module": "investments",
-                "deeplink": "/investments",
-            })
+            # Severity graduation by asset composition (2026-10-23, Kratt call):
+            # a trust whose Schedule A is entirely non-financial (real estate,
+            # vehicles, personal property, insurance, collectibles) is not
+            # "uninvested" — nothing is sitting idle in cash. The Prudent
+            # Investor Rule framing is a false alarm for those trusts, so it
+            # drops to an advisory low-severity note. Any financial-category
+            # item keeps the original high-severity finding.
+            financial_categories = [c for c in item_categories if c in FINANCIAL_ASSET_CATEGORIES]
+            if financial_categories:
+                risks.append({
+                    "type": "uninvested_assets",
+                    "severity": "high",
+                    "title": "Trust assets may be uninvested",
+                    "detail": f"No investment holdings tracked. Schedule A shows ${total_schedule_a_value:,.0f} in assets — review for idle cash exposure under the Prudent Investor Rule.",
+                    "action": "Add investment holdings or document why assets are held in cash",
+                    "module": "investments",
+                    "deeplink": "/investments",
+                })
+            else:
+                risks.append({
+                    "type": "no_securities_advisory",
+                    "severity": "low",
+                    "title": "No securities tracked — advisory only",
+                    "detail": "Schedule A lists non-securities assets (real estate, insurance, or personal property). No investment holdings are tracked. If any funds are held in cash long-term, consider documenting your investment approach for the trust file.",
+                    "action": "Document investment approach or add securities (optional)",
+                    "module": "investments",
+                    "deeplink": "/investments",
+                })
 
     # Rule B: Cash-heavy portfolio — financial accounts > 60% of total tracked investments
     if total_investments > 0:
