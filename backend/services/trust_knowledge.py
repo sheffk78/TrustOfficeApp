@@ -636,12 +636,12 @@ def retrieve_passages(
             # preamble-only first passage lacks).
             per_passage = max(900, (max_chars - used) // 2)
             if len(text) > per_passage:
-                text = text[:per_passage].rstrip() + "…"
+                text = text[:per_passage - 1].rstrip() + "…"  # … replaces the final char: len == per_passage
             if used + len(text) > max_chars:
                 remaining = max_chars - used
                 if remaining <= 200:
                     break
-                text = text[:remaining].rstrip() + "…"
+                text = text[:remaining - 1].rstrip() + "…"  # len == remaining
             results.append({
                 "passage_id": r["passage_id"],
                 "document_id": r["document_id"],
@@ -655,7 +655,7 @@ def retrieve_passages(
                 "heading_hit": heading_hit,
             })
             used += len(text)
-            if len(results) >= limit or used >= max_chars:
+            if len(results) >= limit or used > max_chars:
                 break
         return {
             "registry_version": version,
