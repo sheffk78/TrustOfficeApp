@@ -272,7 +272,7 @@ async def ai_draft_stream(
     Yields content text chunks as they arrive from the AI model.
     Tries OpenRouter (Gemini) first, falls back to non-streaming if needed.
 
-    Raises AIClientError if ALL providers fail â does NOT yield a soft
+    Raises AIClientError if ALL providers fail — does NOT yield a soft
     error string as a token chunk (that would be indistinguishable from
     a real AI response and cause the stream to end without a proper
     'error' event, resulting in "The connection was interrupted" on the

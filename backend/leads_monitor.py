@@ -181,6 +181,17 @@ async def check_leads_pipeline_health(
         if day_ago <= due_at <= now:
             due_in_window += 1
         elif due_at < now - DUE_GRACE:
+            # 2026-10-24: lateness must be measured against when the drip could
+            # actually have run, not against raw wall-clock. The drip fires
+            # every 6 hours, so a step that became due in the LAST 6h has not
+            # been missed by anything yet — flagging it here raced the
+            # scheduler (e.g. 27 sends due at 04:26 AM, drip last ran 04:03,
+            # next run 10:03 -> 6 spurious "overdue" REDs). A send is only
+            # overdue when the previous drip run finished AFTER it came due:
+            # that is at least one full drip cycle of real negligence.
+            if due_at >= now - timedelta(hours=6):
+                due_in_window += 1
+                continue
             # Due and still not sent, past the grace window.
             overdue_due += 1
 
@@ -244,7 +255,7 @@ async def check_leads_pipeline_health(
         if bca > now + BOOKING_LOOKAHEAD:
             continue
         if bca < now - ONE_HOUR_UPPER:
-            # Call is long past â reminders (if any) already fired; not our concern.
+            # Call is long past — reminders (if any) already fired; not our concern.
             continue
 
         day_before_logged = bool(lead.get("reminder_day_before_sent_at")) or await _has_reminder_activity(
@@ -268,8 +279,8 @@ async def check_leads_pipeline_health(
     if booking_violations:
         failures.append(
             f"Booking reminders: {len(booking_violations)} call(s) missing reminder activity "
-            f"within 36h window â " + "; ".join(booking_violations[:5])
-            + (" â¦" if len(booking_violations) > 5 else "")
+            f"within 36h window —" + "; ".join(booking_violations[:5])
+            + ("…" if len(booking_violations) > 5 else "")
         )
 
     all_ok = len(failures) == 0

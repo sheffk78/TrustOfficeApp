@@ -1187,7 +1187,7 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
         "user_id": new_user_id,
         "email": email,
         "name": name or email.split("@")[0],
-        # No password yet â user sets one via the welcome email's
+        # No password yet — user sets one via the welcome email's
         # password-setup link (purpose="set_password") or "forgot password".
         "password_hash": None,
         "created_at": now,

@@ -151,7 +151,7 @@ def _format_date_conveyed(date_conveyed):
     return date_conveyed
 
 
-# Cell paragraph style for table data â enables text wrapping within cells
+# Cell paragraph style for table data — enables text wrapping within cells
 # so long strings never get truncated mid-word.
 def _cell_style():
     return ParagraphStyle(
@@ -169,11 +169,11 @@ def _cell_style():
 # Returns Paragraph objects so ReportLab wraps text within cells
 # instead of truncating mid-word.
 def _build_item_row(item):
-    desc = item.get("description", "") or "â"
-    identifier = item.get("identifier", "â") or "â"
-    location = item.get("location", "â") or "â"
+    desc = item.get("description", "") or "—"
+    identifier = item.get("identifier", "—") or "—"
+    location = item.get("location", "—") or "—"
     value = f"${item.get('approximate_value', 0):,.2f}" if item.get("approximate_value") else "N/D"
-    date_conveyed = _format_date_conveyed(item.get("date_conveyed", "â"))
+    date_conveyed = _format_date_conveyed(item.get("date_conveyed", "—"))
     cs = _cell_style()
     return [Paragraph(desc, cs), Paragraph(identifier, cs), Paragraph(location, cs), Paragraph(value, cs), Paragraph(date_conveyed, cs)]
 

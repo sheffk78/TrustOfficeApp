@@ -1,4 +1,4 @@
-# Orgs router â Institution skeleton (M1, TrustOffice)
+# Orgs router — Institution skeleton (M1, TrustOffice)
 # Gated on TOGGLE_INSTITUTION: returns 404 when flag is off.
 # All endpoints are additive; no existing collection or endpoint is modified.
 

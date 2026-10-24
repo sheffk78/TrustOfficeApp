@@ -368,7 +368,7 @@ async def start_review(
     payload: WorkflowActionBody,
     user: dict = Depends(require_write_access),
 ):
-    """Start reviewing pending minutes (pending_review Ã¢ÂÂ under_review)."""
+    """Start reviewing pending minutes (pending_review → under_review)."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
     if trust_id and (_toggle_institution() or _toggle_trust_parties()):
         # ORG-SKELETON-SPEC §5: org grant never sufficient here (D-C)
@@ -389,7 +389,7 @@ async def finalize_minutes(
     payload: WorkflowActionBody,
     user: dict = Depends(require_write_access),
 ):
-    """Finalize approved minutes (approved Ã¢ÂÂ finalized, terminal)."""
+    """Finalize approved minutes (approved → finalized, terminal)."""
     trust_id = await _resolve_minutes_trust_id(minutes_id)
     if trust_id:
         user = await require_org_grant(trust_id, min_level=GrantLevel.preparer, user=user)

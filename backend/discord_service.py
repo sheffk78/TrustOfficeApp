@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DISCORD_LEADS_WEBHOOK_URL = os.environ.get('DISCORD_LEADS_WEBHOOK_URL')
 DISCORD_ALERTS_WEBHOOK_URL = os.environ.get('DISCORD_ALERTS_WEBHOOK_URL')
-# #trustoffice-main channel (1479343804527153262) â pipeline health RED alerts.
+# #trustoffice-main channel (1479343804527153262) — pipeline health RED alerts.
 DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL = os.environ.get('DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL') or DISCORD_ALERTS_WEBHOOK_URL
 TRUSTOFFICE_MAIN_CHANNEL_ID = "1479343804527153262"
 
@@ -310,7 +310,7 @@ async def notify_pipeline_alert(
 
     result = await send_discord_message(
         webhook_url=webhook_url,
-        content=f"<@{TRUSTOFFICE_MAIN_CHANNEL_ID}> **RED ALERT** â {title}",
+        content=f"<@{TRUSTOFFICE_MAIN_CHANNEL_ID}> **RED ALERT** — {title}",
         embeds=[embed],
     )
     if not result.get("success"):

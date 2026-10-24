@@ -1,4 +1,4 @@
-# Audit Defense PDF Export â court-ready separation evidence report
+# Audit Defense PDF Export — court-ready separation evidence report
 import io
 import logging
 import uuid

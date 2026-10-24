@@ -238,15 +238,15 @@ import logging as _logging
 
 _ssn_logger = _logging.getLogger("trustoffice.security.ssn")
 
-# Dashed SSN: 123-45-6789 â always rejected (all fields) and redacted for LLM.
+# Dashed SSN: 123-45-6789 — always rejected (all fields) and redacted for LLM.
 SSN_DASHED_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-# Dashed EIN: 12-3456789 â legitimate, accepted on EIN fields; redacted for LLM.
+# Dashed EIN: 12-3456789 — legitimate, accepted on EIN fields; redacted for LLM.
 EIN_DASHED_RE = re.compile(r"\b\d{2}-\d{7}\b")
 # Bare 9-digit sequence: ambiguous; rejected on generic fields, accepted on EIN
 # fields (models.py normalizes to XX-XXXXXXX); redacted as SSN for LLM outbound.
 BARE_9_RE = re.compile(r"\b\d{9}\b")
 
-# Keys that carry EINs â these must NOT be rejected for bare 9-digit input.
+# Keys that carry EINs — these must NOT be rejected for bare 9-digit input.
 EIN_FIELD_KEYS = ("ein",)
 
 
@@ -292,7 +292,7 @@ def check_ssn_or_raise(value: str, field_name: str = "") -> None:
         )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="SSNs are not accepted â TrustOffice never stores Social Security numbers.",
+            detail="SSNs are not accepted — TrustOffice never stores Social Security numbers.",
         )
 
 
@@ -338,11 +338,11 @@ def redact_pii_for_llm(text: str):
     redacted, n_ssn_dashed = SSN_DASHED_RE.subn("[REDACTED-SSN]", redacted)
     ssn_count += n_ssn_dashed
 
-    # 2) Dashed EIN (12-3456789) â must run after SSN so 3-2-4 never matches 2-7
+    # 2) Dashed EIN (12-3456789) — must run after SSN so 3-2-4 never matches 2-7
     redacted, n_ein = EIN_DASHED_RE.subn("[REDACTED-EIN]", redacted)
     ein_count += n_ein
 
-    # 3) Bare 9-digit sequences â treat as SSN (most sensitive interpretation)
+    # 3) Bare 9-digit sequences → treat as SSN (most sensitive interpretation)
     redacted, n_bare = BARE_9_RE.subn("[REDACTED-SSN]", redacted)
     ssn_count += n_bare
 
@@ -383,13 +383,13 @@ class SSNGuardMiddleware(BaseHTTPMiddleware):
             import json as _json
             payload = _json.loads(body_bytes)
         except Exception:
-            # Not valid JSON â let downstream validation handle it.
+            # Not valid JSON — let downstream validation handle it.
             return await call_next(request)
 
         try:
             scan_dict_for_ssn(payload)
         except HTTPException as exc:
-            # Return a proper 422 response (don't re-raise â the middleware is
+            # Return a proper 422 response (don't re-raise — the middleware is
             # the boundary that enforces the intake ban).
             from starlette.responses import JSONResponse
             return JSONResponse(

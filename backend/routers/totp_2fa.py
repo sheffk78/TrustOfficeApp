@@ -279,7 +279,7 @@ async def login_2fa(request: Request, body: TwoFactorLoginRequest, response: Res
             return JSONResponse(status_code=429, content=err_body)
         fail_count = totps.record_totp_failure(user_id)
         await _sec_event(user_id, "2fa_login_failed", request, {
-            "reason": method,  # 'invalid' | 'recovery_code' (race) â never the code itself
+            "reason": method,  # 'invalid' | 'recovery_code' (race) — never the code itself
             "attempt_count_in_window": fail_count,
         })
         try:
