@@ -44,6 +44,15 @@ _FINGERPRINT_CACHE: dict[str, tuple[float, str]] = {}
 # Section splitter: "## Heading" at the start of a line.
 _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.M)
 
+# Weight of a document-title match in the re-rank. The title is the corpus's
+# own organization of the domain, so a file NAMED for the concept
+# ("01-hems-standard" for HEMS, "24-utc-07-creditors-protection" for
+# spendthrift) is the canonical source for it. This factor is applied
+# MULTIPLICATIVELY to the passage score: 0.2 is enough for a title match to
+# beat a passage that merely mentions the concept, without letting a long
+# passage with a coincidental title token dominate a better answer.
+_TITLE_MATCH_FACTOR = 0.25
+
 # Minimal synonym expansion so member phrasing hits the indexed terms.
 # Porter stemming already handles plurals; these cover the irregular cases
 # and the domain abbreviations that appear in member questions.
@@ -597,6 +606,18 @@ def retrieve_passages(
                 + 4.0 * title_hit
                 + 2.0 * boost_hit
             )
+            # A document title match is not just another additive term: it
+            # says the corpus is ORGANIZED this way, so the file whose own
+            # name is the concept is the canonical source for it
+            # ("01-hems-standard" for a HEMS question, "24-utc-07-..." for a
+            # spendthrift question). Additively that signal was too weak:
+            # adding documents to the corpus shifts FTS5's IDF and coverage
+            # statistics, which was enough to let a passage that merely
+            # MENTIONS the concept outrank the file NAMED for it. The
+            # multiplicative factor makes the title decisive, which is what
+            # the invariant has always claimed.
+            if title_hit:
+                score *= 1.0 + _TITLE_MATCH_FACTOR * title_hit
             scored.append((score, bm25, coverage, heading_hit, r))
         scored.sort(key=lambda x: x[0], reverse=True)
         results = []
