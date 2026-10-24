@@ -629,6 +629,14 @@ def retrieve_passages(
             # The slice budget is hard. A passage that does not fit is
             # TRUNCATED, not skipped: dropping the top-ranked passage
             # because it is long would hand the slot to a worse answer.
+            # Per-passage carve: no single passage may consume more than
+            # half the remaining budget, so a 2,200-char winner cannot eat
+            # a 3,600-char slice by itself — the next-ranked passages stay
+            # in the render (they carry the s. 502/503 substance the
+            # preamble-only first passage lacks).
+            per_passage = max(900, (max_chars - used) // 2)
+            if len(text) > per_passage:
+                text = text[:per_passage].rstrip() + "…"
             if used + len(text) > max_chars:
                 remaining = max_chars - used
                 if remaining <= 200:

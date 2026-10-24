@@ -486,8 +486,8 @@ def _doctrine_query(message: str, concepts: list[str]) -> str:
 def fetch_doctrine(
     message: str,
     *,
-    limit: int = 4,
-    max_chars: int = 2200,
+    limit: int = 6,
+    max_chars: int = 3600,
     db_path: Optional[str] = None,
 ) -> list:
     """Fetch the top KB passages for a doctrine question.
@@ -537,6 +537,33 @@ def fetch_doctrine(
     return passages
 
 
+
+
+_DOCTRINE_ANCHORS: dict = {}
+
+
+def _doctrine_anchor(source_ref: str) -> str:
+    """Fetch the '**UTC anchor:** ...' line from a 24-utc-*.md KB file (cached).
+
+    UTC anchor lines live in the file preamble; section-level passage chunking
+    can slice around them, so the renderer attaches the anchor explicitly to
+    every UTC passage it renders.
+    """
+    if not _DOCTRINE_ANCHORS:
+        import re
+
+        from pathlib import Path
+        kb = Path(__file__).resolve().parent / "knowledge"
+        for f in sorted(kb.glob("24-utc-*.md")):
+            try:
+                m = re.search(r"\*\*UTC anchor:\*\*\s*(.+)", f.read_text(encoding="utf-8", errors="ignore"))
+            except OSError:
+                continue
+            if m:
+                _DOCTRINE_ANCHORS[f.name] = m.group(1).strip()
+    return _DOCTRINE_ANCHORS.get(source_ref, "")
+
+
 def _render_doctrine(passages: list) -> str:
     """Render doctrine passages with their citations for prompt injection."""
     if not passages:
@@ -550,6 +577,9 @@ def _render_doctrine(passages: list) -> str:
         lines.append(f"### {label}")
         if source:
             lines.append(f"Source: {source}")
+            anchor = _doctrine_anchor(source)
+            if anchor:
+                lines.append(f"UTC anchor: {anchor}")
         lines.append(p.get("text", "").strip())
     return "\n".join(lines)
 
