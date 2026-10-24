@@ -17,11 +17,263 @@ Design constraints:
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Optional
 
 MAX_RETRIEVAL_CHARS = 3500  # per-turn cap on all injected retrieval blocks
+
+# --------------------------------------------------------------------------- #
+# Layer 2b — doctrine retrieval (2026-10-23, P2a)
+#
+# The doctrine corpus is backend/knowledge/*.md, indexed by the FTS5 index in
+# services/trust_knowledge.py. A doctrine question triggers a deterministic
+# keyword/regex match; the matching concepts become an FTS query; the TOP
+# matching passages come back and are injected with their source file, so the
+# assistant can cite them.
+#
+# The corpus is entirely reviewed material: the Trustee-101 course (6 legal
+# review rounds) and the in-repo knowledge base. Nothing here adds legal
+# text — it only selects which reviewed passage to show.
+# --------------------------------------------------------------------------- #
+
+# Doctrine concept -> the regex patterns that mean "this member is asking
+# about that concept". Keys are concept names; values are (regex, extra FTS
+# query terms).
+DOCTRINE_TRIGGERS: dict[str, tuple[str, ...]] = {
+    "duties": (
+        r"\bmy\s+dut(y|ies)\b",
+        r"\btrustee\s+dut(y|ies)\b",
+        r"\bfiduciary\s+dut(y|ies)\b",
+        r"\bwhat\s+(am\s+i|do\s+i)\s+(supposed|required|obligated)\b",
+        r"\bwhat\s+are\s+my\s+(obligations|responsibilit)",
+        r"\bam\s+i\s+allowed\s+to\b",
+        r"\bcan\s+i\s+(as\s+a\s+trustee|self-deal|deal\s+with)",
+    ),
+    "utc": (
+        r"\buniform\s+trust\s+code\b",
+        r"\butc\b",
+        r"\btrust\s+code\b",
+    ),
+    "amendment": (
+        r"\bamend(ment|ments|ing)?\b",
+        r"\bmodify\s+(the\s+)?trust\b",
+        r"\bchange\s+the\s+trust\b",
+        r"\bmodification\b",
+    ),
+    "successor_trustee": (
+        r"\bsuccessor\s+trustee\b",
+        r"\bsuccession\b",
+        r"\bnext\s+trustee\b",
+        r"\breplace\s+(me|my\s+trustee|the\s+trustee)\b",
+        r"\bresign(ation)?\b",
+        r"\bstep\s+down\s+as\s+trustee\b",
+    ),
+    "distribution_standard": (
+        r"\bdistribution\s+standard\b",
+        r"\bhems\b",
+        r"\bsole\s+discretion\b",
+        r"\bstandard\s+of\s+care\b",
+        r"\bwhat\s+can\s+i\s+(give|distribute|distribute\s+to)\b",
+        r"\bmandatory\s+distribution\b",
+        r"\bevery\s+distribution\b",
+        r"\bbefore\s+(every|each|a|the)\s+distribution\b",
+        r"\bdistribution\s+memo\b",
+        r"\b(four|4)[\s-]*question\s+(test|checklist|framework)\b",
+    ),
+    "accounting": (
+        r"\baccounting\b",
+        r"\bhow\s+often\b",
+        r"\bhow\s+frequently\b",
+        r"\bannual\s+report\s+to\s+beneficiar",
+        r"\bbeneficiar(y|ies)\s+(notice|report)",
+    ),
+    "termination": (
+        r"\bterminat(e|ion|ing)\b",
+        r"\bwind\s*-?\s*down\b",
+        r"\bclose\s+the\s+trust\b",
+        r"\bfinal\s+distribution\b",
+    ),
+    "beneficiary_communication": (
+        r"\bnotify\s+(the\s+)?beneficiar",
+        r"\btell\s+(the\s+)?beneficiar",
+        r"\bbeneficiar(y|ies)\s+(letter|communication|notice)",
+        r"\bletter\s+to\s+(my\s+)?beneficiar",
+    ),
+    "commingling": (
+        r"\bcommingl",
+        r"\bseparation\b",
+        r"\bpersonal\s+(funds|money|account)",
+        r"\btrust\s+funds?\b.*\bmy\s+own\b",
+    ),
+    "investment": (
+        r"\bprudent\s+investor\b",
+        r"\binvestment\s+policy\b",
+        r"\bhow\s+should\s+i\s+invest\b",
+        r"\bwhat\s+can\s+i\s+invest\s+in\b",
+    ),
+    "tax": (
+        r"\bform\s+1041\b",
+        r"\bk-?1\b",
+        r"\btrust\s+tax\b",
+        r"\bestimated\s+tax\b",
+    ),
+    "minutes": (
+        r"\bminutes\b",
+        r"\bresolution\b",
+        r"\bmeeting\s+notes\b",
+    ),
+    "co_trustee": (
+        r"\bco-?\s*trustee\b",
+        r"\bjoint\s+trustee\b",
+        r"\bother\s+trustee\b",
+    ),
+    "compromise": (
+        r"\bconflict\s+of\s+interest\b",
+        r"\bself-?deal",
+        r"\brecuse\b",
+    ),
+}
+
+# Concepts that are worth a doctrine fetch on their own. A question that
+# matches ANY of these pulls the corpus; a question that matches none does
+# not (so ordinary chat turns stay cheap).
+DOCTRINE_CONCEPTS = tuple(DOCTRINE_TRIGGERS.keys())
+
+
+def _match_doctrine_concepts(message: str) -> list[str]:
+    """Return the doctrine concepts a message touches, in trigger order."""
+    m = message.lower()
+    hits: list[str] = []
+    for concept, patterns in DOCTRINE_TRIGGERS.items():
+        for pat in patterns:
+            if re.search(pat, m):
+                hits.append(concept)
+                break
+    return hits
+
+
+# Words that carry no retrieval signal. A question's grammatical scaffolding
+# ("what", "does", "how", "stand") matches everywhere and dilutes the query,
+# so it is stripped before the FTS MATCH.
+_DOCTRINE_QUERY_STOPWORDS = frozenset("""
+a an and are as at be been but by can could did do does doing for from had
+has have how i if in into is it its may me might my of on or our out so some
+that the their them then there these they this those to too us was we were
+what when where which who why will with would you your
+""".split())
+
+
+# Doctrine concept -> the canonical vocabulary of that concept. These terms
+# are used as a RE-RANK BOOST, not as part of the FTS MATCH: adding a broad
+# concept word to the MATCH would pull in every passage that mentions it and
+# drown out the passage the member actually asked for.
+DOCTRINE_VOCABULARY: dict = {
+    "duties": ("duty", "duties", "fiduciary", "loyalty", "prudence", "care"),
+    "utc": ("uniform", "trust", "code", "statute"),
+    "amendment": ("amend", "amendment", "modify", "modification"),
+    "successor_trustee": ("successor", "succession", "resign", "resignation"),
+    "distribution_standard": ("hems", "standard", "discretion", "distribution"),
+    "accounting": ("accounting", "account", "notice", "beneficiaries"),
+    "termination": ("terminate", "termination", "final", "distribution"),
+    "beneficiary_communication": ("beneficiary", "beneficiaries", "letter", "notice"),
+    "commingling": ("commingle", "commingling", "separation", "personal"),
+    "investment": ("prudent", "investment", "policy", "portfolio"),
+    "tax": ("1041", "tax", "estimate", "filing"),
+    "minutes": ("minutes", "resolution", "meeting", "documentation"),
+    "co_trustee": ("trustee", "co", "joint"),
+    "compromise": ("conflict", "interest", "recuse", "disqualify"),
+}
+
+
+def _doctrine_query(message: str, concepts: list[str]) -> str:
+    """Build the FTS query for a doctrine fetch.
+
+    The member's own CONTENT words are the signal. Grammatical scaffolding
+    is dropped: "what does HEMS stand for" becomes "hems stand", so the
+    query is about HEMS instead of about the English of the question.
+
+    The matched concepts' canonical vocabulary is returned separately as a
+    BOOST, so a passage that genuinely covers the concept outranks one
+    that merely happens to repeat a common word.
+    """
+    words = [
+        w for w in re.findall(r"[a-z0-9'-]{3,}", (message or "").lower())
+        if w not in _DOCTRINE_QUERY_STOPWORDS
+    ]
+    return " ".join(words)
+
+
+def fetch_doctrine(
+    message: str,
+    *,
+    limit: int = 4,
+    max_chars: int = 2200,
+    db_path: Optional[str] = None,
+) -> list:
+    """Fetch the top KB passages for a doctrine question.
+
+    Returns a list of dicts with the passage text plus its citation
+    metadata (source file, section heading, title). Returns [] when the
+    message does not raise a doctrine trigger, or when the index cannot be
+    built — retrieval must never break the chat.
+    """
+    concepts = _match_doctrine_concepts(message)
+    if not concepts:
+        return []
+    try:
+        from services import trust_knowledge
+        info = trust_knowledge.ensure_index(db_path=db_path)
+        resolved = info.get("db_path")
+        if not resolved or not os.path.isfile(resolved):
+            return []
+        boost: list = []
+        for concept in concepts:
+            boost.extend(DOCTRINE_VOCABULARY.get(concept, ()))
+        result = trust_knowledge.retrieve_passages(
+            _doctrine_query(message, concepts),
+            {"db_path": resolved, "boost_terms": boost},
+            limit=limit,
+            max_chars=max_chars,
+        )
+    except Exception as e:  # retrieval must never break the chat
+        from logging import getLogger
+        getLogger(__name__).warning(
+            f"doctrine retrieval failed: {type(e).__name__}: {e}"
+        )
+        return []
+    passages = []
+    for item in result.get("results", []):
+        text = item.get("text") or ""
+        if not text.strip():
+            continue
+        passages.append({
+            "title": item.get("title", ""),
+            "section": item.get("section", ""),
+            "text": text,
+            "source_ref": item.get("source_ref", ""),
+            "score": item.get("score", 0.0),
+            "concepts": concepts,
+        })
+    return passages
+
+
+def _render_doctrine(passages: list) -> str:
+    """Render doctrine passages with their citations for prompt injection."""
+    if not passages:
+        return ""
+    lines = ["## Retrieved Doctrine (cite the source file)"]
+    for p in passages:
+        title = p.get("title") or ""
+        section = p.get("section") or ""
+        source = p.get("source_ref") or ""
+        label = " — ".join(x for x in (title, section) if x)
+        lines.append(f"### {label}")
+        if source:
+            lines.append(f"Source: {source}")
+        lines.append(p.get("text", "").strip())
+    return "\n".join(lines)
 
 
 @dataclass
@@ -30,6 +282,7 @@ class RetrievalBlock:
     minutes_matches: list = field(default_factory=list)
     asset_history: list = field(default_factory=list)
     vault_doc_detail: Optional[dict] = None
+    doctrine: list = field(default_factory=list)
     extra: list = field(default_factory=list)
 
     def to_text(self) -> str:
@@ -69,6 +322,10 @@ class RetrievalBlock:
             if tags:
                 lines.append(f"Tags: {', '.join(str(t) for t in tags[:10])}")
             parts.append("\n".join(lines))
+        if self.doctrine:
+            rendered = _render_doctrine(self.doctrine)
+            if rendered:
+                parts.append(rendered)
         if self.extra:
             parts.extend(self.extra)
         if not parts:
@@ -79,7 +336,13 @@ class RetrievalBlock:
         return text
 
     def is_empty(self) -> bool:
-        return not (self.minutes_matches or self.asset_history or self.vault_doc_detail or self.extra)
+        return not (
+            self.minutes_matches
+            or self.asset_history
+            or self.vault_doc_detail
+            or self.doctrine
+            or self.extra
+        )
 
 
 # ------------------------------------------------------------ trigger patterns ---
@@ -372,6 +635,14 @@ async def retrieve_for_message(
         except Exception as e:
             from logging import getLogger
             getLogger(__name__).warning(f"vault retrieval failed: {type(e).__name__}: {e}")
+    # Layer 2b — doctrine retrieval (2026-10-23, P2a). Runs regardless of
+    # whether a trust-scoped block matched: a doctrine question is about the
+    # law and the reviewed corpus, not about this member's records.
+    try:
+        block.doctrine = fetch_doctrine(message)
+    except Exception as e:
+        from logging import getLogger
+        getLogger(__name__).warning(f"doctrine retrieval failed: {type(e).__name__}: {e}")
     return block
 
 
@@ -392,6 +663,9 @@ def inject_into_user_content(user_content: str, block: RetrievalBlock) -> str:
 __all__ = [
     "RetrievalBlock",
     "retrieve_for_message",
+    "fetch_doctrine",
+    "DOCTRINE_TRIGGERS",
+    "DOCTRINE_CONCEPTS",
     "minutes_search_needed",
     "asset_history_needed",
     "vault_detail_needed",
