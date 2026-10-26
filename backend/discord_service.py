@@ -145,10 +145,21 @@ async def notify_new_lead(
 
     KENNETH_DISCORD_ID = "1479298864539373702"
     if ping_on_phone and phone:
-        content = (
-            f"<@{KENNETH_DISCORD_ID}> **📞 Call now** — {name} · "
-            f"{phone} · {email}"
-        )
+        from phone_sanity import is_calling_quality
+        if is_calling_quality(phone):
+            content = (
+                f"<@{KENNETH_DISCORD_ID}> **📞 Call now** — {name} · "
+                f"{phone} · {email}"
+            )
+        else:
+            # Junk-looking number (sequential sweep, repeated digits, placeholder):
+            # surface it without interrupting Kenneth — 2026-10-26 Rhonda lesson
+            # (typed 12345678910; line turned out to dial, so keep the number
+            # visible and verifiable, just not ping-worthy).
+            content = (
+                f"**New phone lead** — {name} · {phone} · {email} via {source}\n"
+                f"⚠️ Submitted phone failed sanity check (possible typo/fake) — verify before calling. Booking link: https://trustoffice.app/book-a-call/"
+            )
     else:
         content = f"**New lead** — {name} ({email}) via {source}"
 
