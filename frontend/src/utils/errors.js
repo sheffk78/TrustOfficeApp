@@ -274,6 +274,18 @@ export async function reportErrorToBackend(error, context = {}) {
 export function showError(toast, error, context = {}) {
   const rawMessage = extractErrorMessage(error);
 
+  // 401/auth-expiry detection (err_811be8bd6936): an expired session or an
+  // unauthenticated hit is an expected user state, not an app bug. The backend
+  // already logs auth failures server-side. Used for BOTH the toast CTA and
+  // the skip-reporting decision below.
+  const lowerMsg = (rawMessage || '').toLowerCase();
+  const isAuthExpiry =
+    lowerMsg.includes('invalid token') ||
+    lowerMsg.includes('not authenticated') ||
+    lowerMsg.includes('session expired') ||
+    lowerMsg.includes('token revoked') ||
+    (rawMessage && rawMessage.includes('401'));
+
   // Build the user-facing message with a call-to-action
   let userMessage = rawMessage;
 
@@ -288,13 +300,18 @@ export function showError(toast, error, context = {}) {
     userMessage.toLowerCase().includes('log in');
 
   if (!hasGuidance) {
-    // Add actionable next step based on error type
-    if (userMessage.toLowerCase().includes('network') || userMessage.toLowerCase().includes('connection')) {
+    // Add actionable next step based on error type. Auth-expiry gets its own
+    // branch — the backend's 401 details ("Invalid token", "Session expired",
+    // …) never contain the word "unauthorized", so they previously fell to the
+    // generic fallback with no sign-in guidance.
+    if (isAuthExpiry) {
+      userMessage = 'Your session has expired. Please sign in and try again.';
+    } else if (userMessage.toLowerCase().includes('unauthorized') || userMessage.includes('401')) {
+      userMessage += ' Please sign in and try again.';
+    } else if (userMessage.toLowerCase().includes('network') || userMessage.toLowerCase().includes('connection')) {
       userMessage += ' Please check your internet connection and try again.';
     } else if (userMessage.toLowerCase().includes('not found') || userMessage.includes('404')) {
       userMessage += ' This may have been moved or deleted. Try refreshing the page.';
-    } else if (userMessage.toLowerCase().includes('unauthorized') || userMessage.includes('401')) {
-      userMessage += ' Please sign in and try again.';
     } else if (userMessage.toLowerCase().includes('forbidden') || userMessage.includes('403')) {
       userMessage += ' Your plan may not include this feature. Contact support@trustoffice.app to upgrade.';
     } else if (userMessage.toLowerCase().includes('server error') || userMessage.includes('500')) {
@@ -309,7 +326,11 @@ export function showError(toast, error, context = {}) {
   // Skip reporting expected user-facing errors that are not application bugs.
   // "Not found" / 404 errors from API reads are already logged server-side;
   // re-reporting them here only creates noise in the error scanner.
+  // 401/auth-expiry is an expected user state, not an app bug (err_811be8bd6936:
+  // "Invalid token" on MinutesTemplateForm generate after session expiry — the
+  // backend already logs auth failures; the scanner should treat these as noise).
   const skipReporting =
+    isAuthExpiry ||
     (rawMessage && rawMessage.toLowerCase().includes('not found')) ||
     (rawMessage && rawMessage.includes('404')) ||
     (rawMessage && rawMessage.toLowerCase().includes('forbidden')) ||
