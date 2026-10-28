@@ -144,8 +144,10 @@ export default function PricingPage() {
   const [couponApplied, setCouponApplied] = useState(false);
   // Monthly / annual billing toggle (Phase 3)
   const [billingPeriod, setBillingPeriod] = useState('monthly');
-  // WingPoint card has its own billing period toggle (defaults to annual for best value)
-  const [wingPointPeriod, setWingPointPeriod] = useState('annual');
+  // WingPoint card has its own billing period toggle (defaults to monthly
+  // up front, 2026-10-28 Jeff: "show the monthly up front with the 20%
+  // discount on annual" — annual is the cross-sell, not the default)
+  const [wingPointPeriod, setWingPointPeriod] = useState('monthly');
   // Trustee card in the WingPoint section has its own toggle (defaults to monthly)
   const [trusteePeriod, setTrusteePeriod] = useState('monthly');
   
@@ -167,6 +169,18 @@ export default function PricingPage() {
   // The WingPoint-known email (Connect Flow v2) — prefills the checkout form
   // so the member does not have to retype the address WingPoint already has.
   const prefillEmail = (searchParams.get('email') || '').trim();
+  // Billing-period hint from the origin site (?billing=monthly|annual, 2026-10-28):
+  // the WingPoint card honors it; other entry paths keep their own defaults.
+  const billingHint = (searchParams.get('billing') || '').toLowerCase();
+
+  useEffect(() => {
+    if (!isWingPointFlow) return;
+    if (billingHint === 'monthly' || billingHint === 'annual') {
+      setWingPointPeriod(billingHint);
+      if (targetPlan === 'trustee') setTrusteePeriod(billingHint);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingHint, isWingPointFlow, targetPlan]);
 
   useEffect(() => {
     if (couponCode) {
