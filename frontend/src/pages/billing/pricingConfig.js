@@ -63,17 +63,17 @@ export const TIERS = [
 // NOT added to the public TIERS array to prevent it leaking to non-WingPoint users.
 //
 // Jeff's requirement: WingPoint customers must be given TWO options:
-//   (a) $79/month  → maps to the existing 'trustee' tier (monthly 79, annual 790)
+//   (a) Trustee tier — $99/month, or $948/yr annual ($79/mo equivalent)
 //   (b) WingPoint plan → unlimited trusts at a discounted rate
-//       Monthly: $119/mo   (new — price-conscious customers)
-//       Annual:  $1,188/yr ($99/mo equivalent — best value, annual commitment)
+//       Monthly: $99/mo   (new — price-conscious customers)
+//       Annual:  $948/yr ($79/mo equivalent — best value, annual commitment)
 //
 // Both monthly and annual are real purchasable plans with Stripe price IDs.
 export const WINGPOINT_TIER = {
   id: 'wingpoint',
   name: 'WingPoint Plan',
-  monthly: 119,        // $119/mo — real Stripe price (price_1U4mSwJE7N1Bszdf9GHSbm89)
-  annual: 1188,       // $1,188/yr — real Stripe price (price_1U1JcFJE7N1BszdfbSjSSa7c)
+  monthly: 99,        // $99/mo — real Stripe price (price_1UVXj8JE7N1BszdfjAlfQSaE)
+  annual: 948,       // $948/yr — real Stripe price (price_1UVXj8JE7N1BszdfsPoo3rkm)
   maxTrusts: Infinity,
   trustLimit: 'Unlimited trusts',
   features: [

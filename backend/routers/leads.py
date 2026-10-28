@@ -542,7 +542,7 @@ async def capture_lead(lead: LeadCapture):
     # canonical welcome; Postmark lead_welcome is a fallback only when MC fails.
     await _welcome_with_dedupe(db, email, name, lead_id)
 
-    logger.info(f"Lead captured: {lead_id} â {email} via {source}")
+    logger.info(f"Lead captured: {lead_id} — {email} via {source}")
 
     # Create in-app notification
     await create_notification(
@@ -936,11 +936,20 @@ async def _send_facebook_discord_notification(parsed: dict, name: str, email: st
             # lead has a phone number so the notification actually interrupts.
             # Booking link inline so the invite to book is one click away.
             if parsed["phone"]:
-                content = (
-                    f"<@1479298864539373702> **📞 Call now** — {name} · "
-                    f"{parsed['phone']} · {email}\n"
-                    f"After the call, send them here to lock a time: {BOOKING_LINK}"
-                )
+                from phone_sanity import is_calling_quality
+                if is_calling_quality(parsed["phone"]):
+                    content = (
+                        f"<@1479298864539373702> **📞 Call now** — {name} · "
+                        f"{parsed['phone']} · {email}\n"
+                        f"After the call, send them here to lock a time: {BOOKING_LINK}"
+                    )
+                else:
+                    # Junk-looking number: surface without interrupting Kenneth
+                    # (2026-10-26 Rhonda lesson — sequential submission).
+                    content = (
+                        f"**NEW FACEBOOK LEAD** — {name} · {parsed['phone']} · {email}\n"
+                        f"⚠️ Submitted phone failed sanity check (possible typo/fake) — verify before calling. Booking link: {BOOKING_LINK}"
+                    )
             else:
                 content = (
                     f"**NEW FACEBOOK LEAD** — {name} | no phone | {email}\n"
@@ -1680,7 +1689,7 @@ async def stamp_lead_registered(email: str, user_id: str) -> bool:
         if old_stage != "registered":
             await _log_activity(
                 lead["lead_id"], "registered",
-                f"Lead linked to new account {user_id} (registered) â email {email}",
+                f"Lead linked to new account {user_id} (registered) — email {email}",
             )
             await notify_lead_stage_change(
                 name=lead.get("name", ""),
@@ -1703,7 +1712,7 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
     This is the bridge between the lead CRM and the subscription system.
 
     Attribution stamp #2 (Lead -> Subscriber). Matches by email OR user_id and
-    stamps converted_at + stage='converted'. Never raises â on any failure it
+    stamps converted_at + stage='converted'. Never raises — on any failure it
     logs a warning so the webhook's subscription flow continues unaffected.
     """
     if not email and not user_id:
@@ -1714,7 +1723,7 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
         )
         lead = await db.leads.find_one(query)
         if not lead:
-            logger.info(f"No lead found for email={email} user_id={user_id} â subscribed without a lead first")
+            logger.info(f"No lead found for email={email} user_id={user_id} — subscribed without a lead first")
             return
 
         old_stage = lead.get("stage")
@@ -1736,7 +1745,7 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
         if old_stage != "converted":
             await _log_activity(
                 lead["lead_id"], "converted",
-                f"Lead converted to subscriber (user_id {user_id}) â linked from {old_stage}"
+                f"Lead converted to subscriber (user_id {user_id}) — linked from {old_stage}"
             )
         await notify_lead_stage_change(
             name=lead.get("name", ""),
@@ -1771,7 +1780,7 @@ async def mark_lead_as_subscribed(email: str, user_id: str):
                 f"Failed to link lead {lead['lead_id']} to a contact record: {e}"
             )
 
-        logger.info(f"Lead {lead['lead_id']} marked as subscribed â {email}")
+        logger.info(f"Lead {lead['lead_id']} marked as subscribed — {email}")
     except Exception as e:
         logger.warning(f"mark_lead_as_subscribed failed for email={email} user_id={user_id}: {e}")
 

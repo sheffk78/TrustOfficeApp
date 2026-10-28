@@ -1,0 +1,14 @@
+[
+  {
+    "subscription_id": "sub_1U8U1QJE7N1Bszdfbup7a6Q3",
+    "customer_email": null,
+    "current_price_id": "price_1U1JcFJE7N1BszdfbSjSSa7c",
+    "current_price_name": "wingpoint_annual_1188",
+    "current_price_amount": 1188.0,
+    "proposed_new_price_id": "price_1UVXj8JE7N1BszdfsPoo3rkm",
+    "proposed_new_price_name": "wingpoint_annual_948",
+    "proposed_new_price_amount": 948.0,
+    "next_billing_date": null,
+    "status": "active"
+  }
+]

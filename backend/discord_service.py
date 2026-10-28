@@ -13,9 +13,55 @@ logger = logging.getLogger(__name__)
 
 DISCORD_LEADS_WEBHOOK_URL = os.environ.get('DISCORD_LEADS_WEBHOOK_URL')
 DISCORD_ALERTS_WEBHOOK_URL = os.environ.get('DISCORD_ALERTS_WEBHOOK_URL')
-# #trustoffice-main channel (1479343804527153262) â pipeline health RED alerts.
+# #trustoffice-main channel (1479343804527153262) — pipeline health RED alerts.
 DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL = os.environ.get('DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL') or DISCORD_ALERTS_WEBHOOK_URL
 TRUSTOFFICE_MAIN_CHANNEL_ID = "1479343804527153262"
+
+# Last-resort fallback webhook for ALERTS (the "Kit Leads Monitor" webhook).
+# Hard-coded on purpose: it must keep working even when every alert env var
+# is unconfigured, which is exactly the failure this fallback exists to
+# prevent. The same webhook id is provisioned on the production service as
+# DISCORD_ALERTS_WEBHOOK_URL / DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL.
+DISCORD_ALERT_FALLBACK_WEBHOOK_URL = os.environ.get(
+    'DISCORD_ALERT_FALLBACK_WEBHOOK_URL'
+) or (
+    "https://discord.com/api/webhooks/1545668684788539442/"
+    "siGQryY9y2qc22SY5B6c3G_Lr1SSYxy7JX2GnrlxDdqKSJdYtCL9eaLmovpxIds-hLRM"
+)
+
+
+def _resolve_alert_webhook(primary: Optional[str]):
+    """Resolve the webhook an ALERT should go to, with a hard fallback.
+
+    Returns (webhook_url, used_fallback: bool).
+
+    A monitor that silently drops its RED alert is the exact failure mode
+    this module exists to prevent (2026-10-23 audit: the pipeline monitor
+    went dark for weeks because both alert env vars were unset on the
+    production service and the notifier returned success=False into a caller
+    that never checked it). So when the primary alert webhook is
+    unconfigured we fall back to the known-good alert webhook instead of
+    dropping the alert.
+    """
+    if primary:
+        return primary, False
+    if DISCORD_ALERT_FALLBACK_WEBHOOK_URL:
+        return DISCORD_ALERT_FALLBACK_WEBHOOK_URL, True
+    return None, False
+
+
+def missing_alert_webhook_env() -> list:
+    """Names of the alert webhook env vars that are NOT configured.
+
+    Used by the app-factory startup assertion so the monitoring layer can
+    never go dark silently again.
+    """
+    missing = []
+    if not DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL:
+        missing.append("DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL")
+    if not DISCORD_ALERTS_WEBHOOK_URL:
+        missing.append("DISCORD_ALERTS_WEBHOOK_URL")
+    return missing
 
 # TrustOffice brand colors
 NAVY = 0x010079
@@ -99,10 +145,21 @@ async def notify_new_lead(
 
     KENNETH_DISCORD_ID = "1479298864539373702"
     if ping_on_phone and phone:
-        content = (
-            f"<@{KENNETH_DISCORD_ID}> **📞 Call now** — {name} · "
-            f"{phone} · {email}"
-        )
+        from phone_sanity import is_calling_quality
+        if is_calling_quality(phone):
+            content = (
+                f"<@{KENNETH_DISCORD_ID}> **📞 Call now** — {name} · "
+                f"{phone} · {email}"
+            )
+        else:
+            # Junk-looking number (sequential sweep, repeated digits, placeholder):
+            # surface it without interrupting Kenneth — 2026-10-26 Rhonda lesson
+            # (typed 12345678910; line turned out to dial, so keep the number
+            # visible and verifiable, just not ping-worthy).
+            content = (
+                f"**New phone lead** — {name} · {phone} · {email} via {source}\n"
+                f"⚠️ Submitted phone failed sanity check (possible typo/fake) — verify before calling. Booking link: https://trustoffice.app/book-a-call/"
+            )
     else:
         content = f"**New lead** — {name} ({email}) via {source}"
 
@@ -173,9 +230,21 @@ async def notify_alert(
     the agent to investigate and fix the error automatically — no cron or
     polling needed, the webhook mention IS the trigger.
     """
-    webhook_url = DISCORD_ALERTS_WEBHOOK_URL or DISCORD_LEADS_WEBHOOK_URL
+    webhook_url, used_fallback = _resolve_alert_webhook(
+        DISCORD_ALERTS_WEBHOOK_URL or DISCORD_LEADS_WEBHOOK_URL
+    )
     if not webhook_url:
-        return {"success": False, "error": "Not configured"}
+        logger.error(
+            "ALERT NOT SENT - no Discord webhook configured for alerts "
+            "(DISCORD_ALERTS_WEBHOOK_URL, DISCORD_LEADS_WEBHOOK_URL and the "
+            "hard-coded fallback are all unset). The alert was DROPPED."
+        )
+        return {"success": False, "error": "Not configured", "dropped": True}
+    if used_fallback:
+        logger.error(
+            "ALERT WEBHOOK NOT CONFIGURED - falling back to the hard-coded "
+            "alert webhook. Set DISCORD_ALERTS_WEBHOOK_URL to silence this."
+        )
 
     # Kit bot user ID — mentioning triggers Hermes to investigate automatically
     KIT_BOT_ID = "1488210610893230160"
@@ -191,11 +260,17 @@ async def notify_alert(
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-    return await send_discord_message(
+    result = await send_discord_message(
         webhook_url=webhook_url,
         content=content,
         embeds=[embed]
     )
+    if not result.get("success"):
+        logger.error(
+            f"ALERT FAILED to deliver: {result.get('error')} - "
+            f"title={title!r} message={message!r}"
+        )
+    return result
 
 
 async def notify_pipeline_alert(
@@ -211,10 +286,21 @@ async def notify_pipeline_alert(
     notify_alert (which targets the generic alerts channel) so pipeline failures
     surface in the TrustOffice brand channel.
     """
-    webhook_url = DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL
+    webhook_url, used_fallback = _resolve_alert_webhook(
+        DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL
+    )
     if not webhook_url:
-        logger.warning("TrustOffice-main webhook not configured â skipping pipeline alert")
-        return {"success": False, "error": "Not configured"}
+        logger.error(
+            "PIPELINE RED ALERT NOT SENT - no Discord webhook configured "
+            "(DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL, DISCORD_ALERTS_WEBHOOK_URL "
+            "and the hard-coded fallback are all unset). The alert was DROPPED."
+        )
+        return {"success": False, "error": "Not configured", "dropped": True}
+    if used_fallback:
+        logger.error(
+            "PIPELINE WEBHOOK NOT CONFIGURED - falling back to the hard-coded "
+            "alert webhook. Set DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL to silence this."
+        )
 
     fields = [
         {"name": "Channel", "value": f"#trustoffice-main ({TRUSTOFFICE_MAIN_CHANNEL_ID})", "inline": True},
@@ -225,7 +311,7 @@ async def notify_pipeline_alert(
             fields.append({"name": k, "value": str(v), "inline": False})
 
     embed = {
-        "title": f"Ã°Â¸Â®Âµ {title}",
+        "title": f"🔴 {title}",
         "description": message,
         "color": RUST,
         "fields": fields,
@@ -233,8 +319,14 @@ async def notify_pipeline_alert(
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    return await send_discord_message(
+    result = await send_discord_message(
         webhook_url=webhook_url,
-        content=f"<@{TRUSTOFFICE_MAIN_CHANNEL_ID}> **RED ALERT** â {title}",
+        content=f"<@{TRUSTOFFICE_MAIN_CHANNEL_ID}> **RED ALERT** — {title}",
         embeds=[embed],
     )
+    if not result.get("success"):
+        logger.error(
+            f"PIPELINE RED ALERT FAILED to deliver: {result.get('error')} - "
+            f"title={title!r} message={message!r}"
+        )
+    return result

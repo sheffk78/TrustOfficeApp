@@ -692,16 +692,28 @@ Amount: ${amount}
         self,
         to_email: str,
         name: str,
-        course_url: str
+        course_url: str,
+        booking_url: str = "",
+        phone_request: bool = True
     ) -> Dict[str, Any]:
-        """Send re-engagement email to lead who hasn't started the course"""
+        """Send re-engagement email to lead who hasn't started the course.
+
+        2026-10-22 (Jeff directive): include the book-a-call CTA — reengagement
+        is the email that actually reaches stale leads, so it must invite them
+        to book. Same contract as the welcome email: empty booking_url omits
+        the CTA section entirely.
+        """
+        template_data = {
+            "name": name or "there",
+            "course_url": course_url,
+            "phone_request": phone_request,
+        }
+        if booking_url:
+            template_data["booking_url"] = booking_url
         return await self.send_templated_email(
             to_email=to_email,
             template_name="lead_reengagement",
-            template_data={
-                "name": name or "there",
-                "course_url": course_url
-            },
+            template_data=template_data,
             to_name=name,
             tag="lead_reengagement",
             metadata={"email_type": "lead_reengagement"}

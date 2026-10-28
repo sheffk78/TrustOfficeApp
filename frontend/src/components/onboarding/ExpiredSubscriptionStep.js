@@ -53,11 +53,11 @@ export default function ExpiredSubscriptionStep() {
             data-testid="subscribe-now-cta"
           >
             <CreditCard className="w-5 h-5 mr-2" />
-            Subscribe Now - Starting at $79/month
+            Subscribe Now - Starting at $99/month
           </Button>
 
           <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-2">Save 17% with annual billing</p>
+            <p className="text-sm text-muted-foreground mb-2">Save 20% with annual billing</p>
           </div>
 
           <div className="border-t border-border pt-4 mt-2">

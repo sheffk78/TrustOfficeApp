@@ -119,6 +119,53 @@ def _render_powers(td: dict) -> list[str]:
     return lines
 
 
+def _render_jurisdiction(trust: dict, sc: dict) -> list[str]:
+    """Render the governing-law facts the jurisdiction guard reads.
+
+    The guard (chat_system_practice.md Block 4) needs the trust's state code
+    plus the state compliance profile's UTC-adoption / accounting-frequency /
+    notice facts to speak conditionally instead of asserting a state-law rule.
+    Values come from ctx["state_compliance"], fetched in build_trust_context
+    with one indexed lookup. (P1, 2026-10-23)
+    """
+    sc = sc or {}
+    state_code = (sc.get("state_code") or trust.get("state_code") or "").upper()
+    lines: list[str] = []
+    if not state_code:
+        lines.append("Governing law: not determinable from this trust's records (no state code on file)")
+        return lines
+
+    state_name = sc.get("state_name") or ""
+    label = f"Governing law: {state_name} ({state_code})" if state_name else f"Governing law: {state_code}"
+    lines.append(label)
+
+    utc = (sc.get("utc_adopted") or "").strip().lower()
+    if utc == "full":
+        lines.append("Uniform Trust Code: fully adopted in this state")
+    elif utc == "partial":
+        lines.append("Uniform Trust Code: partially adopted in this state (model act where not adopted)")
+    elif utc == "no":
+        lines.append(
+            "Uniform Trust Code: NOT adopted in this state — it is a model act; "
+            "the law governing this trust is this state's own statute"
+        )
+    else:
+        lines.append(
+            "Uniform Trust Code: adoption status unknown for this state — "
+            "the model act is not the law governing this trust unless the state has adopted it"
+        )
+
+    freq = sc.get("accounting_frequency")
+    if freq:
+        lines.append(f"Accounting frequency on file for this state: {freq}")
+    nr = sc.get("notice_required")
+    if nr is True:
+        lines.append("Beneficiary notice: required in this state")
+    elif nr is False:
+        lines.append("Beneficiary notice: not required in this state")
+    return lines
+
+
 def _render_identity(trust: dict, td: dict) -> list[str]:
     lines = [
         f"Trust: {trust.get('name', 'Unknown')}",
@@ -269,6 +316,14 @@ def build_trust_brief(ctx: dict) -> dict:
     powers = _render_powers(td)
     if identity or dist or powers:
         core_parts.append(("Trust & Instrument", identity + dist + powers, 0))
+
+    # Governing-law facts for the jurisdiction guard (always-on practice core).
+    # Priority -1 — this is the LAST thing shed: without it the guard cannot
+    # tell a member that the Uniform Trust Code is a model act rather than
+    # their state's law. (P1, 2026-10-23)
+    jurisdiction = _render_jurisdiction(trust, ctx.get("state_compliance", {}) or {})
+    if jurisdiction:
+        core_parts.append(("Jurisdiction", jurisdiction, -1))
 
     bens = _render_beneficiaries(ctx.get("beneficiaries", []) or [],
                                  ctx.get("class_beneficiaries", []) or [])

@@ -1,5 +1,5 @@
 # Compensation router - handles trustee compensation plans and payments
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -290,8 +290,37 @@ async def update_comp_plan(plan_id: str, updates: dict, user: dict = Depends(req
 
 
 @router.delete("/compensation-plans/{plan_id}")
-async def delete_comp_plan(plan_id: str, user: dict = Depends(require_write_access)):
-    """Delete a compensation plan"""
+async def delete_comp_plan(
+    plan_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete a compensation plan.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits (actor, impersonation attribution, record
+    type/id, timestamp, snapshot summary).
+    """
+    from exec_hardening import audit_member_deletion
+
+    plan = await db.compensation_plans.find_one(
+        {"plan_id": plan_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="compensation_plans",
+        record_id=plan_id,
+        record=plan,
+        trust_id=plan.get("trust_id", ""),
+        request=request,
+        action="compensation_plan_deleted",
+    )
+
     result = await db.compensation_plans.delete_one({
         "plan_id": plan_id,
         "user_id": user["user_id"]
@@ -552,8 +581,37 @@ async def attach_minutes_to_compensation(
 
 
 @router.delete("/compensation-payments/{payment_id}")
-async def delete_comp_payment(payment_id: str, user: dict = Depends(require_write_access)):
-    """Delete a compensation payment"""
+async def delete_comp_payment(
+    payment_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete a compensation payment.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits (actor, impersonation attribution, record
+    type/id, timestamp, snapshot summary).
+    """
+    from exec_hardening import audit_member_deletion
+
+    payment = await db.compensation_payments.find_one(
+        {"payment_id": payment_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="compensation_payments",
+        record_id=payment_id,
+        record=payment,
+        trust_id=payment.get("trust_id", ""),
+        request=request,
+        action="compensation_payment_deleted",
+    )
+
     result = await db.compensation_payments.delete_one({
         "payment_id": payment_id,
         "user_id": user["user_id"]

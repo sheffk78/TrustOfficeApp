@@ -1,5 +1,5 @@
 # Entities router - handles entity and relationship management
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
@@ -108,12 +108,42 @@ async def update_entity(entity_id: str, updates: dict, user: dict = Depends(requ
 
 
 @router.delete("/entities/{entity_id}")
-async def delete_entity(entity_id: str, user: dict = Depends(require_write_access)):
-    """Delete an entity and its relationships"""
+async def delete_entity(
+    entity_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete an entity and its relationships.
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits (actor, impersonation attribution, record
+    type/id, timestamp, snapshot summary). HARD delete — the audit row is
+    the compensating control.
+    """
+    from exec_hardening import audit_member_deletion
+
+    entity = await db.entities.find_one(
+        {"entity_id": entity_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found. It may have been already deleted. Please refresh the page and try again.")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="entities",
+        record_id=entity_id,
+        record=entity,
+        trust_id=entity.get("trust_id", ""),
+        request=request,
+        action="entity_deleted",
+    )
+
     result = await db.entities.delete_one({"entity_id": entity_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Entity not found. It may have been already deleted. Please refresh the page and try again.")
-    
+
     # Delete related relationships
     await db.entity_relationships.delete_many({
         "user_id": user["user_id"],
@@ -122,7 +152,7 @@ async def delete_entity(entity_id: str, user: dict = Depends(require_write_acces
             {"child_entity_id": entity_id}
         ]
     })
-    
+
     return {"message": "Entity deleted"}
 
 

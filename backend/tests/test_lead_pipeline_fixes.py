@@ -318,14 +318,31 @@ async def test_post_drip_reengagement_sends_and_marks(runner, db):
 # --------------------------------------------------------------------------- #
 # Item 4: Monitor asserts
 # --------------------------------------------------------------------------- #
-def _eligible_lead(lead_id):
-    return _make_lead(lead_id, nurture_step_sent=5, stage="new")
+def _eligible_lead(lead_id, anchor_days=25):
+    """A lead in the monitor's eligible cohort (step 5, stage new).
+
+    2026-10-23: the monitor's throughput floor is now DEMAND-based - it is
+    measured against the number of sends that were due in the window, not a
+    flat 10% of the cohort. `anchor_days` therefore decides whether the
+    lead's next scheduled step (step 6, due on day 25 after the anchor) is
+    DUE now (25) or still in the future (1).
+    """
+    anchor = datetime.now(timezone.utc) - timedelta(days=anchor_days)
+    return _make_lead(
+        lead_id,
+        nurture_step_sent=5,
+        stage="new",
+        created_at=anchor.isoformat(),
+        nurture_step1_sent_at=anchor.isoformat(),
+    )
 
 
 @pytest.mark.asyncio
 async def test_monitor_pass_when_sends_present(db, monkeypatch):
+    # anchor_days=1 -> next step is 24 days out, so nothing is due: a quiet
+    # day with a send present must be GREEN.
     for i in range(4):
-        await db.leads.insert_one(_eligible_lead(f"E{i}"))
+        await db.leads.insert_one(_eligible_lead(f"E{i}", anchor_days=1))
     await db.lead_activities.insert_one({
         "activity_id": "a1",
         "lead_id": "E0",
@@ -340,8 +357,9 @@ async def test_monitor_pass_when_sends_present(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_monitor_red_alert_when_no_sends(db):
+    # anchor_days=25 -> step 6 is due now, and no send went out: RED.
     for i in range(4):
-        await db.leads.insert_one(_eligible_lead(f"E{i}"))
+        await db.leads.insert_one(_eligible_lead(f"E{i}", anchor_days=25))
     result = await leads_monitor.check_leads_pipeline_health(db)
     assert result["all_ok"] is False
     assert any("nurture" in f.lower() for f in result["failures"])
@@ -418,7 +436,7 @@ def test_as_dt_read_compat():
 
 @pytest.mark.asyncio
 async def test_monitor_counts_string_created_at_activities(db):
-    await db.leads.insert_one(_eligible_lead("EZ"))
+    await db.leads.insert_one(_eligible_lead("EZ", anchor_days=1))
     await db.lead_activities.insert_one({
         "activity_id": "sz",
         "lead_id": "EZ",

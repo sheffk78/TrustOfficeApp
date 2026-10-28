@@ -137,6 +137,152 @@ def _friendly_summary(card: dict) -> str:
     return f"{label}{(': ' + str(name)) if name else ''}"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Reply-link coverage (council P0, 2026-10-23)
+# ─────────────────────────────────────────────────────────────────────────────
+# Every action type's success reply must carry a REAL link to the record it
+# created. The route templates below were each verified to exist in
+# frontend/src/App.js. A record type with no member-facing route is NOT
+# given a fabricated one — it is named plainly ("<record type> <id>") so the
+# member can ask support without chasing a 404.
+#
+# The link is built from the result envelope. Key precedence:
+#   1. an explicit review_link on the result (handlers that know better)
+#   2. the endpoint_type + record id, through the map below
+#
+# IMPORTANT: the minutes link is /minutes/{id} — the DETAIL route. The old
+# /minutes/{id}/edit path has no frontend route and 404s (App.js defines
+# /minutes/:minutesId only).
+REPLY_LINK_ROUTES: dict[str, str] = {
+    "minutes":                 "/minutes/{id}",
+    "contribute_asset":        "/minutes/{id}",
+    "distribution":            "/distributions",
+    "distribution_cancel":     "/distributions",
+    "asset":                   "/schedule-a",
+    "asset_update":            "/schedule-a",
+    "beneficiary":             "/beneficiaries?tab=beneficiaries",
+    "beneficiary_update":      "/beneficiaries?tab=beneficiaries",
+    "beneficiary_removal":     "/beneficiaries?tab=certificates",
+    "send_certificate":        "/beneficiaries?tab=certificates",
+    "class_beneficiary":       "/beneficiaries?tab=class",
+    "class_beneficiary_removal": "/beneficiaries?tab=class",
+    "document_upload":         "/vault",
+    "compensation_plan":       "/compensation",
+    "compensation_payment":    "/compensation",
+    "investment":              "/investments",
+    "task":                    "/calendar",
+    "transaction":             "/transactions",
+    "entity":                  "/structures?tab=entities",
+    "settings_update":         "/settings",
+    "alert_dismiss":           "/dashboard",
+}
+
+# Human labels for record types that have no member-facing route.
+RECORD_TYPE_LABELS: dict[str, str] = {
+    "minutes_records": "draft minutes",
+    "minutes_templates": "minutes template",
+    "schedule_a_items": "Schedule A asset",
+    "distribution_records": "distribution",
+    "trust_unit_certificates": "beneficiary certificate",
+    "class_beneficiaries": "class beneficiary",
+    "vault_documents": "vault document",
+    "compensation_plans": "compensation plan",
+    "compensation_payments": "compensation payment",
+    "investments": "investment",
+    "governance_tasks": "governance task",
+    "transactions": "transaction",
+    "entities": "entity",
+    "chat_conversations": "conversation",
+    "dismissed_insights": "governance alert",
+}
+
+
+def build_record_link(endpoint_type: str, result: dict) -> str:
+    """
+    Build the member-facing link (or a plain-language record reference) for
+    a completed action.
+
+    Returns "" only when there is genuinely nothing to reference. Never
+    returns a route that does not exist in frontend/src/App.js.
+    """
+    explicit = (result.get("review_link") or "").strip()
+    if explicit:
+        return explicit
+
+    rid = (
+        result.get("record_id")
+        or result.get("minutes_id")
+        or result.get("schedule_a_id")
+        or result.get("distribution_id")
+        or result.get("certificate_id")
+        or result.get("item_id")
+        or result.get("payment_id")
+        or result.get("plan_id")
+        or result.get("task_id")
+        or result.get("transaction_id")
+        or result.get("entity_id")
+        or result.get("doc_id")
+        or result.get("investment_id")
+        or result.get("class_beneficiary_id")
+    )
+
+    # A couple of actions have no record id but do have a meaningful target.
+    if not rid and endpoint_type == "alert_dismiss":
+        criterion = (result.get("criterion") or "").strip()
+        if criterion:
+            return "/dashboard"
+
+    template = REPLY_LINK_ROUTES.get(endpoint_type)
+    if template and rid:
+        if "{id}" in template:
+            return template.replace("{id}", str(rid))
+        return template
+
+    # No route for this type — name the record plainly instead of inventing
+    # a URL that would 404.
+    label = RECORD_TYPE_LABELS.get(endpoint_type, endpoint_type.replace("_", " "))
+    if rid:
+        return f"{label} {rid}"
+    if endpoint_type:
+        return label
+    return ""
+
+
+def build_success_message(summary: str, result: dict, endpoint_type: str = "") -> str:
+    """
+    Build the assistant's post-approval confirmation text.
+
+    2026-10-23 (Jerel Kratt): the confirmation text never carried the link
+    to the record that was just created, so the member could not find the
+    draft ("there is no drafts tab", "nothing is showing anywhere"). Every
+    successful action reply that carries a review_link now ends with the
+    link, and any caveat (e.g. a substituted minutes type) is surfaced too.
+
+    2026-10-23 council P0: the link is now derived for EVERY action type
+    (not just the ones whose handler happened to set review_link), so a
+    member who creates a task, transaction, entity, investment or vault
+    document is told where it went. Types with no member-facing route are
+    named plainly — no fabricated URLs.
+    """
+    text = f"Done — {summary} has been created."
+    if summary.startswith("distribution"):
+        text += " To finalize it, confirm solvency and recusal on the Distributions page."
+    elif summary.startswith("minutes"):
+        text += " It's saved as a draft — review and finalize on the Minutes page."
+
+    link = build_record_link(endpoint_type, result)
+    if link:
+        if link.startswith("/"):
+            text += f" Open it: {link}"
+        else:
+            # A plain-language record reference (no route exists for it).
+            text += f" It was saved as {link}."
+    caveat = (result.get("caveat") or "").strip()
+    if caveat:
+        text += f" Note: {caveat}"
+    return text
+
+
 async def handle_text_approval(
     conversation_id: str,
     message_index: int,
@@ -188,11 +334,9 @@ async def handle_text_approval(
 
     summary = _friendly_summary(action_card)
     if result.get("success"):
-        text = f"Done — {summary} has been created."
-        if summary.startswith("distribution"):
-            text += " To finalize it, confirm solvency and recusal on the Distributions page."
-        elif summary.startswith("minutes"):
-            text += " It's saved as a draft — review and finalize on the Minutes page."
+        text = build_success_message(
+            summary, result, result.get("endpoint_type", "")
+        )
         return {"success": True, "message": text, "execution_result": result}
     else:
         err = result.get("error", "the system reported an error")

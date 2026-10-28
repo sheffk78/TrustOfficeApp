@@ -152,7 +152,7 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
-        # Item 2: booking reminders (day-before + 1h) â hourly check.
+        # Item 2: booking reminders (day-before + 1h) — hourly check.
         self.scheduler.add_job(
             self.send_booking_reminder_emails,
             trigger=IntervalTrigger(hours=1),
@@ -161,7 +161,7 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
-        # Item 3: post-drip re-engagement for completed-but-stuck cohort â 6h.
+        # Item 3: post-drip re-engagement for completed-but-stuck cohort — 6h.
         self.scheduler.add_job(
             self.send_post_drip_reengagement,
             trigger=IntervalTrigger(hours=6),
@@ -170,7 +170,7 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
-        # Item 4: pipeline health monitor (asserts + RED alert) â 6h.
+        # Item 4: pipeline health monitor (asserts + RED alert) — 6h.
         self.scheduler.add_job(
             self.check_leads_pipeline_health,
             trigger=IntervalTrigger(hours=6),
@@ -179,7 +179,7 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
-        # State compliance reminder monitor (asserts + RED alert) â 6h (item 4).
+        # State compliance reminder monitor (asserts + RED alert) — 6h (item 4).
         self.scheduler.add_job(
             self.check_compliance_reminder_health,
             trigger=IntervalTrigger(hours=6),
@@ -208,7 +208,7 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
-        # Item 5: backfill lead_activities.created_at strings -> BSON Dates â daily.
+        # Item 5: backfill lead_activities.created_at strings -> BSON Dates — daily.
         self.scheduler.add_job(
             self.backfill_lead_activities_dates,
             trigger=IntervalTrigger(hours=24),
@@ -802,13 +802,17 @@ class BackgroundTaskRunner:
 
             emails_sent = 0
             course_url = f"{email_service.app_url}/trustee-101"
+            # 2026-10-22 (Jeff directive): reengagement email must carry the
+            # book-a-call invite — same CTA the welcome email uses.
+            booking_url = "https://trustoffice.app/book-a-call/"
 
             for lead in leads:
                 try:
                     await email_service.send_lead_reengagement(
                         to_email=lead["email"],
                         name=lead.get("name", ""),
-                        course_url=course_url
+                        course_url=course_url,
+                        booking_url=booking_url
                     )
 
                     # Mark re-engagement as sent
@@ -1440,7 +1444,7 @@ class BackgroundTaskRunner:
             from email_service import email_service
 
             if not email_service.is_configured:
-                logger.warning("Email service not configured â skipping deadline + compliance reminders")
+                logger.warning("Email service not configured — skipping deadline + compliance reminders")
                 return {"task_deadlines": 0, "compliance": 0}
 
             today = datetime.now(timezone.utc).date()
@@ -1563,7 +1567,7 @@ class BackgroundTaskRunner:
             from email_service import email_service
 
             if not email_service.is_configured:
-                logger.warning("Email service not configured Ã¢ÂÂ skipping compliance reminders")
+                logger.warning("Email service not configured — skipping compliance reminders")
                 return 0
 
             today = datetime.now(timezone.utc).date()

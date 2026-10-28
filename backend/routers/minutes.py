@@ -1041,23 +1041,60 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
 
 
 @router.delete("/minutes/{minutes_id}")
-async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_access)):
+async def delete_minutes(
+    minutes_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    # 2026-10-23 council P0 — DELETE PROVENANCE.
+    # Every member-record deletion writes an audit_logs row BEFORE the
+    # delete commits, carrying actor, impersonation attribution, record
+    # type/id, timestamp and a snapshot summary. If the audit write fails,
+    # the delete must NOT proceed (an unaudited delete is worse than a
+    # failed one). See exec_hardening.audit_member_deletion.
+    #
+    # DELETE MODE DECISION (2026-10-23): HARD delete for minutes_records.
+    # minutes_records has 44 read sites across 20+ modules (exports,
+    # governance scoring, performance aggregates, the AI trust context,
+    # the bridge/MCP surface, email-minutes dedup, admin stats, demo
+    # cleanup). A soft-delete flag would have to be added to every one of
+    # them or deleted minutes keep appearing in member views, exports,
+    # governance counts and the AI's own retrieval — a much larger and
+    # riskier change than the P0 bundle can carry safely tonight. The
+    # audit_logs row (with its snapshot summary) is the compensating
+    # control: the evidence that the record existed and who removed it
+    # survives the document. Soft-delete is the RIGHT long-term answer
+    # for drafts and is recorded as follow-up work in the report.
+    from exec_hardening import audit_member_deletion
+
     # Try minutes_records first (direct-created minutes)
     minutes = await db.minutes_records.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
     )
-    
+
     if minutes:
         if minutes.get("status") == "finalized":
             raise HTTPException(
                 status_code=403,
                 detail="Finalized minutes cannot be deleted. This protects the legal record chain."
             )
-        
+
+        # Audit BEFORE the delete commits.
+        await audit_member_deletion(
+            db,
+            actor_user_id=user["user_id"],
+            record_type="minutes_records",
+            record_id=minutes_id,
+            record=minutes,
+            trust_id=minutes.get("trust_id", ""),
+            request=request,
+            action="minutes_deleted",
+        )
+
         result = await db.minutes_records.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
-        
+
         # Cascade: unlink any transactions that referenced these minutes
         await db.transactions.update_many(
             {"linked_minutes_id": minutes_id, "user_id": user["user_id"]},
@@ -1071,27 +1108,38 @@ async def delete_minutes(minutes_id: str, user: dict = Depends(require_write_acc
         ).to_list(100)
         for txn in affected_txns:
             await check_transaction_alerts(txn)
-        
+
         return {"message": "Minutes deleted"}
-    
+
     # Not in minutes_records — try minutes_templates (template-created minutes)
     template = await db.minutes_templates.find_one(
         {"minutes_id": minutes_id, "user_id": user["user_id"]}, {"_id": 0}
     )
-    
+
     if template:
         if template.get("status") == "final":
             raise HTTPException(
                 status_code=403,
                 detail="Finalized minutes cannot be deleted. This protects the legal record chain."
             )
-        
+
+        await audit_member_deletion(
+            db,
+            actor_user_id=user["user_id"],
+            record_type="minutes_templates",
+            record_id=minutes_id,
+            record=template,
+            trust_id=template.get("trust_id", ""),
+            request=request,
+            action="minutes_template_deleted",
+        )
+
         result = await db.minutes_templates.delete_one({"minutes_id": minutes_id, "user_id": user["user_id"]})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
-        
+
         return {"message": "Minutes deleted"}
-    
+
     # Not found in either collection
     raise HTTPException(status_code=404, detail="Minutes not found. It may have been already deleted. Please refresh the page and try again.")
 

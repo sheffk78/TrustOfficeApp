@@ -7,6 +7,8 @@ action routing, and response generation with proper fiduciary guardrails.
 import os
 import json
 import logging
+import math
+import re
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 
@@ -51,6 +53,13 @@ with open(os.path.join(PROMPTS_DIR, "chat_system_actions.md"), "r") as f:
 
 with open(os.path.join(PROMPTS_DIR, "chat_system_escalation.md"), "r") as f:
     CHAT_SYSTEM_ESCALATION = f.read()
+
+# Practice core (fiduciary frame + event map + capability index + jurisdiction
+# guard) — loaded on EVERY intent, not gated on ACTION_INTENTS. A member
+# asking "what are my duties as trustee?" (ask_knowledge) needs the fiduciary
+# frame exactly as much as one asking for an action card. (P1, 2026-10-23)
+with open(os.path.join(PROMPTS_DIR, "chat_system_practice.md"), "r") as f:
+    CHAT_SYSTEM_PRACTICE = f.read()
 
 # Legacy full prompt kept for backward compatibility (unused in split mode)
 with open(os.path.join(PROMPTS_DIR, "chat_system.md"), "r") as f:
@@ -102,6 +111,311 @@ ACTION_INTENTS = {
     "check_deadlines", "health_check",
 }
 ESCALATION_INTENTS = ACTION_INTENTS | {"ask_knowledge", "emergency"}
+
+# --------------------------------------------------------------------------- #
+# Retrieval-ranked knowledge slice (P2a, 2026-10-23)
+# --------------------------------------------------------------------------- #
+# The P1 leftover: `_format_knowledge_context()` used to return a blob whose
+# head was always the alphabetically-first relevant file, and the caller
+# truncated that blob at 4,500 chars. The text that answered the member's
+# question could be cut off simply because a less relevant file sorted
+# earlier.
+#
+# The fix: score every candidate passage against the member's MESSAGE and the
+# classified INTENT, then spend the same 4,500-char budget on the top-ranked
+# passages. Relevance wins the budget; position does not.
+
+# Char budget for the knowledge slice in the system prompt. Same as the
+# blind truncation it replaces, so the prompt budget does not grow.
+KNOWLEDGE_SLICE_BUDGET = 4500
+
+# Minimum relevance score for a passage to earn a place in the slice. A
+# passage must either match the member's own words or match the intent's
+# concepts; a stray word overlap is not enough. This is what keeps an
+# off-topic message from filling the prompt with unrelated doctrine.
+_RELEVANCE_FLOOR = 6.0
+
+# Words that carry no topical signal and would otherwise inflate every
+# candidate's score.
+_STOPWORDS = frozenset("""
+a an and are as at be been being but by can could did do does doing for from
+had has have having how i if in into is it its may me might mine my of on or
+our ours out over own same shall she should so some such than that the their
+theirs them then there these they this those to too under until up us was we
+were what when where which while who whom why will with would you your yours
+am im dont doesnt didnt isnt arent wasnt werent cant couldnt shouldnt wouldnt
+""".split())
+
+# Intent -> the concepts that intent is about. These add to the query so a
+# "log_minutes" turn ranks the minutes doctrine, not the tax doctrine.
+INTENT_CONCEPTS = {
+    "ask_knowledge": [],
+    "log_minutes": ("minutes", "resolution", "documentation", "decision"),
+    "create_distribution": ("distribution", "hems", "beneficiary", "standard"),
+    "evaluate_distribution": ("distribution", "hems", "beneficiary", "standard"),
+    "create_beneficiary": ("beneficiary", "notice", "communication"),
+    "remove_beneficiary": ("beneficiary", "notice", "communication"),
+    "add_asset": ("asset", "schedule", "contribution"),
+    "contribute_asset": ("asset", "schedule", "contribution"),
+    "add_investment": ("investment", "prudent", "policy"),
+    "record_compensation_payment": ("compensation", "trustee"),
+    "setup_compensation": ("compensation", "trustee"),
+    "check_deadlines": ("deadline", "tax", "calendar", "filing"),
+    "health_check": ("score", "risk", "defensib"),
+    "review_document": ("document", "review", "vault"),
+    "upload_document": ("document", "vault"),
+    "emergency": ("crisis", "escalation", "urgent"),
+}
+
+
+def _stem(word: str) -> str:
+    """A light suffix stripper.
+
+    Not a full Porter stemmer (no dependency needed), but enough that
+    "accounting"/"accountings"/"accounted" collapse to one term, and
+    "distributions"/"distribution" do too. Without this, a question about
+    "trustee accounting" cannot match a section titled "Annual
+    Accountings", and the ranking silently misses the right passage.
+    """
+    w = word
+    for suffix, repl in (
+        ("ies", "y"),
+        ("sses", "ss"),
+        ("ing", ""),
+        ("edly", ""),
+        ("ed", ""),
+        ("es", ""),
+        ("s", ""),
+    ):
+        if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+            w = w[: len(w) - len(suffix)] + repl
+            break
+    return w
+
+
+def _content_tokens(text: str) -> list:
+    """Lowercase word tokens with stopwords removed, lightly stemmed."""
+    words = re.findall(r"[a-z][a-z0-9'-]{2,}", (text or "").lower())
+    return [_stem(w) for w in words if w not in _STOPWORDS]
+
+
+def _split_kb_passages(content: str) -> list:
+    """Split a knowledge file into (heading, text) passages.
+
+    Splits on "## " and "### " headings, keeping the heading text in the
+    passage body (so the excerpt is self-describing) but returning the
+    heading separately for scoring.
+    """
+    if not content:
+        return []
+    matches = list(re.finditer(r"(?m)^(#{2,3})\s+(.+?)\s*$", content))
+    if not matches:
+        return [("", content.strip())]
+    out = []
+    pre = content[: matches[0].start()].strip()
+    if pre:
+        out.append(("", pre))
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+        body = content[m.start(): end].strip()
+        if body:
+            out.append((m.group(2).strip(), body))
+    return out
+
+
+# Cache of term -> number of knowledge passages containing it. Used to
+# weight a match by how SELECTIVE the term is. Built lazily once per KB.
+_TERM_DF_CACHE: dict = {}
+_TERM_IDF_CACHE: dict = {}
+_TOTAL_PASSAGES = 0
+
+
+def _term_document_frequency(term: str) -> int:
+    """How many knowledge passages contain `term` (0 if the KB is not loaded)."""
+    if not _TERM_DF_CACHE:
+        kb = get_knowledge_base()
+        counts: dict = {}
+        for content in kb.values():
+            for _, text in _split_kb_passages(content):
+                for t in set(_content_tokens(text)):
+                    counts[t] = counts.get(t, 0) + 1
+        _TERM_DF_CACHE.update(counts)
+        global _TOTAL_PASSAGES
+        _TOTAL_PASSAGES = max(1, sum(counts.values()) and len(
+            [1 for content in kb.values() for _ in _split_kb_passages(content)]
+        ))
+        _TERM_IDF_CACHE.update(
+            {
+                t: math.log((_TOTAL_PASSAGES + 1) / (c + 0.5))
+                for t, c in counts.items()
+            }
+        )
+    return _TERM_DF_CACHE.get(term, 0)
+
+
+def _term_idf(term: str) -> float:
+    """Inverse document frequency for a term in the knowledge corpus.
+
+    A term that appears in nearly every passage contributes almost nothing;
+    a term that appears in one passage contributes a lot. This is what makes
+    the ranking follow the QUESTION rather than the frequency of common
+    words like "trustee".
+    """
+    if not _TERM_IDF_CACHE:
+        _term_document_frequency(term)  # populates both caches
+    return _TERM_IDF_CACHE.get(term, 0.0)
+
+
+def _score_passage(
+    message_tokens: set,
+    intent_tokens: set,
+    topic: str,
+    heading: str,
+    text: str,
+    pinned: bool = False,
+) -> float:
+    """Score a passage's relevance to the member's message and intent.
+
+    The score is deliberately simple and explainable:
+      - how many of the member's own content words appear in the passage
+      - how many appear in the passage's heading (a heading match means the
+        passage is ABOUT the question, not merely adjacent to it)
+      - how many intent concepts appear (so a minutes turn prefers minutes)
+      - how many appear in the file name (the file name is how the corpus is
+        organized, so it is a strong prior)
+    """
+    passage_tokens = set(_content_tokens(text))
+    heading_tokens = set(_content_tokens(f"{topic} {heading}"))
+    topic_tokens = set(_content_tokens(topic))
+
+    msg_hits = message_tokens & passage_tokens
+    msg_heading_hits = message_tokens & heading_tokens
+    intent_hits = intent_tokens & (passage_tokens | heading_tokens)
+    topic_hits = message_tokens & topic_tokens
+
+    # IDF WEIGHTING: the word that carries the question ("accounting",
+    # "successor") is more diagnostic than the common words around it
+    # ("trustee", "how", "often"). Every matched message term is weighted
+    # by how SELECTIVE it is across the corpus: a term that appears in one
+    # passage is worth far more than a term in fifty.
+    #
+    # This is what makes the ranking about the question rather than about
+    # how many times a common word happens to appear.
+    weighted_msg = 0.0
+    weighted_heading = 0.0
+    for term in message_tokens & passage_tokens:
+        weighted_msg += _term_idf(term)
+    for term in message_tokens & heading_tokens:
+        weighted_heading += _term_idf(term)
+    weighted_topic = sum(_term_idf(t) for t in topic_hits)
+    weighted_intent = sum(
+        _term_idf(t) for t in intent_tokens & (passage_tokens | heading_tokens)
+    )
+
+    if not msg_hits and not intent_hits and not topic_hits:
+        return 0.0
+    # Heading and topic-name matches weigh more than a passing mention in
+    # the body: they mean the passage is the answer, not a neighbour.
+    score = (
+        1.0 * weighted_msg
+        + 2.0 * weighted_heading
+        + 0.5 * weighted_intent
+        + 1.5 * weighted_topic
+    )
+    # A PINNED topic was chosen by the hand-coded keyword map, so it is a
+    # relevant file by construction. It gets a floor so it cannot be
+    # out-ranked by an incidental mention elsewhere, but it does not get to
+    # skip the ranking: a pinned file still has to match the question to
+    # take a slot.
+    if pinned:
+        score += 2.0
+    return score
+
+
+def _ranked_knowledge_slice(
+    user_message: str,
+    intent: str,
+    kb: Dict[str, str],
+    selected: list,
+    budget: int = KNOWLEDGE_SLICE_BUDGET,
+) -> str:
+    """Build the KB slice by relevance instead of by file position.
+
+    Returns "" when nothing scores (so the caller falls back to the previous
+    behaviour rather than injecting an empty slice).
+    """
+    if not kb:
+        return ""
+    message_tokens = set(_content_tokens(user_message))
+    if not message_tokens:
+        # Nothing topical to rank against. A greeting must not fill the
+        # prompt with arbitrary knowledge.
+        return ""
+    intent_tokens = set()
+    for concept in INTENT_CONCEPTS.get(intent, ()):
+        intent_tokens.update(_content_tokens(concept))
+    # The intent name itself is a signal too.
+    intent_tokens.update(_content_tokens(intent.replace("_", " ")))
+
+    candidates = []
+    # Candidate files: the keyword-selected topics, plus every file whose
+    # name matches the message, so a topical file that the hand-coded
+    # keyword map missed can still win on relevance.
+    topics = list(dict.fromkeys(list(selected) + sorted(kb.keys())))
+    for topic in topics:
+        content = kb.get(topic)
+        if not content:
+            continue
+        topic_tokens = set(_content_tokens(topic))
+        if topic_tokens and not (message_tokens & topic_tokens) and topic not in selected:
+            # Not keyword-selected and its name says nothing about the
+            # question. Still worth scanning when the BODY matches the
+            # question: a file named "06-state-compliance" is the right
+            # answer to "how often must I account?" even though its name
+            # does not contain the word.
+            body_tokens = set(_content_tokens(content))
+            if not (message_tokens & body_tokens) and not (intent_tokens & body_tokens):
+                continue
+        pinned = topic in selected
+        for heading, text in _split_kb_passages(content):
+            score = _score_passage(
+                message_tokens, intent_tokens, topic, heading, text, pinned=pinned
+            )
+            if score < _RELEVANCE_FLOOR:
+                continue
+            candidates.append((score, topic, heading, text))
+
+    if not candidates:
+        return ""
+
+    # Highest score first; ties broken by topic name for determinism.
+    candidates.sort(key=lambda c: (-c[0], c[1]))
+
+    parts = []
+    used = 0
+    per_topic: dict = {}
+    for score, topic, heading, text in candidates:
+        if used >= budget:
+            break
+        # Keep the slice from being 20 excerpts of the same file: allow at
+        # most 2 passages per file before moving on.
+        if per_topic.get(topic, 0) >= 2:
+            continue
+        block = f"### {topic}"
+        if heading:
+            block += f" — {heading}"
+        block += f"\n{text}"
+        if used + len(block) > budget:
+            remaining = budget - used
+            if remaining <= 200:
+                break
+            block = block[:remaining].rstrip() + "…"
+        parts.append(block)
+        used += len(block)
+        per_topic[topic] = per_topic.get(topic, 0) + 1
+    if not parts:
+        return ""
+    return "\n\n".join(parts)
 
 
 def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
@@ -336,6 +650,20 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
         content = kb[topic]
         sections.append(f"### {topic}\n{relevant_excerpt(topic, content)}")
 
+    # --- Retrieval-ranked slice (P2a, 2026-10-23) -------------------------
+    # The keyword selection above picks WHICH files are relevant, but the
+    # excerpt inside each file is still chosen by string position, and the
+    # caller truncated the whole blob at 4,500 chars from the top. That
+    # blind truncation meant the answer could be cut off simply because a
+    # less-relevant file came first alphabetically.
+    #
+    # Now: rank every candidate passage by relevance to THIS message and
+    # intent, and take the top slice within the same budget. The relevant
+    # text wins the budget instead of losing it to position.
+    ranked = _ranked_knowledge_slice(user_message, intent, kb, selected)
+    if ranked:
+        return ranked
+
     # --- FTS5 fallback: if keyword matching found fewer than 3 files, use the
     # SQLite FTS5 index for semantic search. This catches cases where the
     # user's phrasing doesn't match our hand-coded keyword mappings.
@@ -534,6 +862,46 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
         }
     else:
         context["trust"] = {"name": "Unknown Trust"}
+
+    # 1b. State compliance facts (one indexed find on the state's profile).
+    # The jurisdiction guard in the practice core needs utc_adopted /
+    # accounting_frequency / notice_required to speak conditionally instead of
+    # asserting a state-law rule from memory. The profile is keyed by state
+    # code, so this is a single indexed lookup, and it is fetched on every
+    # intent (including the lightweight path) because the guard is always-on.
+    # (P1, 2026-10-23)
+    state_code = (trust or {}).get("state_code", "") if trust else ""
+    if state_code:
+        try:
+            profile = await db.state_compliance_profiles.find_one(
+                {"_id": str(state_code).upper()},
+                {"_id": 0, "state_name": 1, "utc_adopted": 1,
+                 "accounting_frequency": 1, "notice_required": 1,
+                 "notice_timing_days": 1},
+            )
+        except Exception as e:  # never let a compliance lookup break the turn
+            logger.warning(f"state_compliance_profiles lookup failed for {state_code}: {e}")
+            profile = None
+        if profile:
+            context["state_compliance"] = {
+                "state_code": str(state_code).upper(),
+                "state_name": profile.get("state_name", ""),
+                "utc_adopted": profile.get("utc_adopted", ""),
+                "accounting_frequency": profile.get("accounting_frequency", ""),
+                "notice_required": profile.get("notice_required"),
+            }
+        else:
+            # Trust has a state on file but no compliance profile — the guard
+            # must treat this as "unknown adoption status", not as "full".
+            context["state_compliance"] = {
+                "state_code": str(state_code).upper(),
+                "state_name": "",
+                "utc_adopted": "",
+                "accounting_frequency": "",
+                "notice_required": None,
+            }
+    else:
+        context["state_compliance"] = {}
 
     # 2. Defensibility Score (always included — one query, cheap)
     health = await db.health_score_snapshots.find_one(
@@ -1473,6 +1841,9 @@ def _build_system_prompt(
     # Core is always loaded (~3K chars).
     # Actions section loaded for action intents (~5K chars).
     # Escalation section loaded for any intent touching fiduciary decisions (~2K chars).
+    # Practice core (fiduciary frame + event map + capability index + jurisdiction
+    # guard) is ALWAYS loaded — it is the frame for every turn, not a section
+    # that only matters for writes. (P1, 2026-10-23)
     # Uses module-level ACTION_INTENTS and ESCALATION_INTENTS (unified). (MEDIUM-2 fix)
 
     system_prompt_base = CHAT_SYSTEM_CORE
@@ -1480,6 +1851,7 @@ def _build_system_prompt(
         system_prompt_base += "\n\n" + CHAT_SYSTEM_ACTIONS
     if intent in ESCALATION_INTENTS:
         system_prompt_base += "\n\n" + CHAT_SYSTEM_ESCALATION
+    system_prompt_base += "\n\n" + CHAT_SYSTEM_PRACTICE
 
     # Approval-response guidance: the model should never re-ask for approval.
     # When the deterministic interception didn't fire (no pending card found),
@@ -1521,7 +1893,7 @@ When evaluating, always cite the specific trust document language and article re
 {trust_type_guidance}
 
 ## Knowledge Base
-{knowledge_context[:4500] if knowledge_context else "No knowledge base available."}
+{knowledge_context if knowledge_context else "No knowledge base available."}
 
 ## Conversation History (recent)
 {_fmt_history(conversation_history)}

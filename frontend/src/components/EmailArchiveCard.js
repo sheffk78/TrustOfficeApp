@@ -142,7 +142,7 @@ export default function EmailArchiveCard({ trustId, trustName }) {
             </p>
             <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
               <p className="text-sm text-amber-800">
-                Available on <strong>Estate ($149/mo)</strong> and <strong>Advisor ($399/mo)</strong> plans.
+                Available on <strong>Estate ($189/mo)</strong> and <strong>Advisor ($499/mo)</strong> plans.
                 Your current plan: <span className="capitalize">{planType}</span>.
               </p>
             </div>

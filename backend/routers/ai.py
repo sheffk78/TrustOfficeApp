@@ -882,7 +882,7 @@ async def auto_draft_quarterly_minutes(
             "minutes_id": existing["minutes_id"],
             "quarter": quarter,
             "already_existed": True,
-            "review_link": f"/minutes/{existing['minutes_id']}/edit",
+            "review_link": f"/minutes/existing['minutes_id']",
         }
 
     # Gather quarterly activity
@@ -992,5 +992,5 @@ async def auto_draft_quarterly_minutes(
         "minutes_id": minutes_id,
         "quarter": quarter,
         "activity_count": len(decisions),
-        "review_link": f"/minutes/{minutes_id}/edit",
+        "review_link": f"/minutes/minutes_id",
     }

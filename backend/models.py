@@ -885,7 +885,7 @@ class MinutesDraftRequest(BaseModel):
     section_context: Optional[str] = None
 
 class MinutesDraftResponse(BaseModel):
-    """Response model for unified AI minutes draft â same as GuidedMinutesDraftResponse + template_type"""
+    """Response model for unified AI minutes draft — same as GuidedMinutesDraftResponse + template_type"""
     suggested_title: str = Field(..., description="Suggested title for the minutes")
     draft_body: str = Field(..., description="The main minutes text body")
     cautions: List[str] = Field(default_factory=list, description="Warnings or notes for the trustee")

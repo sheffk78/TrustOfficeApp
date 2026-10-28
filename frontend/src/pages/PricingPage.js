@@ -352,10 +352,10 @@ export default function PricingPage() {
               You purchased your trust through WingPoint. TrustOffice is where that trust lives, managed, updated, and accessible whenever you need it. As a WingPoint customer, you get unlimited trusts at a special rate not available to the public.
             </p>
             <div className="inline-block bg-gold/10 text-navy px-5 py-3 text-xs font-mono uppercase tracking-wider mb-3">
-              Unlimited trusts from <span className="font-mono">$99/mo</span> (annual) or <span className="font-mono">$119/mo</span> (monthly). WingPoint exclusive.
+              Unlimited trusts from <span className="font-mono">$79/mo</span> (annual) or <span className="font-mono">$99/mo</span> (monthly). WingPoint exclusive.
             </div>
             <p className="text-sm text-success mt-2 font-medium">
-              <span className="font-mono">Save $240/year</span> with annual billing. Monthly available for flexibility.
+              <span className="font-mono">$79/mo equivalent · Save 20% with annual</span>. Monthly available for flexibility.
             </p>
           </div>
         </section>
@@ -369,7 +369,7 @@ export default function PricingPage() {
           <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8 items-stretch">
-                {/* Card 1: Trustee Plan — $99/mo, or $79/mo with annual (1 trust) */}
+                {/* Card 1: Trustee Plan — $99/mo, or $948/yr annual ($79/mo equivalent, 1 trust) */}
                 <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-mono uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     1 Trust
@@ -439,7 +439,7 @@ export default function PricingPage() {
                   </Button>
                 </div>
 
-                {/* Card 2: WingPoint — $119/mo or $99/mo (unlimited trusts) */}
+                {/* Card 2: WingPoint — $99/mo or $79/mo equivalent (unlimited trusts) */}
                 <div className="card-trust corner-mark p-8 border-2 border-gold relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gold text-navy px-4 py-1.5 text-xs font-mono uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     WingPoint Exclusive
@@ -469,7 +469,7 @@ export default function PricingPage() {
                           aria-pressed={wingPointPeriod === 'annual'}
                           className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${wingPointPeriod === 'annual' ? 'bg-gold text-navy' : 'text-muted-foreground hover:text-navy'}`}
                         >
-                          Annual <span className="ml-1 font-mono text-success">save $240/yr</span>
+                          Annual <span className="ml-1 font-mono text-success">Save 20%</span>
                         </Button>
                       </div>
                     </div>
@@ -478,7 +478,7 @@ export default function PricingPage() {
                     {wingPointPeriod === 'monthly' ? (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-mono text-5xl text-navy">$119</span>
+                          <span className="font-mono text-5xl text-navy">$99</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
@@ -486,10 +486,10 @@ export default function PricingPage() {
                     ) : (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-mono text-5xl text-navy">$99</span>
+                          <span className="font-mono text-5xl text-navy">$79</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4">billed annually ($1,188/year)</p>
+                        <p className="text-sm text-muted-foreground mb-4">billed annually ($948/year)</p>
                       </>
                     )}
 
@@ -501,16 +501,16 @@ export default function PricingPage() {
                       </div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-navy">Your WingPoint rate</span>
-                        <span className="text-sm font-mono font-bold text-navy">${wingPointPeriod === 'monthly' ? '119/mo' : '1,188/yr'}</span>
+                        <span className="text-sm font-mono font-bold text-navy">${wingPointPeriod === 'monthly' ? '99/mo' : '948/yr'}</span>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-navy/10">
                         <span className="text-sm font-bold text-gold">You save</span>
-                        <span className="text-lg font-mono font-bold text-gold">${wingPointPeriod === 'monthly' ? '380/mo' : '3,600/year'}</span>
+                        <span className="text-lg font-mono font-bold text-gold">${wingPointPeriod === 'monthly' ? '400/mo' : '3,840/year'}</span>
                       </div>
                     </div>
 
                     <div className="inline-block bg-gold/20 text-navy px-4 py-2 text-xs font-mono uppercase tracking-wider mb-6 self-center">
-                      Unlimited trusts &middot; {wingPointPeriod === 'annual' ? 'annual' : 'monthly'}
+                      Unlimited trusts · {wingPointPeriod === 'annual' ? 'annual' : 'monthly'}
                     </div>
                   </div>
                   <Button
@@ -692,8 +692,8 @@ export default function PricingPage() {
       <section className="pb-12 px-8">
         <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
           Subscribe to start — <span className="font-mono">$99/month</span> for Trustee, <span className="font-mono">$189/month</span> for Estate, or <span className="font-mono">$499/month</span> for Advisor,
-          or lock in the lower annual rate: <span className="font-mono">$79/mo</span> Trustee (billed <span className="font-mono">$948/yr</span>), <span className="font-mono">$149/mo</span> Estate (billed <span className="font-mono">$1,788/yr</span>),
-          or <span className="font-mono">$399/mo</span> Advisor (billed <span className="font-mono">$4,788/yr</span>) — save 20% with annual billing.
+          or lock in the lower annual rate: <span className="font-mono">$948/yr</span> Trustee ($79/mo equivalent), <span className="font-mono">$1,788/yr</span> Estate ($149/mo equivalent),
+          or <span className="font-mono">$4,788/yr</span> Advisor ($399/mo equivalent) — save 20% with annual billing.
           The trust pays for governance tools the same way it pays for legal counsel.
         </p>
       </section>

@@ -17,11 +17,571 @@ Design constraints:
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Optional
 
 MAX_RETRIEVAL_CHARS = 3500  # per-turn cap on all injected retrieval blocks
+
+# --------------------------------------------------------------------------- #
+# Layer 2b — doctrine retrieval (2026-10-23, P2a)
+#
+# The doctrine corpus is backend/knowledge/*.md, indexed by the FTS5 index in
+# services/trust_knowledge.py. A doctrine question triggers a deterministic
+# keyword/regex match; the matching concepts become an FTS query; the TOP
+# matching passages come back and are injected with their source file, so the
+# assistant can cite them.
+#
+# The corpus is entirely reviewed material: the Trustee-101 course (6 legal
+# review rounds) and the in-repo knowledge base. Nothing here adds legal
+# text — it only selects which reviewed passage to show.
+# --------------------------------------------------------------------------- #
+
+# Doctrine concept -> the regex patterns that mean "this member is asking
+# about that concept". Keys are concept names; values are (regex, extra FTS
+# query terms).
+DOCTRINE_TRIGGERS: dict[str, tuple[str, ...]] = {
+    "duties": (
+        r"\bmy\s+dut(y|ies)\b",
+        r"\btrustee\s+dut(y|ies)\b",
+        r"\bfiduciary\s+dut(y|ies)\b",
+        r"\bwhat\s+(am\s+i|do\s+i)\s+(supposed|required|obligated)\b",
+        r"\bwhat\s+are\s+my\s+(obligations|responsibilit)",
+        r"\bam\s+i\s+allowed\s+to\b",
+        r"\bcan\s+i\s+(as\s+a\s+trustee|self-deal|deal\s+with)",
+    ),
+    "utc": (
+        r"\buniform\s+trust\s+code\b",
+        r"\butc\b",
+        r"\btrust\s+code\b",
+        r"\bqualified\s+beneficiar",
+        r"\bterms\s+of\s+(a|the)\s+trust\b",
+        r"\bascertainable\s+standard\b",
+        r"\bwhat\s+law\s+governs\b",
+        r"\bwhich\s+(state's\s+)?law\s+(applies|governs)\b",
+        r"\bwhere\s+is\s+(my|the)\s+trust\s+(administered|run|located)\b",
+        r"\bdoes\s+the\s+(utc|trust\s+code)\s+apply\b",
+        r"\bis\s+my\s+trust\s+(covered|subject)\b",
+        r"\bgoverning\s+law\b",
+        r"\bprincipal\s+place\s+of\s+administration\b",
+    ),
+    "amendment": (
+        r"\bamend(ment|ments|ing)?\b",
+        r"\bmodify\s+(the\s+)?trust\b",
+        r"\bchange\s+the\s+trust\b",
+        r"\bmodification\b",
+    ),
+    "successor_trustee": (
+        r"\bsuccessor\s+trustee\b",
+        r"\bsuccession\b",
+        r"\bnext\s+trustee\b",
+        r"\breplace\s+(me|my\s+trustee|the\s+trustee)\b",
+        r"\bresign(ation)?\b",
+        r"\bstep\s+down\s+as\s+trustee\b",
+    ),
+    "distribution_standard": (
+        r"\bdistribution\s+standard\b",
+        r"\bhems\b",
+        r"\bsole\s+discretion\b",
+        r"\bstandard\s+of\s+care\b",
+        r"\bwhat\s+can\s+i\s+(give|distribute|distribute\s+to)\b",
+        r"\bhow\s+(much|many)\s+can\s+i\s+(give|distribute)\b",
+        r"\bcan\s+i\s+distribute\s+(to|any|some)\b",
+        r"\bhow\s+much\s+(can|should)\s+i\s+distribute\b",
+        r"\bdiscretion\b",
+        r"\bdiscretionary\s+(distribution|trust|payment)\b",
+        r"\bpower\s+of\s+withdrawal\b",
+        r"\bwhat\s+discretion\b",
+        r"\bmandatory\s+distribution\b",
+        r"\bevery\s+distribution\b",
+        r"\bbefore\s+(every|each|a|the)\s+distribution\b",
+        r"\bdistribution\s+memo\b",
+        r"\b(four|4)[\s-]*question\s+(test|checklist|framework)\b",
+    ),
+    "accounting": (
+        r"\baccounting\b",
+        r"\bhow\s+often\b",
+        r"\bhow\s+frequently\b",
+        r"\bannual\s+report\s+to\s+beneficiar",
+        r"\bbeneficiar(y|ies)\s+(notice|report)",
+        r"\bkeep\s+(trust\s+)?records\b",
+        r"\brecord-?keeping\b",
+        r"\btrust\s+records\b",
+        r"\bwhat\s+records\b",
+        r"\bformal\s+accounting\b",
+        r"\binformal\s+accounting\b",
+        r"\bwritten\s+accounting\b",
+        r"\baccounting\s+to\s+(my|our|the)\s+beneficiar",
+        r"\bannual\s+accounting\b",
+    ),
+    "termination": (
+        r"\bterminat(e|ion|ing)\b",
+        r"\bwind\s*-?\s*down\b",
+        r"\bclose\s+the\s+trust\b",
+        r"\bfinal\s+distribution\b",
+    ),
+    "beneficiary_communication": (
+        r"\bnotify\s+(the\s+)?beneficiar",
+        r"\btell\s+(the\s+)?beneficiar",
+        r"\bbeneficiar(y|ies)\s+(letter|communication|notice)",
+        r"\bletter\s+to\s+(my\s+)?beneficiar",
+    ),
+    "commingling": (
+        r"\bcommingl",
+        r"\bseparation\b",
+        r"\bpersonal\s+(funds|money|account)",
+        r"\btrust\s+funds?\b.*\bmy\s+own\b",
+    ),
+    "investment": (
+        r"\bprudent\s+investor\b",
+        r"\binvestment\s+policy\b",
+        r"\bhow\s+should\s+i\s+invest\b",
+        r"\bwhat\s+can\s+i\s+invest\s+in\b",
+    ),
+    "tax": (
+        r"\bform\s+1041\b",
+        r"\bk-?1\b",
+        r"\btrust\s+tax\b",
+        r"\bestimated\s+tax\b",
+    ),
+    "minutes": (
+        r"\bminutes\b",
+        r"\bresolution\b",
+        r"\bmeeting\s+notes\b",
+    ),
+    "co_trustee": (
+        r"\bco-?\s*trustee\b",
+        r"\bjoint\s+trustee\b",
+        r"\bother\s+trustee\b",
+    ),
+    "compromise": (
+        r"\bconflict\s+of\s+interest\b",
+        r"\bself-?deal",
+        r"\brecuse\b",
+    ),
+    # ---- UTC doctrine pack (2026-10-24, P2b) --------------------------- #
+    # The nine approved Uniform Trust Code files answer questions the
+    # concepts above do not cover. Each new concept below is anchored to
+    # the file that answers it.
+    "spendthrift": (
+        r"\bspendthrift\b",
+        r"\bcreditor\s+protection\b",
+        r"\bprotect\w*\s+(the\s+)?(trust\s+)?assets\b",
+        r"\bcan\s+(a\s+)?creditor\s+(reach|come\s+after)\b",
+        r"\bcreditors?\s+(reach|claim|take)\b",
+        r"\bmy\s+(family's\s+)?money\s+(is\s+)?protected\b",
+        r"\bprotected\s+from\s+creditors\b",
+        r"\basset\s+protection\b",
+        r"\bjudgment\s+creditor\b",
+    ),
+    "revocation": (
+        r"\brevoke\b",
+        r"\brevocation\b",
+        r"\bcan\s+i\s+(change|revoke|cancel)\s+(my|our|the)\s+trust\b",
+        r"\bchange\s+or\s+revoke\b",
+        r"\birrevocable\b",
+        r"\bundo\s+(the|my)\s+trust\b",
+    ),
+    "trust_termination": (
+        r"\bhow\s+does\s+(a|my|the)\s+trust\s+(end|terminate)",
+        r"\bhow\s+(do|can|would)\s+(i|we)\s+(end|terminate|close)\s+(the|my|a|our)\s+trust",
+        r"\bwhen\s+does\s+(a|my|the)\s+trust\s+(end|terminate)",
+        r"\b(end|terminate|terminating|close|closing)\s+(the|my|a|our)\s+trust\b",
+        r"\btrust\s+(end|ends|terminates|termination)\b",
+        r"\bwhen\s+is\s+(my|the)\s+trust\s+over\b",
+        r"\bafter\s+(the\s+)?settlor\s+(dies|death)\b",
+        r"\bsettlor\s+(dies|death)\b",
+        r"\bdissolve\b",
+        r"\bfinal\s+report\b",
+        r"\bexpeditious\w*\s+delivery\b",
+    ),
+    "beneficiary_notification": (
+        r"\bnotify\s+(a|my|the|each|all)\s+beneficiar",
+        r"\bnotif(y|ication|ications)\s+to\s+(a\s+)?beneficiar",
+        r"\bnotification\s+register\b",
+        r"\bregister\s+of\s+(notices|notifications)\b",
+        r"\bdo\s+i\s+have\s+to\s+notify\b",
+        r"\bwho\s+do\s+i\s+have\s+to\s+(tell|notify)\b",
+        r"\bnotice\s+to\s+beneficiaries\b",
+        r"\b(notices?|notification)\s+(i|we|do)\s+.{0,20}\bbeneficiar",
+        r"\bwhat\s+(notices?|notifications)\b",
+        r"\bnotify\b.*\bbeneficiar",
+    ),
+    "register_agent": (
+        r"\bregister\b",
+        r"\bregistration\b",
+        r"\bappointment\s+of\s+agent\b",
+        r"\bagent\s+to\s+accept\s+service\b",
+        r"\bservice\s+of\s+process\b",
+        r"\bprincipal\s+place\s+of\s+administration\b",
+        r"\bchange\s+of\s+situs\b",
+    ),
+    "distribution_discretion": (
+        r"\bhow\s+much\s+(discretion|freedom)\b",
+        r"\bdiscretion\s+(do|does|can|when)\b",
+        r"\bhow\s+much\s+(can|may)\s+i\s+decide\b",
+        r"\bconstrain(ed|s)\s+.{0,25}distribution",
+        r"\bwhat\s+happens\s+to\s+the\s+money\b",
+        r"\bwhen\s+the\s+trust\s+ends\b",
+    ),
+    "trustee_removal": (
+        r"\bremove\s+(me|my|our|the|a|an)\s+(as\s+)?trustee\b",
+        r"\bremoval\s+of\s+(a|the|my|an)\s+trustee\b",
+        r"\bcan\s+(i|the|they)\s+be\s+removed\b",
+        r"\bfire\s+(my|the|a)\s+trustee\b",
+        r"\bcompel\s+(a|the|my)\s+trustee\b",
+        r"\bresign(ation)?\b",
+        r"\bstep\s+down\s+as\s+trustee\b",
+        r"\bvacancy\b",
+        r"\b(trustee|trustees)\s+(removed|removal)",
+    ),
+}
+
+# Concepts that are worth a doctrine fetch on their own. A question that
+# matches ANY of these pulls the corpus; a question that matches none does
+# not (so ordinary chat turns stay cheap).
+DOCTRINE_CONCEPTS = tuple(DOCTRINE_TRIGGERS.keys())
+
+
+def _match_doctrine_concepts(message: str) -> list[str]:
+    """Return the doctrine concepts a message touches, in trigger order."""
+    m = message.lower()
+    hits: list[str] = []
+    for concept, patterns in DOCTRINE_TRIGGERS.items():
+        for pat in patterns:
+            if re.search(pat, m):
+                hits.append(concept)
+                break
+    return hits
+
+
+# Words that carry no retrieval signal. A question's grammatical scaffolding
+# ("what", "does", "how", "stand") matches everywhere and dilutes the query,
+# so it is stripped before the FTS MATCH.
+_DOCTRINE_QUERY_STOPWORDS = frozenset("""
+a an and are as at be been but by can could did do does doing for from had
+has have how i if in into is it its may me might my of on or our out so some
+that the their them then there these they this those to too us was we were
+what when where which who why will with would you your
+""".split())
+
+
+# Doctrine concept -> the canonical vocabulary of that concept. These terms
+# are used as a RE-RANK BOOST, not as part of the FTS MATCH: adding a broad
+# concept word to the MATCH would pull in every passage that mentions it and
+# drown out the passage the member actually asked for.
+DOCTRINE_VOCABULARY: dict = {
+    "duties": ("duty", "duties", "fiduciary", "loyalty", "prudence", "care"),
+    "utc": (
+        "uniform",
+        "trust",
+        "code",
+        "statute",
+        "qualified",
+        "beneficiary",
+        "ascertainable",
+        "definition",
+        "defined",
+        "article",
+        "governing",
+        "administered",
+        "jurisdiction",
+        "applies",
+    ),
+    "amendment": ("amend", "amendment", "modify", "modification"),
+    "successor_trustee": ("successor", "succession", "resign", "resignation"),
+    # NOTE: this vocabulary is shared with the pre-UTC corpus. Adding
+    # broad legal nouns here ("discretion", "mandatory") re-ranks the
+    # canonical 01-hems-standard answer out of first place on a plain
+    # HEMS question — a P2a regression. The UTC distribution file (03) is
+    # reached through its own concepts instead.
+    "distribution_standard": ("hems", "standard", "discretion", "distribution"),
+    "accounting": (
+        "accounting",
+        "account",
+        "notice",
+        "beneficiaries",
+        "records",
+        "record",
+        "keeping",
+        "report",
+        "inform",
+        "formal",
+        "informal",
+        "written",
+        "quarterly",
+        "annual",
+    ),
+    "termination": ("terminate", "termination", "final", "distribution"),
+    "beneficiary_communication": ("beneficiary", "beneficiaries", "letter", "notice"),
+    "commingling": ("commingle", "commingling", "separation", "personal"),
+    "investment": ("prudent", "investment", "policy", "portfolio"),
+    "tax": ("1041", "tax", "estimate", "filing"),
+    "minutes": ("minutes", "resolution", "meeting", "documentation"),
+    "co_trustee": ("trustee", "co", "joint"),
+    "compromise": ("conflict", "interest", "recuse", "disqualify"),
+    # ---- UTC doctrine pack boost vocabulary (2026-10-24, P2b) ---------- #
+    # Distinctive noun phrases from the nine approved UTC files. These are
+    # RE-RANK boosts only — they are deliberately NOT part of the FTS MATCH,
+    # because broad legal nouns ("trust", "property", "notice") would pull in
+    # every passage in the corpus and drown the answer.
+    "spendthrift": (
+        "spendthrift",
+        "creditor",
+        "creditors",
+        "provision",
+        "clause",
+        "voluntary",
+        "involuntary",
+        "judgment",
+        "claim",
+        "claims",
+        "extent",
+        "discretion",
+        "transfer",
+        "personal",
+        "spouse",
+        "support",
+        "distributed",
+        "valid",
+        "subject",
+        "reach",
+    ),
+    "revocation": (
+        "revocation",
+        "revoke",
+        "revocable",
+        "amend",
+        "amendment",
+        "modification",
+        "irrevocable",
+        "settlor",
+        "consent",
+        "bracketed",
+        "objectives",
+        "instrument",
+        "expressly",
+        "convincing",
+        "evidence",
+        "proceeding",
+        "method",
+        "power",
+    ),
+    "trust_termination": (
+        "termination",
+        "terminate",
+        "terminating",
+        "final",
+        "expeditious",
+        "expeditiously",
+        "receipt",
+        "reserve",
+        "claim",
+        "release",
+        "proposal",
+        "window",
+        "sequence",
+        "debts",
+        "taxes",
+        "expenses",
+        "compensation",
+        "closing",
+        "material",
+        "informed",
+    ),
+    "distribution_discretion": (
+        "discretion",
+        "constrain",
+        "constrained",
+        "withdrawal",
+        "ascertainable",
+        "mandatory",
+        "discretionary",
+        "814",
+        "817",
+    ),
+    "beneficiary_notification": (
+        "notification",
+        "notice",
+        "notices",
+        "register",
+        "registration",
+        "qualified",
+        "beneficiary",
+        "beneficiaries",
+        "distributees",
+        "delivery",
+        "manner",
+        "receipt",
+        "report",
+        "objection",
+        "baseline",
+        "acceptance",
+        "deadline",
+        "event",
+        "rows",
+        "period",
+        "principal",
+    ),
+    "register_agent": (
+        "administered",
+        "governing",
+        "defined",
+        "definition",
+        "article",
+        "uniform",
+        "purposes",
+        "trusts",
+        "requirement",
+        "principal",
+        "place",
+        "administration",
+        "agent",
+    ),
+    "trustee_removal": (
+        "removal",
+        "remove",
+        "removed",
+        "resign",
+        "resignation",
+        "vacancy",
+        "vacant",
+        "cotrustee",
+        "co-trustee",
+        "special",
+        "fiduciary",
+        "bond",
+        "court",
+        "successor",
+        "designated",
+        "trusteeship",
+        "persistent",
+        "administer",
+        "serious",
+        "breach",
+        "omissions",
+    ),
+}
+
+
+def _doctrine_query(message: str, concepts: list[str]) -> str:
+    """Build the FTS query for a doctrine fetch.
+
+    The member's own CONTENT words are the signal. Grammatical scaffolding
+    is dropped: "what does HEMS stand for" becomes "hems stand", so the
+    query is about HEMS instead of about the English of the question.
+
+    The matched concepts' canonical vocabulary is returned separately as a
+    BOOST, so a passage that genuinely covers the concept outranks one
+    that merely happens to repeat a common word.
+    """
+    words = [
+        w for w in re.findall(r"[a-z0-9'-]{3,}", (message or "").lower())
+        if w not in _DOCTRINE_QUERY_STOPWORDS
+    ]
+    return " ".join(words)
+
+
+def fetch_doctrine(
+    message: str,
+    *,
+    limit: int = 6,
+    max_chars: int = 3600,
+    db_path: Optional[str] = None,
+) -> list:
+    """Fetch the top KB passages for a doctrine question.
+
+    Returns a list of dicts with the passage text plus its citation
+    metadata (source file, section heading, title). Returns [] when the
+    message does not raise a doctrine trigger, or when the index cannot be
+    built — retrieval must never break the chat.
+    """
+    concepts = _match_doctrine_concepts(message)
+    if not concepts:
+        return []
+    try:
+        from services import trust_knowledge
+        info = trust_knowledge.ensure_index(db_path=db_path)
+        resolved = info.get("db_path")
+        if not resolved or not os.path.isfile(resolved):
+            return []
+        boost: list = []
+        for concept in concepts:
+            boost.extend(DOCTRINE_VOCABULARY.get(concept, ()))
+        result = trust_knowledge.retrieve_passages(
+            _doctrine_query(message, concepts),
+            {"db_path": resolved, "boost_terms": boost},
+            limit=limit,
+            max_chars=max_chars,
+        )
+    except Exception as e:  # retrieval must never break the chat
+        from logging import getLogger
+        getLogger(__name__).warning(
+            f"doctrine retrieval failed: {type(e).__name__}: {e}"
+        )
+        return []
+    passages = []
+    for item in result.get("results", []):
+        text = item.get("text") or ""
+        if not text.strip():
+            continue
+        passages.append({
+            "title": item.get("title", ""),
+            "section": item.get("section", ""),
+            "text": text,
+            "source_ref": item.get("source_ref", ""),
+            "score": item.get("score", 0.0),
+            "concepts": concepts,
+        })
+    return passages
+
+
+
+
+_DOCTRINE_ANCHORS: dict = {}
+
+
+def _doctrine_anchor(source_ref: str) -> str:
+    """Fetch the '**UTC anchor:** ...' line from a 24-utc-*.md KB file (cached).
+
+    UTC anchor lines live in the file preamble; section-level passage chunking
+    can slice around them, so the renderer attaches the anchor explicitly to
+    every UTC passage it renders.
+    """
+    if not _DOCTRINE_ANCHORS:
+        import re
+
+        from pathlib import Path
+        kb = Path(__file__).resolve().parent / "knowledge"
+        for f in sorted(kb.glob("24-utc-*.md")):
+            try:
+                m = re.search(r"\*\*UTC anchor:\*\*\s*(.+)", f.read_text(encoding="utf-8", errors="ignore"))
+            except OSError:
+                continue
+            if m:
+                _DOCTRINE_ANCHORS[f.name] = m.group(1).strip()
+    return _DOCTRINE_ANCHORS.get(source_ref, "")
+
+
+def _render_doctrine(passages: list) -> str:
+    """Render doctrine passages with their citations for prompt injection."""
+    if not passages:
+        return ""
+    lines = ["## Retrieved Doctrine (cite the source file)"]
+    for p in passages:
+        title = p.get("title") or ""
+        section = p.get("section") or ""
+        source = p.get("source_ref") or ""
+        label = " — ".join(x for x in (title, section) if x)
+        lines.append(f"### {label}")
+        if source:
+            lines.append(f"Source: {source}")
+            anchor = _doctrine_anchor(source)
+            if anchor:
+                lines.append(f"UTC anchor: {anchor}")
+        lines.append(p.get("text", "").strip())
+    return "\n".join(lines)
 
 
 @dataclass
@@ -30,6 +590,7 @@ class RetrievalBlock:
     minutes_matches: list = field(default_factory=list)
     asset_history: list = field(default_factory=list)
     vault_doc_detail: Optional[dict] = None
+    doctrine: list = field(default_factory=list)
     extra: list = field(default_factory=list)
 
     def to_text(self) -> str:
@@ -69,6 +630,10 @@ class RetrievalBlock:
             if tags:
                 lines.append(f"Tags: {', '.join(str(t) for t in tags[:10])}")
             parts.append("\n".join(lines))
+        if self.doctrine:
+            rendered = _render_doctrine(self.doctrine)
+            if rendered:
+                parts.append(rendered)
         if self.extra:
             parts.extend(self.extra)
         if not parts:
@@ -79,7 +644,13 @@ class RetrievalBlock:
         return text
 
     def is_empty(self) -> bool:
-        return not (self.minutes_matches or self.asset_history or self.vault_doc_detail or self.extra)
+        return not (
+            self.minutes_matches
+            or self.asset_history
+            or self.vault_doc_detail
+            or self.doctrine
+            or self.extra
+        )
 
 
 # ------------------------------------------------------------ trigger patterns ---
@@ -372,6 +943,14 @@ async def retrieve_for_message(
         except Exception as e:
             from logging import getLogger
             getLogger(__name__).warning(f"vault retrieval failed: {type(e).__name__}: {e}")
+    # Layer 2b — doctrine retrieval (2026-10-23, P2a). Runs regardless of
+    # whether a trust-scoped block matched: a doctrine question is about the
+    # law and the reviewed corpus, not about this member's records.
+    try:
+        block.doctrine = fetch_doctrine(message)
+    except Exception as e:
+        from logging import getLogger
+        getLogger(__name__).warning(f"doctrine retrieval failed: {type(e).__name__}: {e}")
     return block
 
 
@@ -392,6 +971,9 @@ def inject_into_user_content(user_content: str, block: RetrievalBlock) -> str:
 __all__ = [
     "RetrievalBlock",
     "retrieve_for_message",
+    "fetch_doctrine",
+    "DOCTRINE_TRIGGERS",
+    "DOCTRINE_CONCEPTS",
     "minutes_search_needed",
     "asset_history_needed",
     "vault_detail_needed",

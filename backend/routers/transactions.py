@@ -1,5 +1,5 @@
 # Transactions router - Trust Transaction Ledger for structural separation tracking
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import Field
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -187,14 +187,38 @@ async def update_transaction(transaction_id: str, updates: TransactionUpdate, us
 
 
 @router.delete("/transactions/{transaction_id}")
-async def delete_transaction(transaction_id: str, user: dict = Depends(require_write_access)):
-    """Delete a transaction (audit log entry preserved)"""
+async def delete_transaction(
+    transaction_id: str,
+    request: Request = None,
+    user: dict = Depends(require_write_access),
+):
+    """
+    Delete a transaction (audit log entry preserved)
+
+    2026-10-23 council P0 — DELETE PROVENANCE: an audit_logs row is written
+    BEFORE the delete commits, carrying the actor, the impersonation
+    attribution, the record type/id, the timestamp and a snapshot summary.
+    The pre-existing transaction_audit_log row is preserved unchanged.
+    """
+    from exec_hardening import audit_member_deletion
+
     txn = await db.transactions.find_one(
         {"transaction_id": transaction_id, "user_id": user["user_id"]},
         {"_id": 0}
     )
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+
+    await audit_member_deletion(
+        db,
+        actor_user_id=user["user_id"],
+        record_type="transactions",
+        record_id=transaction_id,
+        record=txn,
+        trust_id=txn.get("trust_id", ""),
+        request=request,
+        action="transaction_deleted",
+    )
 
     await db.transactions.delete_one({"transaction_id": transaction_id})
 

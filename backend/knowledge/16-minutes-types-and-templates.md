@@ -2,7 +2,7 @@
 
 ## Overview
 
-TrustOffice supports 41 minutes template types across 9 categories. When a user asks the Trust Assistant to "create minutes," "draft minutes," or "document a meeting," the assistant should identify the appropriate template type and guide the user to it.
+TrustOffice supports 43 minutes template types across 9 categories. When a user asks the Trust Assistant to "create minutes," "draft minutes," or "document a meeting," the assistant should identify the appropriate template type and guide the user to it.
 
 ## How to Create Minutes in TrustOffice
 
@@ -10,7 +10,7 @@ Users create minutes via **Minutes → Create Minutes** (`/minutes/create`), whi
 
 The Trust Assistant can reference specific template types and direct users to the correct one. When a user says "create my initial trust minutes" or "document my first trustee meeting," that maps to the `initial_trustee_meeting` template.
 
-## All 41 Template Types
+## All 43 Template Types
 
 ### First Meeting (1 template)
 
@@ -26,7 +26,7 @@ The Trust Assistant can reference specific template types and direct users to th
 | `quarterly_review` | Quarterly Review Meeting | Routine quarterly trustee meeting and financial review |
 | `general_meeting` | General Meeting | Record a general trustee meeting with multiple resolutions |
 
-### Trustee Changes (4 templates)
+### Trustee Changes (5 templates)
 
 | Template ID | Name | When to Use |
 |---|---|---|
@@ -34,8 +34,9 @@ The Trust Assistant can reference specific template types and direct users to th
 | `appointment_successor_trustee` | Appoint Successor Trustee | Appoint a replacement trustee due to resignation, death, or removal |
 | `trustee_resignation` | Trustee Resignation/Removal | Document a trustee's departure from office |
 | `trustee_compensation` | Trustee Compensation | Approve trustee fee arrangements and compensation |
+| `successor_trustee_acceptance` | Successor Trustee Acceptance & Qualification | Record a successor trustee's formal acceptance of trusteeship and qualification to serve |
 
-### Property & Assets (7 templates)
+### Property & Assets (8 templates)
 
 | Template ID | Name | When to Use |
 |---|---|---|
@@ -45,10 +46,10 @@ The Trust Assistant can reference specific template types and direct users to th
 | `business_interest_acquisition` | Business Interest Acquisition | Authorize purchase of LLC, partnership, or corporate interest |
 | `real_estate_lease` | Real Estate Lease | Authorize leasing of trust real property to third parties |
 | `bill_of_sale` | Bill of Sale (Vehicle/Equipment) | Generate a bill of sale transferring tangible personal property to the trust |
-| `assignment_of_personal_property` | Assignment of Personal Property | Assign artwork, antiques, jewelry, or collectibles to the trust |
+| `assignment_of_personal_property` | Assignment of Personal Property (Art/Jewelry/Collectibles) | Assign artwork, antiques, jewelry, or collectibles to the trust |
 | `general_assignment` | General Assignment (Intangible Assets) | Assign intangible assets (notes, IP, business interests, digital assets) |
 
-### Financial (5 templates)
+### Financial (6 templates)
 
 | Template ID | Name | When to Use |
 |---|---|---|
@@ -57,8 +58,9 @@ The Trust Assistant can reference specific template types and direct users to th
 | `loan_authorization` | Loan Authorization | Authorize the trust to make or receive a loan |
 | `insurance_authorization` | Insurance Authorization | Approve trust insurance policies and coverage |
 | `spending_authorization` | Spending Authorization | Document trustee approval of an expenditure that exceeds the spending threshold |
+| `reserve_account_resolution` | Reserve Account / Corpus Preservation | Establish or adjust a reserve policy preserving trust corpus against anticipated obligations |
 
-### Distributions (6 templates)
+### Distributions (7 templates)
 
 | Template ID | Name | When to Use |
 |---|---|---|
@@ -67,6 +69,8 @@ The Trust Assistant can reference specific template types and direct users to th
 | `beneficiary_loan` | Loan to Beneficiary | Authorize an intra-family loan to a beneficiary |
 | `beneficiary_distribution_notice` | Beneficiary Distribution Notice | Notify a beneficiary of an approved distribution with formal documentation |
 | `evaluate_distribution` | Evaluate Distribution Request | Get an AI evaluation of whether a distribution request complies with the trust document and trust law |
+| `beneficiary_receipt_release` | Beneficiary Receipt & Release | Record a beneficiary's written acknowledgment of a distribution received |
+| `beneficiary_periodic_notice` | Beneficiary Periodic Notice | Send the periodic beneficiary notice your state requires and record it against the compliance deadline |
 
 ### Legal & Governance (7 templates)
 
@@ -78,6 +82,7 @@ The Trust Assistant can reference specific template types and direct users to th
 | `power_of_attorney` | Power of Attorney | Grant limited power of attorney to a trustee or agent |
 | `trust_termination` | Trust Termination | Document trust dissolution and final distribution |
 | `change_of_situs` | Change Trust Situs | Change the jurisdiction and principal place of administration |
+| `trustee_indemnification_release` | Trustee Indemnification & Release | Document the trust's indemnification of a trustee and the scope of any release after a matter closes |
 
 ### Admin (5 templates)
 
@@ -87,6 +92,7 @@ The Trust Assistant can reference specific template types and direct users to th
 | `tax_filing_authorization` | Tax Filing Authorization | Authorize preparation and filing of trust tax returns |
 | `designation_of_beneficiaries` | Designate Beneficiaries | Establish or amend beneficiary designations and units of beneficial interest |
 | `beneficiary_request_denial` | Beneficiary Request Denial | Document denial of a beneficiary request with proper reasoning |
+| `grantor_trust_election` | Grantor Trust / Entity Election | Record the trustees' adoption of a tax-election position for the trust (e.g., check-the-box or an S-corp election for a held entity) |
 
 ### Benevolence (1 template)
 
@@ -108,6 +114,7 @@ When a user asks the Trust Assistant to create or draft minutes, map their reque
 | "successor trustee" / "replace a trustee" | `appointment_successor_trustee` |
 | "trustee resigning" / "removing a trustee" | `trustee_resignation` |
 | "trustee compensation" / "trustee fees" / "pay trustee" | `trustee_compensation` |
+| "successor accepts" / "successor qualification" / "accept appointment" | `successor_trustee_acceptance` |
 | "buy real estate" / "purchase property" | `real_estate_purchase` |
 | "accept property" / "add asset to trust" / "convey property" | `acceptance_of_property` |
 | "sell asset" / "dispose of asset" / "remove from schedule A" | `disposition_of_asset` |
@@ -121,10 +128,13 @@ When a user asks the Trust Assistant to create or draft minutes, map their reque
 | "authorize loan" / "trust making a loan" / "trust receiving a loan" | `loan_authorization` |
 | "insurance" / "coverage for trust" | `insurance_authorization` |
 | "authorize spending" / "approve expenditure" / "large purchase" | `spending_authorization` |
+| "reserve account" / "corpus preservation" / "reserve policy" | `reserve_account_resolution` |
 | "distribute to beneficiary" / "make a distribution" | `distribution_to_beneficiaries` |
 | "HEMS distribution" / "health education maintenance support" | `hems_distribution` |
 | "loan to beneficiary" / "intra-family loan" | `beneficiary_loan` |
 | "notify beneficiary of distribution" | `beneficiary_distribution_notice` |
+| "beneficiary receipt" / "signed receipt" / "release of distribution" | `beneficiary_receipt_release` |
+| "periodic beneficiary notice" / "required notice" | `beneficiary_periodic_notice` |
 | "evaluate distribution request" / "is this distribution allowed" | `evaluate_distribution` |
 | "amend trust" / "modify trust provisions" / "trust amendment" | `trust_amendment` |
 | "conflict of interest" / "disclose conflict" | `conflict_of_interest` |
@@ -132,10 +142,12 @@ When a user asks the Trust Assistant to create or draft minutes, map their reque
 | "power of attorney" / "grant POA" | `power_of_attorney` |
 | "terminate trust" / "dissolve trust" / "close the trust" | `trust_termination` |
 | "change jurisdiction" / "change situs" / "move trust to another state" | `change_of_situs` |
+| "indemnify trustee" / "trustee release" / "trustee indemnification" | `trustee_indemnification_release` |
 | "fiscal year election" / "choose tax year" | `fiscal_year_election` |
 | "authorize tax filing" / "authorize tax return" | `tax_filing_authorization` |
 | "designate beneficiaries" / "update beneficiary designations" | `designation_of_beneficiaries` |
 | "deny beneficiary request" / "reject beneficiary request" | `beneficiary_request_denial` |
+| "grantor trust election" / "check the box" / "entity election" | `grantor_trust_election` |
 | "benevolence grant" / "charitable assistance" | `benevolence_approval` |
 
 ## Trust Data Available in Context

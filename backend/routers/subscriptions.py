@@ -66,8 +66,8 @@ PLAN_AMOUNTS = {
     ("trustee", "annual"): 948.00,
     ("estate", "monthly"): 189.00,
     ("estate", "annual"): 1788.00,
-    ("wingpoint", "monthly"): 119.00,
-    ("wingpoint", "annual"): 1188.00,
+    ("wingpoint", "monthly"): 99.00,
+    ("wingpoint", "annual"): 948.00,
     ("advisor", "monthly"): 499.00,
     ("advisor", "annual"): 4788.00,
     # Legacy rates (grandfathered subscribers keep these until cancel)
@@ -400,7 +400,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     # (new signups always bill at current prices; grandfathered subscribers
     # don't go through checkout — their Stripe price persists). Legacy
     # plan_type identifiers (monthly/annual) still map to legacy price IDs.
-    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
+    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 948.00, "monthly": 79.00, "annual": 790.00}
     amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 99.00))
     
     # Get or create subscription to get/create stripe customer
@@ -609,7 +609,7 @@ async def create_guest_checkout_session(checkout: GuestCheckoutRequest, _rl: Non
     # (new signups always bill at current prices; grandfathered subscribers
     # don't go through checkout — their Stripe price persists). Legacy
     # plan_type identifiers (monthly/annual) still map to legacy price IDs.
-    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 1188.00, "monthly": 79.00, "annual": 790.00}
+    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 948.00, "monthly": 79.00, "annual": 790.00}
     amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 99.00))
 
     try:
@@ -1187,7 +1187,7 @@ async def _provision_guest_account(session, metadata: dict, plan_type: str, bill
         "user_id": new_user_id,
         "email": email,
         "name": name or email.split("@")[0],
-        # No password yet â user sets one via the welcome email's
+        # No password yet — user sets one via the welcome email's
         # password-setup link (purpose="set_password") or "forgot password".
         "password_hash": None,
         "created_at": now,

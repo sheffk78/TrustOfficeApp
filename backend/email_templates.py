@@ -270,6 +270,8 @@ The TrustOffice Team
 
             <p>If you have questions or need help getting started, just reply to this email.</p>
 
+            {_booking_cta_html(data.get('booking_url', ''), data.get('phone_request', True))}
+
             <p>Best regards,<br>The TrustOffice Team</p>
         """),
         "text": lambda data: f"""
@@ -288,6 +290,7 @@ Here's a quick preview:
 - Why trustees have legal duties — and what they are
 - How to avoid the most common trustee mistakes
 
+{_booking_cta_text(data.get('booking_url', ''), data.get('phone_request', True))}
 Best regards,
 The TrustOffice Team
 """,
@@ -539,11 +542,11 @@ TrustOffice
     # State Compliance Deadline Reminder Email
     "compliance_deadline_reminder": {
         "subject": lambda data: (
-            f"ACTION REQUIRED: {data.get('act', 'state compliance').title()} overdue â "
+            f"ACTION REQUIRED: {data.get('act', 'state compliance').title()} overdue — "
             f"{data.get('trust_name', 'your trust')}"
             if data.get("is_overdue")
             else f"Reminder: {data.get('act', 'state compliance').title()} due "
-            f"{data.get('due_date', 'soon')} â {data.get('trust_name', 'your trust')}"
+            f"{data.get('due_date', 'soon')} — {data.get('trust_name', 'your trust')}"
         ),
         "html": lambda data: _base_template(f"""
             <h2 style="color: #dc3545;">State Compliance Deadline</h2>
@@ -563,7 +566,7 @@ TrustOffice
             <div class="alert" style="background-color: #f8d7da; border-color: #dc3545;">
               <strong>Why this matters:</strong> {data.get('act')} is required by
               {data.get('state_name', 'the governing state')} law for this trust.
-              {f" This deadline is now <strong>overdue</strong> â overdue state compliance directly lowers this trust's compliance score." if data.get('is_overdue') else " Completing it on time protects this trust's compliance score."}
+              {f" This deadline is now <strong>overdue</strong> — overdue state compliance directly lowers this trust's compliance score." if data.get('is_overdue') else " Completing it on time protects this trust's compliance score."}
             </div>
 
             <p style="text-align: center;">
@@ -583,7 +586,7 @@ Required Act: {data.get('act', 'State compliance requirement')}
 Due Date: {data.get('due_date', 'N/A')}
 {f"Days Remaining: {data.get('days_remaining')} days" if not data.get('is_overdue') else f"Days Overdue: {data.get('days_overdue')} days"}
 
-Why this matters: {data.get('act')} is required by {data.get('state_name', 'the governing state')} law for this trust.{f" This deadline is now OVERDUE â overdue state compliance directly lowers this trust's compliance score." if data.get('is_overdue') else " Completing it on time protects this trust's compliance score."}
+Why this matters: {data.get('act')} is required by {data.get('state_name', 'the governing state')} law for this trust.{f" This deadline is now OVERDUE — overdue state compliance directly lowers this trust's compliance score." if data.get('is_overdue') else " Completing it on time protects this trust's compliance score."}
 
 Review Compliance Status: {data.get('app_url', '#')}/governance?tab=state
 
@@ -1249,13 +1252,13 @@ Founder, TrustOffice
         """
     },
 
-    # Booking reminder â sent ~24h before the scheduled call (no-show reduction)
+    # Booking reminder — sent ~24h before the scheduled call (no-show reduction)
     "booking_reminder_day_before": {
         "subject": lambda data: f"Tomorrow: your TrustOffice call at {data.get('call_time', 'see you soon')}",
         "html": lambda data: _base_template(f"""
             <h2>Your call is tomorrow</h2>
             <p>Hi {_h(data.get('name', 'there'))},</p>
-            <p>Just a reminder that your 15-minute discovery call with <strong>Kenneth (Jeff) Kohler, founder of TrustOffice</strong> â Kenneth is his legal name, Jeff is what everyone calls him â is tomorrow.</p>
+            <p>Just a reminder that your 15-minute discovery call with <strong>Kenneth (Jeff) Kohler, founder of TrustOffice</strong> — Kenneth is his legal name, Jeff is what everyone calls him — is tomorrow.</p>
 
             <div class="task-card">
               <p class="label">Date</p>
@@ -1275,7 +1278,7 @@ Founder, TrustOffice
               <span style="word-break: break-all;">{data.get('meeting_url', '#')}</span>
             </p>
 
-            <p><strong>What to expect:</strong> No pitch, no pressure. We'll talk about what's going on with your trust right now, whether TrustOffice is a good fit, and if it makes sense I'll walk you through the annual plan. You'll walk away with a clearer picture of what you should be doing as trustee â whether or not you sign up.</p>
+            <p><strong>What to expect:</strong> No pitch, no pressure. We'll talk about what's going on with your trust right now, whether TrustOffice is a good fit, and if it makes sense I'll walk you through the annual plan. You'll walk away with a clearer picture of what you should be doing as trustee — whether or not you sign up.</p>
             <p><strong>No prep needed.</strong> Just show up and tell me about your situation.</p>
 
             <p>Need to reschedule or cancel? You can do that right from your original booking confirmation email, or reply to this one.</p>
@@ -1288,7 +1291,7 @@ Your call is tomorrow
 
 Hi {data.get('name', 'there')},
 
-Just a reminder that your 15-minute discovery call with Kenneth (Jeff) Kohler, founder of TrustOffice â Kenneth is his legal name, Jeff is what everyone calls him â is tomorrow.
+Just a reminder that your 15-minute discovery call with Kenneth (Jeff) Kohler, founder of TrustOffice — Kenneth is his legal name, Jeff is what everyone calls him — is tomorrow.
 
 Date: {data.get('call_date', '')}
 Time: {data.get('call_time', '')}
@@ -1309,9 +1312,9 @@ Founder, TrustOffice
         """
     },
 
-    # Booking reminder â sent ~1h before the scheduled call (no-show reduction)
+    # Booking reminder — sent ~1h before the scheduled call (no-show reduction)
     "booking_reminder_1h": {
-        "subject": lambda data: f"Your TrustOffice call is in 1 hour â join link inside",
+        "subject": lambda data: f"Your TrustOffice call is in 1 hour — join link inside",
         "html": lambda data: _base_template(f"""
             <h2>Your call is in 1 hour</h2>
             <p>Hi {_h(data.get('name', 'there'))},</p>
@@ -1325,7 +1328,7 @@ Founder, TrustOffice
               <span style="word-break: break-all;">{data.get('meeting_url', '#')}</span>
             </p>
 
-            <p>No prep needed â just click the link at call time and tell me about your situation. See you in a bit.</p>
+            <p>No prep needed — just click the link at call time and tell me about your situation. See you in a bit.</p>
 
             <p><strong>Kenneth (Jeff) Kohler</strong><br>Founder, TrustOffice</p>
         """),
@@ -1345,7 +1348,7 @@ Founder, TrustOffice
         """
     },
 
-    # Post-drip re-engagement â sent ONCE to leads that finished the 12-email
+    # Post-drip re-engagement — sent ONCE to leads that finished the 12-email
     # nurture sequence with no conversion. Distinct template (not part of the
     # 12-email sequence); marks the cohort as stage='post_drip'.
     "post_drip_reengagement": {
@@ -1353,15 +1356,15 @@ Founder, TrustOffice
         "html": lambda data: _base_template(f"""
             <h2>Still here whenever you're ready</h2>
             <p>Hi {_h(data.get('name', 'there'))},</p>
-            <p>Over the last few months I've sent you a series of notes on protecting your trust and serving as trustee without the overwhelm. I don't want to keep landing in your inbox if it's not useful â but I also don't want you to slip through the cracks if the timing just wasn't right.</p>
+            <p>Over the last few months I've sent you a series of notes on protecting your trust and serving as trustee without the overwhelm. I don't want to keep landing in your inbox if it's not useful — but I also don't want you to slip through the cracks if the timing just wasn't right.</p>
 
-            <p>The single most valuable next step is a short conversation. In 15 minutes we can look at where your trust stands today and whether TrustOffice is worth it for your situation â no pressure, no pitch. Most people leave with at least one thing they should fix right away.</p>
+            <p>The single most valuable next step is a short conversation. In 15 minutes we can look at where your trust stands today and whether TrustOffice is worth it for your situation — no pressure, no pitch. Most people leave with at least one thing they should fix right away.</p>
 
             <p style="text-align: center; margin: 24px 0;">
               <a href="{data.get('booking_url', 'https://trustoffice.app/book-a-call/')}" class="button">Book a Free Call</a>
             </p>
 
-            <p>If now's not the time, no worries â you can ignore this and I'll leave the door open. And the trustee course is still here whenever you want it:</p>
+            <p>If now's not the time, no worries — you can ignore this and I'll leave the door open. And the trustee course is still here whenever you want it:</p>
             <p style="text-align: center; margin: 16px 0;">
               <a href="{data.get('course_url', 'https://trustoffice.app/trustee-101')}" class="button-secondary">Open the Trustee 101 Course</a>
             </p>

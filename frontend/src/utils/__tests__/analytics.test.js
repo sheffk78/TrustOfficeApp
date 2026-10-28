@@ -83,7 +83,7 @@ describe('analytics utilities', () => {
       );
     });
 
-    it('uses correct tier pricing for wingpoint/annual ($1,188)', () => {
+    it('uses correct tier pricing for wingpoint/annual ($948)', () => {
       analytics.trackActivationComplete({
         user_id: 'user_wp',
         plan_type: 'wingpoint',
@@ -91,7 +91,7 @@ describe('analytics utilities', () => {
       });
 
       expect(mockGtag).toHaveBeenCalledWith('event', 'activation_complete',
-        expect.objectContaining({ value: 1188 })
+        expect.objectContaining({ value: 948 })
       );
     });
 

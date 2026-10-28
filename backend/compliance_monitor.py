@@ -73,10 +73,10 @@ async def check_compliance_reminder_health(
 
     failures: list = []
 
-    # If email is not configured there is nothing to alert about â a "stall" is
+    # If email is not configured there is nothing to alert about — a "stall" is
     # expected, not a defect. (The scanner itself also no-ops when unconfigured.)
     if not email_configured:
-        logger.info("[compliance-monitor] email not configured â skipping stall check")
+        logger.info("[compliance-monitor] email not configured — skipping stall check")
         return {
             "all_ok": True,
             "email_configured": False,
@@ -149,7 +149,7 @@ async def check_compliance_reminder_health(
             logger.error(f"[compliance-monitor] failed to send RED alert: {e}")
     else:
         logger.info(
-            f"[compliance-monitor] OK â at_risk={at_risk}, sends_24h={sends_last_24h}"
+            f"[compliance-monitor] OK — at_risk={at_risk}, sends_24h={sends_last_24h}"
         )
 
     return {

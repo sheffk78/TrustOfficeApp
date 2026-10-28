@@ -12,10 +12,10 @@ import { Lock, Eye, EyeOff, ArrowRight, CheckCircle, AlertTriangle, CreditCard, 
 const API = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 
 const WINGPOINT_PLAN = {
-  name: 'WingPoint Annual',
-  price: '$99/mo',
+  name: 'WingPoint Plan',
+  price: '$79/mo',
   billing: 'billed annually',
-  annualTotal: '$1,188/year',
+  annualTotal: '$948/year',
   trusts: 'Unlimited trusts',
   features: [
     'AI-powered guided minutes',
@@ -48,15 +48,15 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Can I cancel anytime?',
-    a: 'Yes. Your TrustOffice subscription renews annually. If you cancel, you won\'t be able to get this special pricing again — you would need to subscribe at regular TrustOffice rates.',
+    a: 'Yes. Your TrustOffice subscription renews monthly or annually depending on your plan. If you cancel, you won\'t be able to get this special pricing again — you would need to subscribe at regular TrustOffice rates.',
   },
   {
     q: 'What happens if I cancel?',
     a: 'This exclusive WingPoint rate is available to WingPoint customers only. If you cancel, you won\'t be able to get this pricing again — you would need to subscribe at regular TrustOffice rates.',
   },
   {
-    q: 'Why is this plan annual only?',
-    a: 'WingPoint customers get unlimited trusts at a special rate below our public pricing. Annual commitment makes that possible.',
+    q: 'Should I choose monthly or annual?',
+    a: 'Monthly ($99/mo) gives you flexibility. Annual ($948/yr) is the best value — it works out to $79/mo, saving you $240/year. You can switch anytime.',
   },
   {
     q: 'My setup link expired',
@@ -257,7 +257,7 @@ export default function WingPointWelcomePage() {
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gold/10 border border-gold/30">
             <CreditCard className="w-4 h-4 text-navy" />
             <span className="text-sm text-navy font-medium">
-              You're eligible for WingPoint's exclusive annual plan at <span className="font-mono">$99/mo</span>.
+              You're eligible for WingPoint's exclusive plan at <span className="font-mono">$99/mo</span> (<span className="font-mono">$948/yr</span>).
             </span>
           </div>
         </section>
@@ -284,7 +284,7 @@ export default function WingPointWelcomePage() {
               <div className="flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-navy">WingPoint Annual plan</span> provides unlimited trusts at <span className="font-mono">$99/mo</span>, billed annually.
+                  <span className="font-medium text-navy">WingPoint Plan</span> provides unlimited trusts at <span className="font-mono">$99/mo</span> (<span className="font-mono">$948/yr</span>), billed annually.
                 </p>
               </div>
             </div>
