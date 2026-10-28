@@ -59,21 +59,37 @@ export const TIERS = [
   }
 ];
 
-// WingPoint-exclusive plan — only shown to WingPoint customers (is_wingpoint).
+// WingPoint-exclusive plan Ã¢ÂÂ only shown to WingPoint customers (is_wingpoint).
 // NOT added to the public TIERS array to prevent it leaking to non-WingPoint users.
 //
-// Jeff's requirement: WingPoint customers must be given TWO options:
-//   (a) Trustee tier — $99/month, or $948/yr annual ($79/mo equivalent)
-//   (b) WingPoint plan → unlimited trusts at a discounted rate
-//       Monthly: $99/mo   (new — price-conscious customers)
-//       Annual:  $948/yr ($79/mo equivalent — best value, annual commitment)
+// Jeff-approved offer (msg 1565060388909744262): WingPoint customers get BOTH plans
+// at WingPoint-discounted rates:
 //
-// Both monthly and annual are real purchasable plans with Stripe price IDs.
+//   (a) WingPoint Trustee Ã¢ÂÂ 1 trust only: $79/mo monthly ÃÂ· $758/yr annual (20% off)
+//   (b) WingPoint Plan Ã¢ÂÂ unlimited trusts: $99/mo monthly ÃÂ· $948/yr annual (20% off)
+//
+// Public TrustOffice pricing (TIERS above) is untouched: Trustee $99/mo ÃÂ· $948/yr.
+// Both WingPoint options are real purchasable plans with Stripe price IDs and are
+// checkout-gated by server-side WingPoint membership verification (wp_ref ledger).
+export const WINGPOINT_TRUSTEE_TIER = {
+  id: 'wingpoint_trustee',
+  name: 'Trustee Plan (WingPoint)',
+  monthly: 79,        // $79/mo Ã¢ÂÂ WingPoint discount vs public $99/mo
+  annual: 758,        // $758/yr Ã¢ÂÂ 20% off $948; real Stripe price below
+  maxTrusts: 1,
+  trustLimit: '1 trust',
+  features: [
+    'Govern one trust end-to-end',
+    'AI-powered guided minutes',
+    'Governance Health Score & compliance calendar',
+  ],
+};
+
 export const WINGPOINT_TIER = {
   id: 'wingpoint',
   name: 'WingPoint Plan',
-  monthly: 99,        // $99/mo — real Stripe price (price_1UVXj8JE7N1BszdfjAlfQSaE)
-  annual: 948,       // $948/yr — real Stripe price (price_1UVXj8JE7N1BszdfsPoo3rkm)
+  monthly: 99,        // $99/mo Ã¢ÂÂ real Stripe price (price_1UVXj8JE7N1BszdfjAlfQSaE)
+  annual: 948,       // $948/yr Ã¢ÂÂ real Stripe price (price_1UVXj8JE7N1BszdfsPoo3rkm)
   maxTrusts: Infinity,
   trustLimit: 'Unlimited trusts',
   features: [
@@ -81,7 +97,7 @@ export const WINGPOINT_TIER = {
     'AI-powered guided minutes',
     '31 professional document templates',
     'Governance Health Score & compliance calendar',
-    'Minutes ↔ Money integration',
+    'Minutes â Money integration',
     'Priority support'
   ]
 };

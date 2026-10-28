@@ -396,7 +396,9 @@ export default function PricingPage() {
           <section className="pb-8 px-8 pt-6" data-testid="wp-preselected-card">
             <div className="max-w-4xl mx-auto">
               <div className="grid md:grid-cols-2 gap-8 items-stretch">
-                {/* Card 1: Trustee Plan — $99/mo, or $948/yr annual ($79/mo equivalent, 1 trust) */}
+                {/* Card 1: WingPoint Trustee Plan â $79/mo monthly, or $758/yr annual (20% off).
+                    WingPoint-exclusive discounted rate Ã¢ÂÂ 1 trust only, WingPoint customers only
+                    (server-side guard requires verified WingPoint membership at checkout). */}
                 <div className="card-trust corner-mark p-8 border border-border relative overflow-visible flex flex-col">
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-white px-4 py-1.5 text-xs font-mono uppercase tracking-wider shadow-md whitespace-nowrap z-10">
                     1 Trust
@@ -431,23 +433,23 @@ export default function PricingPage() {
                       </div>
                     </div>
 
-                    {/* Price display */}
+                    {/* Price display â WingPoint discount ($79/mo monthly Â· $758/yr annual) */}
                     {trusteePeriod === 'monthly' ? (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-mono text-5xl text-navy">${TIERS.find(t => t.id === 'trustee').monthly}</span>
+                          <span className="font-mono text-5xl text-navy">$79</span>
                           <span className="text-muted-foreground">/mo</span>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4">billed monthly · cancel anytime</p>
+                        <p className="text-sm text-muted-foreground mb-4">billed monthly Â· cancel anytime</p>
                       </>
                     ) : (
                       <>
                         <div className="flex items-baseline justify-center gap-1 mb-1">
-                          <span className="font-mono text-5xl text-navy">${(TIERS.find(t => t.id === 'trustee').annual / 12).toFixed(2).replace(/\.00$/, '')}</span>
-                          <span className="text-muted-foreground">/mo</span>
+                          <span className="font-mono text-5xl text-navy">$63</span>
+                          <span className="text-muted-foreground">/mo equivalent</span>
                         </div>
-                        <p className="text-sm text-success font-medium mb-1">Save 20% with annual (<span className="font-mono">${TIERS.find(t => t.id === 'trustee').monthly * 12 - TIERS.find(t => t.id === 'trustee').annual}/yr</span>)</p>
-                        <p className="text-sm text-muted-foreground mb-4">billed annually (<span className="font-mono">${TIERS.find(t => t.id === 'trustee').annual.toLocaleString()}/year</span>)</p>
+                        <p className="text-sm text-success font-medium mb-1">Save 20% with annual (<span className="font-mono">$190/yr</span>)</p>
+                        <p className="text-sm text-muted-foreground mb-4">billed annually (<span className="font-mono">$758/year</span>)</p>
                       </>
                     )}
 
@@ -456,12 +458,12 @@ export default function PricingPage() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => handleCheckout('trustee', trusteePeriod)}
+                    onClick={() => handleCheckout('wingpoint_trustee', trusteePeriod)}
                     disabled={loading !== null}
                     className="w-full btn-primary text-lg py-6"
                     data-testid="wp-confirm-plan-btn"
                   >
-                    {loading === 'trustee' ? 'Loading...' : `Choose Trustee (${trusteePeriod === 'annual' ? 'Annual' : 'Monthly'})`}
+                    {loading === 'trustee' ? 'Loading...' : `Choose WingPoint Trustee (${trusteePeriod === 'annual' ? 'Annual' : 'Monthly'})`}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </div>

@@ -56,6 +56,8 @@ PRICE_IDS = {
     ("advisor", "annual"): STRIPE_ADVISOR_ANNUAL_PRICE_ID,
     ("wingpoint", "monthly"): STRIPE_WINGPOINT_MONTHLY_PRICE_ID,
     ("wingpoint", "annual"): STRIPE_WINGPOINT_ANNUAL_PRICE_ID,
+    ("wingpoint_trustee", "monthly"): STRIPE_WPTRUSTEE_MONTHLY_PRICE_ID,
+    ("wingpoint_trustee", "annual"): STRIPE_WPTRUSTEE_ANNUAL_PRICE_ID,
 }
 
 # Amount lookup (for payment_transactions logging)
@@ -69,6 +71,12 @@ PLAN_AMOUNTS = {
     ("estate", "annual"): 1788.00,
     ("wingpoint", "monthly"): 99.00,
     ("wingpoint", "annual"): 948.00,
+    # WingPoint gated discount â 1 trust (WingPoint customers only,
+    # verified checkout-path membership): $79/mo monthly Â· $758/yr annual
+    # (Jeff approval msg 1565060388909744262; number = exact 20% off
+    # the $79/moÃ¢ÂÂ¨x12 annualized rate, mirroring "save 20% with annual")
+    ("wingpoint_trustee", "monthly"): 79.00,
+    ("wingpoint_trustee", "annual"): 758.00,
     ("advisor", "monthly"): 499.00,
     ("advisor", "annual"): 4788.00,
     # Legacy rates (grandfathered subscribers keep these until cancel)
@@ -338,7 +346,7 @@ async def get_subscription_features(user: dict = Depends(get_current_user)):
 async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session for subscription"""
     # Support both new 3-tier system and legacy 2-plan system
-    valid_new_plans = ["trustee", "estate", "advisor", "wingpoint"]
+    valid_new_plans = ["trustee", "estate", "advisor", "wingpoint", "wingpoint_trustee"]
     valid_legacy_plans = ["monthly", "annual"]
     valid_periods = ["monthly", "annual"]
     
@@ -363,7 +371,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     #      account's row in the provisioning ledger, so no client payload can
     #      confer membership by guessing a ref format. On success the ref is
     #      back-stamped onto the user doc so future checkouts skip this probe.
-    if checkout.plan_type == "wingpoint":
+    if checkout.plan_type in ("wingpoint", "wingpoint_trustee"):
         user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
         is_wingpoint = is_wingpoint_user(user_doc)
         if not is_wingpoint and checkout.wp_ref:
@@ -393,7 +401,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     trust_count = await db.trusts.count_documents({"user_id": user["user_id"]})
     trust_limit = get_trust_limit(checkout.plan_type, None)
     if trust_limit != float('inf') and trust_count > trust_limit:
-        _plan_display_names = {"trustee": "Trustee", "estate": "Estate", "advisor": "Advisor", "wingpoint": "WingPoint", "monthly": "Trustee", "annual": "Trustee"}
+        _plan_display_names = {"trustee": "Trustee", "estate": "Estate", "advisor": "Advisor", "wingpoint": "WingPoint", "wingpoint_trustee": "Trustee", "monthly": "Trustee", "annual": "Trustee"}
         plan_display_name = _plan_display_names.get(checkout.plan_type, checkout.plan_type.title())
         raise HTTPException(
             status_code=400,
@@ -414,7 +422,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     # (new signups always bill at current prices; grandfathered subscribers
     # don't go through checkout — their Stripe price persists). Legacy
     # plan_type identifiers (monthly/annual) still map to legacy price IDs.
-    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 948.00, "monthly": 79.00, "annual": 790.00}
+    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 948.00, "wingpoint_trustee": 79.00, "monthly": 79.00, "annual": 790.00}
     amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 99.00))
     
     # Get or create subscription to get/create stripe customer
@@ -559,8 +567,8 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
 
 async def _validate_guest_checkout(checkout) -> tuple[str, str]:
     """Shared validation for guest checkout. Returns (email, name)."""
-    if checkout.plan_type == "wingpoint":
-        # WingPoint plan requires a provisioned (existing) WingPoint user —
+    if checkout.plan_type in ("wingpoint", "wingpoint_trustee"):
+        # WingPoint plan requires a provisioned (existing) WingPoint user Ã¢ÂÂ
         # guest checkout cannot verify WP eligibility pre-account, so block it.
         raise HTTPException(
             status_code=403,
@@ -623,7 +631,7 @@ async def create_guest_checkout_session(checkout: GuestCheckoutRequest, _rl: Non
     # (new signups always bill at current prices; grandfathered subscribers
     # don't go through checkout — their Stripe price persists). Legacy
     # plan_type identifiers (monthly/annual) still map to legacy price IDs.
-    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 948.00, "monthly": 79.00, "annual": 790.00}
+    _amount_fallbacks = {"trustee": 99.00, "estate": 189.00, "advisor": 499.00, "wingpoint": 948.00, "wingpoint_trustee": 79.00, "monthly": 79.00, "annual": 790.00}
     amount = PLAN_AMOUNTS.get((checkout.plan_type, billing_period), _amount_fallbacks.get(checkout.plan_type, 99.00))
 
     try:

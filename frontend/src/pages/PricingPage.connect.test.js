@@ -55,7 +55,7 @@ describe('PricingPage — WingPoint email prefill', () => {
 
     const buttons = await screen.findAllByRole('button');
     const wpButton = buttons.find((b) =>
-      /wingpoint/i.test(b.textContent || '') && /get started|start|choose|connect/i.test(b.textContent || ''),
+      /wingpoint/i.test(b.textContent || '') && /start|connect/i.test(b.textContent || ''),
     );
     expect(wpButton).toBeTruthy();
     fireEvent.click(wpButton);

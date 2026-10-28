@@ -567,6 +567,7 @@ PLAN_TRUST_LIMITS = {
     "free": 1,
     "forever_free": 1,
     "trustee": 1,
+    "wingpoint_trustee": 1,      # WingPoint-gated discount Ã¢ÂÂ 1 trust
     "estate": 8,
     "advisor": float('inf'),  # unlimited
     "wingpoint": float('inf'),  # unlimited — WingPoint exclusive annual plan
