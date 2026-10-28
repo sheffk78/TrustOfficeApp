@@ -66,8 +66,8 @@ PLAN_AMOUNTS = {
     ("trustee", "annual"): 948.00,
     ("estate", "monthly"): 189.00,
     ("estate", "annual"): 1788.00,
-    ("wingpoint", "monthly"): 119.00,
-    ("wingpoint", "annual"): 1188.00,
+    ("wingpoint", "monthly"): 99.00,
+    ("wingpoint", "annual"): 948.00,
     ("advisor", "monthly"): 499.00,
     ("advisor", "annual"): 4788.00,
     # Legacy rates (grandfathered subscribers keep these until cancel)
