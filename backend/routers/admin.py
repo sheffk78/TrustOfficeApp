@@ -1270,9 +1270,11 @@ def _fetch_stripe_all_time_revenue():
 # advisor 399), so the admin dashboard under-reported MRR for every
 # subscriber on a current-rate plan. They now match the real prices the
 # backend charges (backend/routers/subscriptions.py PLAN_AMOUNTS):
-#   trustee $99/mo, estate $189/mo, advisor $499/mo, wingpoint $119/mo
+#   trustee $99/mo, estate $189/mo, advisor $499/mo, wingpoint $99/mo
 #   annual: trustee $948/yr ($79/mo), estate $1,788/yr ($149/mo),
-#           advisor $4,788/yr ($399/mo)
+#           advisor $4,788/yr ($399/mo); wingpoint $948/yr ($79/mo)
+# 2026-10-28: wingpoint repriced 119→99 monthly, 1188→948 annual (same
+# 20%-annual structure as trustee).
 # The legacy 'monthly'/'annual' plan_types are grandfathered subscribers
 # still billed at $79/mo and $790/yr — those rates stay.
 MRR_RATES_CENTS = {
@@ -1280,7 +1282,7 @@ MRR_RATES_CENTS = {
     "trustee": 9900,   # $99/mo
     "estate": 18900,   # $189/mo
     "advisor": 49900,  # $499/mo
-    "wingpoint": 11900,  # $119/mo
+    "wingpoint": 9900,  # $99/mo (2026-10-28 repricing)
     # Grandfathered legacy plan_types
     "monthly": 7900,   # $79/mo
     "annual": 6583,    # $790/yr ~ $65.83/mo

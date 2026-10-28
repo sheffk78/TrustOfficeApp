@@ -86,7 +86,7 @@ const TIER_PRICES = {
   trustee: { monthly: 99, annual: 948 },
   estate: { monthly: 189, annual: 1788 },
   advisor: { monthly: 499, annual: 4788 },
-  wingpoint: { monthly: 119, annual: 1188 },
+  wingpoint: { monthly: 99, annual: 948 },
   // Grandfathered (pre-2026-09-08) Trustee rates.
   // These are the real amounts grandfathered subscribers are billed by
   // Stripe (backend PLAN_AMOUNTS: ("trustee","legacy-monthly")=79.00,
