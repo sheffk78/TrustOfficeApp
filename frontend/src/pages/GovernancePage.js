@@ -66,6 +66,33 @@ export default function GovernancePage() {
     }
   };
 
+  // Dismiss a risk finding. The backend records it under the 'risk:<type>'
+  // key and stops applying the penalty — the row disappears and the penalty
+  // total updates on the reload below.
+  const dismissRisk = async (riskType) => {
+    if (!selectedTrust) return;
+    try {
+      const response = await fetchWithAuth('/insights/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          criterion_name: `risk:${riskType}`
+        })
+      });
+      if (response.ok) {
+        toast.success('Recommendation dismissed');
+        await loadGovernanceData();
+      } else {
+        const data = await response.json();
+        showError(toast, new Error(data.detail || 'Failed to dismiss'), { operation: 'dismiss', page: 'Governance' });
+      }
+    } catch (error) {
+      console.error('Failed to dismiss risk finding:', error);
+      showError(toast, error, { operation: 'dismiss', page: 'Governance' });
+    }
+  };
+
   const getScoreColor = (score) => {
     if (score >= 85) return 'text-success';
     if (score >= 65) return 'text-warning';
@@ -511,6 +538,14 @@ export default function GovernancePage() {
                           >
                             Resolve
                           </Link>
+                          <button
+                            type="button"
+                            onClick={() => dismissRisk(risk.type)}
+                            className="text-muted-foreground hover:text-navy text-sm font-mono uppercase tracking-wider"
+                            data-testid={`dismiss-risk-${risk.type}`}
+                          >
+                            Dismiss
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -714,6 +749,19 @@ function HiddenInsightsPanel({ trustId }) {
     }
   };
 
+  // Risk dismissals are stored as 'risk:<finding_type>' — show them with a
+  // friendly label ('no_benevolence_policy' -> 'No Benevolence Policy').
+  const formatCriterionName = (criterionName) => {
+    if (!criterionName) return criterionName;
+    if (!criterionName.startsWith('risk:')) return criterionName;
+    const type = criterionName.slice('risk:'.length);
+    return type
+      .split('_')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   const restoreInsight = async (criterionName) => {
     try {
       const response = await fetchWithAuth('/insights/restore', {
@@ -722,7 +770,7 @@ function HiddenInsightsPanel({ trustId }) {
         body: JSON.stringify({ trust_id: trustId, criterion_name: criterionName })
       });
       if (response.ok) {
-        toast.success(`${criterionName} restored`);
+        toast.success(`${formatCriterionName(criterionName)} restored`);
         setDismissed(prev => prev.filter(d => d.criterion_name !== criterionName));
       } else {
         const data = await response.json();
@@ -765,6 +813,7 @@ function HiddenInsightsPanel({ trustId }) {
     <div className="space-y-3">
       {dismissed.map((item, index) => {
         const Icon = INSIGHT_ICONS[item.criterion_name] || Shield;
+        const displayName = formatCriterionName(item.criterion_name);
         return (
           <div
             key={index}
@@ -776,7 +825,7 @@ function HiddenInsightsPanel({ trustId }) {
                 <Icon className="w-4 h-4 text-navy" />
               </div>
               <div>
-                <p className="font-medium text-sm text-navy">{item.criterion_name}</p>
+                <p className="font-medium text-sm text-navy">{displayName}</p>
                 <p className="text-xs text-muted-foreground">
                   Dismissed {safeFormatDate(item.dismissed_at, 'MMM d, yyyy')}
                 </p>

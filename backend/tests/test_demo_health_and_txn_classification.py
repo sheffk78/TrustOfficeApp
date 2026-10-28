@@ -194,7 +194,7 @@ async def test_scorer_counts_governance_classification():
             m.find = MagicMock(return_value=MagicMock(to_list=AsyncMock(return_value=[])))
 
     gov.db = db
-    gov._gather_risk_findings = AsyncMock(return_value=[])
+    gov._gather_risk_findings = AsyncMock(return_value=([], set()))
 
     data = await gov._gather_score_data("t", "u", use_cache=False)
     # No txns → criterion is no_data; assert the gather ran and the txn block
@@ -248,7 +248,7 @@ async def test_scorer_uses_real_field_with_txns():
 
     gov.db = db
     # _gather_risk_findings is heavy — stub it
-    gov._gather_risk_findings = AsyncMock(return_value=[])
+    gov._gather_risk_findings = AsyncMock(return_value=([], set()))
 
     data = await gov._gather_score_data("t", "u", use_cache=False)
     assert data["total_txns"] == 7

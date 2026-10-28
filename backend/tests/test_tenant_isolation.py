@@ -134,6 +134,15 @@ NON_DATA_ROUTERS = {
     "marketing_expenses", "error_reports", "trust_admin_service",
     "account_summary", "repository", "trust_archive", "totp_2fa",
     "internal_agent",
+    # WingPoint Connect Flow v2 (2026-10-22): pre-authentication connect
+    # surface. These endpoints run BEFORE a session exists (that is the point
+    # — the member is mid-handoff from WingPoint), so the unauthenticated
+    # probe does not apply. They are scoped by a validated WingPoint connect
+    # context (wp_ref + app_id + WingPoint redirect host) instead of by a
+    # session user, they never act on an existing account's objects, and
+    # they are covered by tests/test_wingpoint_connect_flow.py
+    # (branch resolution, account-claim, log hygiene, rate limiting).
+    "wingpoint_connect",
 }
 
 # Data routers not yet in ROUTE_MAP — explicit, visible debt (not silent gaps).

@@ -6,7 +6,10 @@ import uuid
 
 from database import db, client
 from dependencies import get_current_user, require_write_access, should_show_watermark
-from models import BenevolencePolicyCreate, BenevolencePolicyUpdate, BenevolencePolicyResponse, BenevolencePolicyVersionResponse
+from models import (
+    BenevolencePolicyCreate, BenevolencePolicyUpdate, BenevolencePolicyResponse,
+    BenevolencePolicyVersionResponse, BenevolencePolicyDecline,
+)
 from utils.audit import log_audit_event
 from services.benevolence_policy_pdf import generate_policy_pdf
 
@@ -334,6 +337,158 @@ async def delete_policy_version(policy_version_id: str, user: dict = Depends(req
     })
 
     return {"message": "Draft version deleted"}
+
+
+# ==================== POLICY DECLINE (deliberate "no written policy") ====================
+
+def _decline_label(now: datetime) -> str:
+    """Version label for a declined policy: 'declined-YYYYMMDD'."""
+    return f"declined-{now.strftime('%Y%m%d')}"
+
+
+@router.post("/benevolence/policy/decline")
+async def decline_benevolence_policy(
+    req: BenevolencePolicyDecline,
+    user: dict = Depends(require_write_access),
+):
+    """Record a deliberate decision NOT to maintain a written benevolence policy.
+
+    The trustee elects not to keep a written policy. That is a governance
+    decision, not a missing document — the risk engine treats it as neutral
+    (no 'no_benevolence_policy' penalty). Any existing draft data is
+    preserved: the policy container keeps its current_version_id and the
+    version documents are untouched.
+    """
+    trust = await db.trusts.find_one(
+        {"trust_id": req.trust_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found.")
+    if not trust.get("benevolence_enabled"):
+        raise HTTPException(status_code=400, detail="Benevolence mode is not enabled for this trust.")
+
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    label = _decline_label(now)
+
+    existing = await db.benevolence_policies.find_one(
+        {"trust_id": req.trust_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+
+    if existing:
+        # Preserve the prior draft: keep current_version_id and the version
+        # documents. Only the container's status/label change.
+        await db.benevolence_policies.update_one(
+            {"policy_id": existing["policy_id"]},
+            {"$set": {
+                "current_version_status": "declined",
+                "current_version_label": label,
+                "declined_at": now_iso,
+                "updated_at": now_iso,
+            }},
+        )
+        policy_id = existing["policy_id"]
+    else:
+        policy_id = f"benpol_{uuid.uuid4().hex[:12]}"
+        await db.benevolence_policies.insert_one({
+            "policy_id": policy_id,
+            "trust_id": req.trust_id,
+            "user_id": user["user_id"],
+            "current_version_id": None,
+            "current_version_label": label,
+            "current_version_status": "declined",
+            "declined_at": now_iso,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        })
+
+    await log_audit_event(
+        user["user_id"], "benevolence_policy_declined", "benevolence_policy", policy_id,
+        {"trust_id": req.trust_id, "version_label": label, "notes": req.notes},
+    )
+
+    return {
+        "message": "Benevolence policy declined — the decision is recorded and no longer penalized.",
+        "status": "declined",
+        "trust_id": req.trust_id,
+        "policy_id": policy_id,
+        "current_version_label": label,
+        "declined_at": now_iso,
+    }
+
+
+@router.post("/benevolence/policy/undecline")
+async def undecline_benevolence_policy(
+    req: BenevolencePolicyDecline,
+    user: dict = Depends(require_write_access),
+):
+    """Reverse a decline — the trust is back to the normal policy workflow.
+
+    If a draft version exists it is restored (status 'draft'); otherwise the
+    declined marker is cleared so the trust can start a policy from scratch.
+    """
+    trust = await db.trusts.find_one(
+        {"trust_id": req.trust_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found.")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    policy = await db.benevolence_policies.find_one(
+        {"trust_id": req.trust_id, "user_id": user["user_id"]}, {"_id": 0}
+    )
+    if not policy or policy.get("current_version_status") != "declined":
+        raise HTTPException(status_code=404, detail="No declined benevolence policy found for this trust.")
+
+    # Prefer restoring the prior draft version if one still exists.
+    draft_version = None
+    if policy.get("current_version_id"):
+        draft_version = await db.benevolence_policy_versions.find_one(
+            {"policy_version_id": policy["current_version_id"]}, {"_id": 0}
+        )
+    if not draft_version:
+        draft_version = await db.benevolence_policy_versions.find_one(
+            {"policy_id": policy["policy_id"], "status": "draft"},
+            {"_id": 0},
+            sort=[("version_number", -1)],
+        )
+
+    if draft_version:
+        await db.benevolence_policies.update_one(
+            {"policy_id": policy["policy_id"]},
+            {"$set": {
+                "current_version_id": draft_version["policy_version_id"],
+                "current_version_label": draft_version["version_label"],
+                "current_version_status": "draft",
+                "declined_at": None,
+                "updated_at": now_iso,
+            }},
+        )
+    else:
+        # No prior draft to restore — clear the declined marker entirely.
+        await db.benevolence_policies.update_one(
+            {"policy_id": policy["policy_id"]},
+            {"$set": {
+                "current_version_status": "draft",
+                "current_version_label": "1.0",
+                "declined_at": None,
+                "updated_at": now_iso,
+            }},
+        )
+
+    await log_audit_event(
+        user["user_id"], "benevolence_policy_undeclined", "benevolence_policy", policy["policy_id"],
+        {"trust_id": req.trust_id, "notes": req.notes},
+    )
+
+    return {
+        "message": "Benevolence policy decline reversed.",
+        "status": "draft",
+        "trust_id": req.trust_id,
+        "policy_id": policy["policy_id"],
+        "declined_at": None,
+    }
 
 
 # ==================== PDF EXPORT ====================

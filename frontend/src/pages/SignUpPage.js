@@ -24,8 +24,12 @@ export default function SignUpPage() {
     const ref = searchParams.get('ref');
     const coupon = searchParams.get('coupon');
     const plan = searchParams.get('plan');
+    // The WingPoint-known email (Connect Flow v2) — carried so the pricing
+    // page can prefill the checkout form with the member's address.
+    const email = searchParams.get('email');
     if (ref) pricingParams.set('ref', ref);
     if (coupon) pricingParams.set('coupon', coupon);
+    if (email) pricingParams.set('email', email);
     if (ref && ref.toLowerCase() === 'wp') pricingParams.set('wp', '1');
     // WingPoint attribution beyond ref=wp: provisioned refs (WP-xxxx) and the
     // wingpoint plan param both mean "this is a WP customer" — keep the flag.

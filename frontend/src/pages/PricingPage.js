@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { pickWpRef } from '@/utils/wingpointConnect';
 import { getUtmParams } from '@/utils/utm';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -163,6 +164,9 @@ export default function PricingPage() {
   const isWingPointFlow = searchParams.get('wp') === '1';
   // The pre-selected plan from the WingPoint flow (?plan=XX).
   const wingPointPlan = isWingPointFlow && targetPlan ? targetPlan : null;
+  // The WingPoint-known email (Connect Flow v2) — prefills the checkout form
+  // so the member does not have to retype the address WingPoint already has.
+  const prefillEmail = (searchParams.get('email') || '').trim();
 
   useEffect(() => {
     if (couponCode) {
@@ -200,6 +204,8 @@ export default function PricingPage() {
         toast.info('The WingPoint plan requires your WingPoint account. Please log in first.');
         const loginRedirect = new URLSearchParams({ wp: '1', action: 'subscribe', plan: 'wingpoint', billing: period });
         if (couponCode) loginRedirect.set('coupon', couponCode);
+        // Carry the WingPoint-known email so the login screen prefills it.
+        if (prefillEmail) loginRedirect.set('email', prefillEmail);
         navigate(`/login?${loginRedirect.toString()}`);
         return;
       }
@@ -228,6 +234,18 @@ export default function PricingPage() {
         success_url: successUrl,
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
+
+      // WingPoint attribution (2026-10-28): carry the provisioning ref so the
+      // backend can verify membership against the provisioning ledger for
+      // accounts that pre-date identity stamping. Source order: URL param
+      // (freshest, from the login/signup handoff) → sessionStorage (stashed
+      // earlier in the flow). The ref is shape-checked; the backend re-verifies.
+      const wpRefCheckout = pickWpRef([
+        searchParams.get('wp_ref'),
+        searchParams.get('ref'),
+        (() => { try { return sessionStorage.getItem('wp_ref'); } catch (e) { return null; } })(),
+      ]);
+      if (wpRefCheckout) checkoutData.wp_ref = wpRefCheckout;
 
       // Add marketing attribution (UTM) so direct-to-checkout conversions can
       // be attributed to ad campaigns.
@@ -709,6 +727,7 @@ export default function PricingPage() {
           planType={guestCheckout.planType}
           billingPeriod={guestCheckout.period}
           couponCode={couponCode}
+          prefillEmail={prefillEmail}
           onClose={() => setGuestCheckout(null)}
           onSuccess={() => setGuestCheckout(null)}
         />
@@ -719,8 +738,8 @@ export default function PricingPage() {
 
 // ==================== Guest Checkout Modal (checkout-first signup) ====================
 
-function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSuccess }) {
-  const [email, setEmail] = useState('');
+function GuestCheckoutModal({ planType, billingPeriod, couponCode, prefillEmail, onClose, onSuccess }) {
+  const [email, setEmail] = useState(prefillEmail || '');
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -762,8 +781,10 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, onClose, onSu
       if (typeof window !== 'undefined' && window.Rewardful && window.Rewardful.referral) {
         checkoutData.referral_id = window.Rewardful.referral;
       }
-      // WingPoint connect-flow attribution (session storage, no account yet)
-      const wpRef = sessionStorage.getItem('wp_ref');
+      // WingPoint connect-flow attribution (session storage, no account yet).
+      // Shape-checked via pickWpRef (2026-10-28) so only real provisioning
+      // refs are sent; the backend independently verifies against the ledger.
+      const wpRef = pickWpRef([sessionStorage.getItem('wp_ref')]);
       if (wpRef) checkoutData.wp_ref = wpRef;
 
       const result = await xhrPost(`${API_URL}/api/subscription/guest-checkout`, checkoutData);

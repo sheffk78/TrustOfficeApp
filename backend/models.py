@@ -1109,13 +1109,33 @@ class BenevolencePolicyUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class BenevolencePolicyStatus(str, Enum):
+    """Lifecycle states of the policy container's current version.
+
+    'declined' (2026-10-23) records a deliberate trustee decision NOT to
+    maintain a written policy — it is a governance-grade record, not a
+    missing document.
+    """
+    draft = "draft"
+    published = "published"
+    superseded = "superseded"
+    declined = "declined"
+
+
+class BenevolencePolicyDecline(BaseModel):
+    """Body for POST /benevolence/policy/decline and /undecline."""
+    trust_id: str
+    notes: str = ""            # optional trustee rationale
+
+
 class BenevolencePolicyResponse(BaseModel):
     policy_id: str                         # unique ID for the policy (one per trust)
     trust_id: str
     user_id: str
     current_version_id: str                # policy_version_id of the active version
     current_version_label: str
-    current_version_status: str            # "draft" | "published" | "superseded"
+    current_version_status: str            # "draft" | "published" | "superseded" | "declined"
+    declined_at: Optional[str] = None      # set when current_version_status == "declined"
     created_at: str
     updated_at: Optional[str] = None
 
@@ -1287,6 +1307,7 @@ class HealthScoreResponse(BaseModel):
     criteria: List[HealthScoreCriterion]
     risk_findings: List[RiskFinding] = []
     risk_penalty_breakdown: Optional[RiskPenaltyBreakdown] = None
+    dismissed_risk_types: List[str] = []   # risk finding types the user dismissed
     calculated_at: str
 
 
@@ -1530,6 +1551,11 @@ class CheckoutRequest(BaseModel):
     utm_campaign: Optional[str] = None
     utm_medium: Optional[str] = None
     referrer: Optional[str] = None
+    # WingPoint attribution (2026-10-28): lets a verified wp_ref ride with
+    # checkout so legacy/admin-created accounts without identity markers can
+    # still buy the wingpoint plan. NEVER trusted alone — the checkout guard
+    # verifies it against external_provisions (see subscriptions.py).
+    wp_ref: Optional[str] = None
 
 
 # ==================== RECORDS REPOSITORY (F1, 2026-09-12) ====================

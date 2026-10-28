@@ -345,6 +345,51 @@ The TrustOffice Team
         """
     },
 
+    # WingPoint Connect Flow v2 — account-claim verification code.
+    # Sent when a provisioned member (email known to WingPoint) has never set
+    # a password. The code is what lets them claim the EXISTING account.
+    "wingpoint_connect_code": {
+        "subject": "Your TrustOffice verification code",
+        "html": lambda data: _base_template(f"""
+            <h2>Finish setting up your TrustOffice account</h2>
+            <p>Hi {data.get('user_name', 'there')},</p>
+            <p>Your trust is ready in TrustOffice. Enter this 6-digit code to
+            set your password and activate your account:</p>
+
+            <p style="text-align: center; margin: 30px 0;">
+              <span style="font-family: 'Courier New', monospace; font-size: 34px; letter-spacing: 8px; font-weight: bold; color: #010079;">{data.get('code', '')}</span>
+            </p>
+
+            <div class="alert">
+              <strong>This code expires in 20 minutes.</strong> If you didn't
+              try to connect your WingPoint trust, you can ignore this email.
+            </div>
+
+            <p>Your trust is already attached to this account — you will not
+            create a second one.</p>
+
+            <p>Best regards,<br>The TrustOffice Team</p>
+        """),
+        "text": lambda data: f"""
+Finish setting up your TrustOffice account
+
+Hi {data.get('user_name', 'there')},
+
+Your trust is ready in TrustOffice. Enter this 6-digit code to set your
+password and activate your account:
+
+    {data.get('code', '')}
+
+This code expires in 20 minutes. If you didn't try to connect your WingPoint
+trust, you can ignore this email.
+
+Your trust is already attached to this account — you will not create a second one.
+
+Best regards,
+The TrustOffice Team
+        """
+    },
+
     # Welcome + Set Password Email (for admin-created accounts)
     "welcome_set_password": {
         "subject": "Welcome to TrustOffice - Set Up Your Account",

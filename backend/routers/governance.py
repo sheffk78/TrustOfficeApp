@@ -211,10 +211,47 @@ async def _gather_compensation_data(trust_id: str, user_id: str, year_start: dat
     return comp_plan, ytd_total, approved_amount
 
 
-async def _gather_risk_findings(trust_id: str, trust_doc: dict, now: datetime, today, use_cache: bool) -> list:
-    """Gather risk findings, using TTL cache (5 min) if use_cache=True."""
+async def _get_dismissed_risk_types(trust_id: str, user_id: str) -> set:
+    """Return the set of risk finding types the user has dismissed.
+
+    Dismissal key format is f'risk:{finding_type}'.  Only 'risk:' prefixed
+    criterion names are risk dismissals — regular insight dismissals
+    (criterion names like 'Quarterly Minutes') never affect penalties.
+    """
+    if not trust_id or not user_id:
+        return set()
+    dismissed = await db.dismissed_insights.find(
+        {"trust_id": trust_id, "user_id": user_id},
+        {"_id": 0, "criterion_name": 1},
+    ).to_list(1000)
+    return {
+        d["criterion_name"].removeprefix("risk:")
+        for d in dismissed
+        if d.get("criterion_name", "").startswith("risk:")
+    }
+
+
+async def _gather_risk_findings(
+    trust_id: str, trust_doc: dict, now: datetime, today, use_cache: bool,
+    user_id: Optional[str] = None,
+) -> tuple:
+    """Gather risk findings, using TTL cache (5 min) if use_cache=True.
+
+    Returns (findings, dismissed_risk_types).  Findings whose type was
+    dismissed by the user (dismissal key f'risk:{type}') are filtered out
+    BEFORE the penalty math and the UI ever see them, so a dismissed
+    recommendation costs zero points.
+
+    The TTL cache stores UNFILTERED findings.  Filtering happens on the way
+    out, so a restored dismissal immediately brings its finding back.  When
+    dismissals exist for the trust the cache is bypassed on read (and
+    rewritten with the fresh gather) so the score updates immediately after a
+    dismiss instead of waiting out the 5-minute TTL.
+    """
+    dismissed_types = await _get_dismissed_risk_types(trust_id, user_id) if user_id else set()
+
     risk_findings = None
-    if use_cache:
+    if use_cache and not dismissed_types:
         cached = await db.risk_findings_cache.find_one({
             "trust_id": trust_id,
             "cached_at": {"$gte": (now - timedelta(minutes=5)).isoformat()}
@@ -228,12 +265,23 @@ async def _gather_risk_findings(trust_id: str, trust_doc: dict, now: datetime, t
             include_upcoming_tax=False,  # v4: upcoming tax = reminder, not penalty
         )
         if use_cache:
+            # Cache the RAW gather — dismissal filtering is applied below, so
+            # restoring a dismissal does not need a cache purge to reappear.
             await db.risk_findings_cache.update_one(
                 {"trust_id": trust_id},
                 {"$set": {"findings": risk_findings, "cached_at": now.isoformat()}},
                 upsert=True
             )
-    return risk_findings
+
+    # Filter BEFORE returning — compute path, penalty math and the
+    # GovernancePage display all see only non-dismissed findings.
+    if dismissed_types:
+        risk_findings = [
+            f for f in risk_findings
+            if f.get("type") not in dismissed_types
+        ]
+
+    return risk_findings, dismissed_types
 
 
 async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = False) -> dict:
@@ -322,7 +370,9 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
 
     trust_doc = await db.trusts.find_one({"trust_id": trust_id}, {"_id": 0}) or {}
     today = now.date()
-    risk_findings = await _gather_risk_findings(trust_id, trust_doc, now, today, use_cache)
+    risk_findings, dismissed_risk_types = await _gather_risk_findings(
+        trust_id, trust_doc, now, today, use_cache, user_id=user_id
+    )
 
     # Raw onboarding doc for the Foundation & Setup criterion. Read directly
     # (not via OnboardingState model) so PATCH-only fields like
@@ -352,6 +402,7 @@ async def _gather_score_data(trust_id: str, user_id: str, use_cache: bool = Fals
         "risk_findings": risk_findings,
         "onboarding_state_raw": onboarding_state_raw,
         "benevolence_enabled": bool(trust_doc.get("benevolence_enabled")),
+        "dismissed_risk_types": dismissed_risk_types,
     }
 
 
@@ -768,6 +819,7 @@ def _compute_health_score(data: dict) -> dict:
         "color": color,
         "risk_findings": findings_with_penalty,
         "risk_penalty_breakdown": breakdown,
+        "dismissed_risk_types": data.get("dismissed_risk_types", set()),
         "now": now,
     }
 
@@ -870,6 +922,7 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
     now = result["now"]
     risk_findings = result["risk_findings"]
     risk_penalty_breakdown = result["risk_penalty_breakdown"]
+    dismissed_risk_types = result.get("dismissed_risk_types") or set()
 
     # Auto-clear dismissals for criteria that are now achieved
     await _clear_achieved_dismissals(trust_id, user_id, criteria)
@@ -896,6 +949,7 @@ async def calculate_health_score(trust_id: str, user_id: str, save_snapshot: boo
         "criteria": [c.model_dump() for c in criteria],
         "risk_findings": risk_findings,
         "risk_penalty_breakdown": risk_penalty_breakdown,
+        "dismissed_risk_types": sorted(dismissed_risk_types),
         "calculated_at": now.isoformat()
     }
 
@@ -1585,7 +1639,13 @@ async def dismiss_insight(
         },
         upsert=True
     )
-    
+
+    # Risk dismissals (criterion_name 'risk:<type>') change the penalty math,
+    # so the cached risk findings are stale the moment one is recorded.
+    # Drop the cache row so the next computation gathers fresh findings.
+    if criterion_name.startswith("risk:"):
+        await db.risk_findings_cache.delete_one({"trust_id": trust_id})
+
     return {
         "message": f"Insight '{criterion_name}' dismissed",
         "criterion_name": criterion_name,

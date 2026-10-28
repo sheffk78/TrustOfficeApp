@@ -20,6 +20,7 @@ from dependencies import (
     TRIAL_DAYS
 )
 from routers.auth import rate_limit
+from services.wingpoint_identity import is_wingpoint_user, wp_ref_belongs_to_referrer
 from models import SubscriptionResponse, CheckoutRequest, GuestCheckoutRequest, PortalRequest, ChangePlanRequest
 
 # Import email service
@@ -352,20 +353,33 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
         raise HTTPException(status_code=400, detail="Invalid plan type. Choose 'trustee', 'estate', 'advisor', or 'wingpoint'.")
 
     # WingPoint eligibility guard — only WingPoint customers can purchase
-    # the wingpoint plan. Checks wp_ref, source, or created_via on the
-    # user document. Prevents non-WingPoint users from accessing the
-    # discounted rate via a direct API call.
+    # the wingpoint plan. Ordering (2026-10-28, JOB-20261028-TO-WP-PRICING):
+    #   1. Doc-based identity (wp_ref / source / created_via) — covers provision
+    #      flow, Connect Flow v2, and any stamped account.
+    #   2. Checkout-carried wp_ref VERIFIED against the external_provisions
+    #      ledger — closes the pricing-page path where a legacy/admin-created
+    #      account (no marker fields) arrives via ?wp=1 with their referral in
+    #      the URL. Verification is server-side: the ref must match the
+    #      account's row in the provisioning ledger, so no client payload can
+    #      confer membership by guessing a ref format. On success the ref is
+    #      back-stamped onto the user doc so future checkouts skip this probe.
     if checkout.plan_type == "wingpoint":
         user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        is_wingpoint = user_doc and (
-            user_doc.get("wp_ref")
-            or user_doc.get("source") == "wingpoint"
-            or user_doc.get("created_via") == "wingpoint_provision"
-        )
+        is_wingpoint = is_wingpoint_user(user_doc)
+        if not is_wingpoint and checkout.wp_ref:
+            verified_ref = await wp_ref_belongs_to_referrer(
+                db, user["user_id"], checkout.wp_ref
+            )
+            if verified_ref:
+                is_wingpoint = True
+                await db.users.update_one(
+                    {"user_id": user["user_id"]},
+                    {"$set": {"wp_ref": verified_ref}},
+                )
         if not is_wingpoint:
             raise HTTPException(
                 status_code=403,
-                detail="The WingPoint plan is only available to WingPoint customers."
+                detail="The WingPoint plan is only available to WingPoint customers.",
             )
     
     # Trust count validation — prevent checkout for plans that can't support

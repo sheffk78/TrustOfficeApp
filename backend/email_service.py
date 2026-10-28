@@ -228,7 +228,30 @@ class EmailService:
             tag="welcome_set_password",
             metadata={"email_type": "welcome_set_password"}
         )
-    
+
+    async def send_wingpoint_connect_code_email(
+        self,
+        to_email: str,
+        user_name: str,
+        code: str
+    ) -> Dict[str, Any]:
+        """Send the WingPoint connect account-claim verification code.
+
+        Used by Connect Flow v2: a provisioned member who never set a password
+        claims the EXISTING account by entering this 6-digit code.
+        """
+        return await self.send_templated_email(
+            to_email=to_email,
+            template_name="wingpoint_connect_code",
+            template_data={
+                "user_name": user_name or "there",
+                "code": code,
+            },
+            to_name=user_name,
+            tag="wingpoint_connect_code",
+            metadata={"email_type": "wingpoint_connect_code"}
+        )
+
     async def send_task_reminder(
         self,
         to_email: str,

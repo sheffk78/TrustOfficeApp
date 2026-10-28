@@ -44,6 +44,7 @@ from dependencies import (
     verify_password,
 )
 from routers.auth import rate_limit
+from services.wingpoint_identity import is_wingpoint_user
 from services.security_events import check_security_alert, record_security_event
 from services import totp_service as totps
 from utils.audit import log_audit_event
@@ -225,11 +226,7 @@ def _build_login_payload(user_doc: dict, token: str):
     PRIMARY_ADMIN_EMAIL = "contact@trustoffice.app"
     email_norm = (user_doc.get("email") or "").lower()
     is_admin = bool(user_doc.get("is_admin")) or email_norm == PRIMARY_ADMIN_EMAIL
-    is_wingpoint = bool(
-        user_doc.get("wp_ref")
-        or user_doc.get("source") == "wingpoint"
-        or user_doc.get("created_via") == "wingpoint_provision"
-    )
+    is_wingpoint = is_wingpoint_user(user_doc)
     return {
         "token": token,
         "user": {

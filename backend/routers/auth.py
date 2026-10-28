@@ -40,6 +40,7 @@ from dependencies import (
     _extract_token,
 )
 from models import UserCreate, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, PasswordChange, ProfileUpdate
+from services.wingpoint_identity import is_wingpoint_user
 from email_service import email_service
 from security import InputSanitizer
 from services.security_events import record_security_event, check_security_alert
@@ -357,9 +358,7 @@ async def login(user: UserLogin, response: Response, background_tasks: Backgroun
             "is_leads_user": user_doc.get("is_leads_user", False),
             "wp_ref": user_doc.get("wp_ref"),
             "is_wingpoint": bool(
-                user_doc.get("wp_ref")
-                or user_doc.get("source") == "wingpoint"
-                or user_doc.get("created_via") == "wingpoint_provision"
+                is_wingpoint_user(user_doc)
             )
         }
     }
@@ -783,9 +782,7 @@ async def exchange_session(request: Request, response: Response):
             "is_admin": is_admin,
             "wp_ref": user_doc.get("wp_ref"),
             "is_wingpoint": bool(
-                user_doc.get("wp_ref")
-                or user_doc.get("source") == "wingpoint"
-                or user_doc.get("created_via") == "wingpoint_provision"
+                is_wingpoint_user(user_doc)
             )
         }
     }
@@ -811,11 +808,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         is_stats_user=is_stats_user,
         is_leads_user=is_leads_user,
         wp_ref=user.get("wp_ref"),
-        is_wingpoint=bool(
-            user.get("wp_ref")
-            or user.get("source") == "wingpoint"
-            or user.get("created_via") == "wingpoint_provision"
-        ),
+        is_wingpoint=is_wingpoint_user(user),
     )
 
 
@@ -848,11 +841,7 @@ async def update_profile(profile: ProfileUpdate, user: dict = Depends(get_curren
             "name": updated_user["name"],
             "picture": updated_user.get("picture"),
             "wp_ref": updated_user.get("wp_ref"),
-            "is_wingpoint": bool(
-                updated_user.get("wp_ref")
-                or updated_user.get("source") == "wingpoint"
-                or updated_user.get("created_via") == "wingpoint_provision"
-            )
+            "is_wingpoint": is_wingpoint_user(updated_user)
         }
     }
 
