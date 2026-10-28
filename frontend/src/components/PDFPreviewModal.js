@@ -166,18 +166,18 @@ export function PDFPreviewModal({
         data-testid="pdf-preview-modal"
       >
         {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b border-navy/10 dark:border-white/10 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="font-serif text-xl text-navy dark:text-gold">
+        <DialogHeader className="px-6 py-4 pr-14 border-b border-navy/10 dark:border-white/10 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="font-serif text-xl text-navy dark:text-gold truncate">
               {title}
             </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0 pr-8">
               {/* Open in New Tab - always show */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleOpenInNewTab}
-                className="font-mono text-xs uppercase tracking-widest"
+                className="font-mono text-xs uppercase tracking-widest hidden sm:inline-flex"
                 data-testid="pdf-open-new-tab-btn"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -194,7 +194,9 @@ export function PDFPreviewModal({
                 <Download className="w-4 h-4 mr-2" />
                 Download
               </Button>
-              {/* Close X is rendered by DialogContent automatically */}
+              {/* Close X is rendered by DialogContent automatically —
+                  pr-8 keeps the action buttons clear of it (Jeff 2026-10-28:
+                  Download button overlapped the X on this modal). */}
             </div>
           </div>
         </DialogHeader>

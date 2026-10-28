@@ -30,6 +30,10 @@ export default function VaultPage() {
   const [searchParams] = useSearchParams();
   const focusBackup = searchParams.get('focus') === 'backup';
   const backupCardRef = useRef(null);
+  // Jeff (2026-10-28): clicking "Add Document" opens the upload form far below
+  // the header button — on short screens it lands out of view. Scroll it into
+  // view when it opens so the user can see the upload section immediately.
+  const addFormRef = useRef(null);
   const [backupHighlight, setBackupHighlight] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [byCategory, setByCategory] = useState({});
@@ -112,6 +116,18 @@ export default function VaultPage() {
     }, 300);
     return () => clearTimeout(t);
   }, [focusBackup, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Jeff (2026-10-28): scroll the Add Document form into view whenever it
+  // opens (from the header button or the empty-vault CTA) — the form renders
+  // below the backup card + search row and would otherwise be off-screen.
+  useEffect(() => {
+    if (!upload.showAdd) return;
+    // Wait a frame so the form is mounted before scrolling to it.
+    const t = setTimeout(() => {
+      addFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [upload.showAdd]);
 
   /** Copy a doc's external storage URL to the clipboard. */
   const handleCopyLink = useCallback((doc) => {
@@ -245,6 +261,7 @@ export default function VaultPage() {
 
           {/* Add Form */}
           {upload.showAdd && (
+            <div ref={addFormRef} data-testid="vault-add-form-scroll-target">
             <VaultAddForm
               addMode={upload.addMode}
               setAddMode={upload.setAddMode}
@@ -262,6 +279,7 @@ export default function VaultPage() {
               fileInputRef={upload.fileInputRef}
               categories={categories}
             />
+            </div>
           )}
 
           {/* Document Grid by Category */}

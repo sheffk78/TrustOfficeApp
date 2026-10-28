@@ -1729,10 +1729,10 @@ async def get_minutes_pdf(minutes_id: str, user: dict = Depends(get_current_user
                                      white_label=white_label,
                                      state_compliance_block=state_block)
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-    
+
     return {
         "pdf_base64": pdf_base64,
-        "filename": f"minutes_{minutes_id}.pdf"
+        "filename": _minutes_pdf_filename(minutes, trust or {}),
     }
 
 
@@ -5384,6 +5384,13 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
     if not minutes:
         raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
 
+    # Trust name for the human-readable PDF filename (name it for the trust,
+    # not the minutes_id — Jeff 2026-10-28).
+    trust = await db.trusts.find_one(
+        {"trust_id": minutes.get("trust_id", ""), "user_id": user["user_id"]},
+        {"_id": 0, "name": 1},
+    ) or {}
+
     white_label = await is_white_label(user["user_id"])
 
     # Generate PDF from the document text
@@ -5457,8 +5464,32 @@ async def get_minutes_template_pdf(minutes_id: str, user: dict = Depends(get_cur
     
     return {
         "pdf_base64": pdf_base64,
-        "filename": f"minutes_{minutes_id}.pdf"
+        "filename": _minutes_pdf_filename(minutes, trust or {})
     }
+
+def _minutes_pdf_filename(minutes: dict, trust: dict) -> str:
+    """Human-readable PDF filename: TrustName MinutesType Minutes YYYY-MM-DD.pdf.
+
+    Jeff (2026-10-28): downloads from minutes PDF preview were named
+    minutes_<uuid>.pdf — a string of numbers. Name by trust, meeting type,
+    and meeting date instead. Falls back to the old pattern if trust name
+    is unavailable (should not happen — every minutes record is trust-scoped).
+    """
+    minutes_type = (
+        minutes.get("minutes_type")
+        or minutes.get("template_type")
+        or "meeting"
+    )
+    type_label = minutes_type.replace("_", " ").title()
+    trust_name = (trust.get("name") or "").strip()
+    # Filesystem-safe: strip path separators and control chars from trust name.
+    trust_name = re.sub(r'[\\/:*?"<>|]', '', trust_name).strip()
+    meeting_date = (minutes.get("meeting_date") or "").strip()
+    date_label = meeting_date[:10] if meeting_date else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    if trust_name:
+        return f"{trust_name} {type_label} Minutes {date_label}.pdf"
+    return f"{type_label} Minutes {date_label}.pdf"
 
 @router.get("/template-options")
 async def get_template_options(trust_id: Optional[str] = None, user: dict = Depends(get_current_user)):
