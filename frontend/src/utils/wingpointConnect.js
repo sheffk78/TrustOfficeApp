@@ -194,6 +194,26 @@ export function stashConnectResumeParams(queryString) {
 }
 
 /**
+ * Shape-check and normalize a WingPoint provisioning ref (WP-XXXXXXXX-XXXX).
+ *
+ * The ref rides URL params under two names depending on the path: `wp_ref`
+ * (login/signup handoffs) and `ref` (the admin_settings signup template).
+ * Anything that doesn't match the provisioning-ref shape is ignored — free
+ * text in `ref` is marketing attribution, not a WingPoint referral.
+ */
+const WP_REF_RE = /^WP-[A-Z0-9]{8}-[A-Z0-9]{4}$/;
+
+export function pickWpRef(candidates) {
+  if (!Array.isArray(candidates)) return null;
+  for (const c of candidates) {
+    if (typeof c === 'string' && WP_REF_RE.test(c.trim())) {
+      return c.trim().toUpperCase();
+    }
+  }
+  return null;
+}
+
+/**
  * Client-side password strength check — mirrors the backend
  * `validate_password_strength` (>= 8 chars, a letter, a digit).
  */

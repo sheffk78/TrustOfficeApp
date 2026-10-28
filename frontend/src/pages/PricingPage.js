@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { pickWpRef } from '@/utils/wingpointConnect';
 import { getUtmParams } from '@/utils/utm';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -233,6 +234,18 @@ export default function PricingPage() {
         success_url: successUrl,
         cancel_url: `${baseUrl}/pricing${couponCode ? `?coupon=${couponCode}` : ''}`
       };
+
+      // WingPoint attribution (2026-10-28): carry the provisioning ref so the
+      // backend can verify membership against the provisioning ledger for
+      // accounts that pre-date identity stamping. Source order: URL param
+      // (freshest, from the login/signup handoff) → sessionStorage (stashed
+      // earlier in the flow). The ref is shape-checked; the backend re-verifies.
+      const wpRefCheckout = pickWpRef([
+        searchParams.get('wp_ref'),
+        searchParams.get('ref'),
+        (() => { try { return sessionStorage.getItem('wp_ref'); } catch (e) { return null; } })(),
+      ]);
+      if (wpRefCheckout) checkoutData.wp_ref = wpRefCheckout;
 
       // Add marketing attribution (UTM) so direct-to-checkout conversions can
       // be attributed to ad campaigns.
@@ -768,8 +781,10 @@ function GuestCheckoutModal({ planType, billingPeriod, couponCode, prefillEmail,
       if (typeof window !== 'undefined' && window.Rewardful && window.Rewardful.referral) {
         checkoutData.referral_id = window.Rewardful.referral;
       }
-      // WingPoint connect-flow attribution (session storage, no account yet)
-      const wpRef = sessionStorage.getItem('wp_ref');
+      // WingPoint connect-flow attribution (session storage, no account yet).
+      // Shape-checked via pickWpRef (2026-10-28) so only real provisioning
+      // refs are sent; the backend independently verifies against the ledger.
+      const wpRef = pickWpRef([sessionStorage.getItem('wp_ref')]);
       if (wpRef) checkoutData.wp_ref = wpRef;
 
       const result = await xhrPost(`${API_URL}/api/subscription/guest-checkout`, checkoutData);

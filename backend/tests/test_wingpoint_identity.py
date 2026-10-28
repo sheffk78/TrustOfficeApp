@@ -94,3 +94,116 @@ def test_services_module_has_no_router_dependencies():
     source = (BACKEND / "services" / "wingpoint_identity.py").read_text()
     for banned in ("from database", "import pymongo", "from routers", "from fastapi"):
         assert banned not in source
+
+
+# ==================== checkout-path membership (2026-10-28) ====================
+# The pricing-page checkout path may carry a wp_ref for legacy/admin-created
+# accounts that pre-date identity stamping. Contracts pinned here:
+#   1. normalize_wp_ref only accepts provisioning-ref shapes (WP-XXXXXXXX-XXXX)
+#   2. wp_ref_belongs_to_referrer verifies user+ref AGAINST the ledger
+#   3. garbage refs never reach the ledger
+#   4. CheckoutRequest accepts wp_ref; the guard verifies BEFORE the 403
+#   5. guest checkout stays blocked (can't pre-verify without an account)
+
+import re  # noqa: E402
+
+from services.wingpoint_identity import (  # noqa: E402
+    normalize_wp_ref,
+    wp_ref_belongs_to_referrer,
+)
+
+
+def _make_db_with(doc):
+    """Fake db.external_provisions that captures the last find_one query."""
+
+    class ProvisionColl:
+        last_query = None
+        calls = 0
+
+        async def find_one(self, query, projection=None):
+            ProvisionColl.calls += 1
+            ProvisionColl.last_query = query
+            return doc
+
+    class FakeDB:
+        external_provisions = ProvisionColl()
+
+    ProvisionColl.calls = 0
+    ProvisionColl.last_query = None
+    return FakeDB()
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("WP-AB12CD34-5678", "WP-AB12CD34-5678"),        # canonical
+        ("  wp-ab12cd34-5678  ", "WP-AB12CD34-5678"),    # trim + case-fold up
+        ("WP-ab12CD34-5678", "WP-AB12CD34-5678"),        # mixed case normalized
+        ("ref=wp", None),                                # marketing ref is NOT a WP ref
+        ("wp", None),
+        ("", None),
+        (None, None),
+        (12345, None),
+        ("WP-SHORT-1", None),                            # malformed shape
+        ("WP-AB12CD34-56789", None),                     # wrong trailing length
+    ],
+)
+def test_normalize_wp_ref(raw, expected):
+    assert normalize_wp_ref(raw) == expected
+
+
+@pytest.mark.asyncio
+async def test_wp_ref_ledger_match_is_user_scoped():
+    """A ledger hit only counts when the row belongs to THIS user_id."""
+    db = _make_db_with({"_id": "x"})
+    assert await wp_ref_belongs_to_referrer(db, "user_abc", "wp-ab12cd34-5678") is True
+    q = db.external_provisions.last_query
+    assert q["wingpoint_ref"] == "WP-AB12CD34-5678"
+    assert q["user_id"] == "user_abc"
+
+
+@pytest.mark.asyncio
+async def test_wp_ref_ledger_mismatch_returns_false():
+    db = _make_db_with(None)
+    assert await wp_ref_belongs_to_referrer(db, "user_abc", "WP-AB12CD34-5678") is False
+    # Even on miss, the probe stayed user-scoped
+    assert db.external_provisions.last_query["user_id"] == "user_abc"
+
+
+@pytest.mark.asyncio
+async def test_wp_ref_garbage_never_hits_ledger():
+    db = _make_db_with({"_id": "x"})
+    assert await wp_ref_belongs_to_referrer(db, "user_abc", "ref=wp") is False
+    assert await wp_ref_belongs_to_referrer(db, "", "WP-AB12CD34-5678") is False
+    assert await wp_ref_belongs_to_referrer(db, None, "WP-AB12CD34-5678") is False
+    assert db.external_provisions.calls == 0, "malformed input must not query the ledger"
+
+
+def test_checkout_request_carries_wp_ref():
+    """CheckoutRequest must accept wp_ref so verified legacy accounts can pass membership."""
+    src = (BACKEND / "models.py").read_text()
+    m = re.search(r"class CheckoutRequest\(BaseModel\):.*?(?=\nclass )", src, re.DOTALL)
+    assert m, "CheckoutRequest class not found"
+    assert "wp_ref" in m.group(0), "CheckoutRequest lost the wp_ref field"
+
+
+def test_checkout_guard_verifies_before_403():
+    """The logged-in checkout guard must try ledger verification before rejecting."""
+    src = (BACKEND / "routers" / "subscriptions.py").read_text()
+    assert "wp_ref_belongs_to_referrer(" in src, "guard does not call wp_ref_belongs_to_referrer"
+    # Guard order: doc identity first, ledger probe second, 403 last.
+    i_doc = src.find("is_wingpoint_user(user_doc)")
+    i_ledger = src.find("wp_ref_belongs_to_referrer(")
+    i_403 = src.find("only available to WingPoint customers", i_ledger)
+    assert -1 < i_doc < i_ledger < i_403, "guard verification order regressed"
+
+
+def test_guest_checkout_still_blocks_wingpoint():
+    """Guest checkout can't verify membership pre-account — must stay blocked."""
+    src = (BACKEND / "routers" / "subscriptions.py").read_text()
+    m = re.search(
+        r"async def _validate_guest_checkout.*?(?=\nasync def |\nclass |\Z)", src, re.DOTALL
+    )
+    assert m and "wingpoint" in m.group(0) and "403" in m.group(0), (
+        "guest-checkout wingpoint block regressed"
+    )

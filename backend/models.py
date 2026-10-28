@@ -1551,6 +1551,11 @@ class CheckoutRequest(BaseModel):
     utm_campaign: Optional[str] = None
     utm_medium: Optional[str] = None
     referrer: Optional[str] = None
+    # WingPoint attribution (2026-10-28): lets a verified wp_ref ride with
+    # checkout so legacy/admin-created accounts without identity markers can
+    # still buy the wingpoint plan. NEVER trusted alone — the checkout guard
+    # verifies it against external_provisions (see subscriptions.py).
+    wp_ref: Optional[str] = None
 
 
 # ==================== RECORDS REPOSITORY (F1, 2026-09-12) ====================

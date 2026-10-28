@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { showError, reportErrorToBackend } from '@/utils/errors';
 import { is2faChallenge, login2fa, get2faRateLimitMessage, get2faAttemptsRemaining } from '@/utils/twoFactor';
 import { use2faLockout, formatLockout } from '@/hooks/use2faLockout';
+import { pickWpRef } from '@/utils/wingpointConnect';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, X, Shield } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
@@ -103,14 +104,24 @@ export default function LoginPage() {
     if (wp === '1' && action) {
       const coupon = searchParams.get('coupon');
       const plan = searchParams.get('plan');
+      // Keep the WingPoint provisioning ref alive through navigation (2026-10-28):
+      // it arrives as `ref` (admin template) or `wp_ref` (connect handoffs) and
+      // must reach pricing → checkout, or the eligibility guard 403s legacy
+      // accounts. Only well-formed refs are carried (see pickWpRef).
+      const wpRef = pickWpRef([searchParams.get('wp_ref'), searchParams.get('ref')]);
+      if (wpRef) {
+        try { sessionStorage.setItem('wp_ref', wpRef); } catch (e) { /* storage blocked */ }
+      }
       if (action === 'subscribe') {
         const params = new URLSearchParams({ wp: '1', action: 'subscribe' });
         if (coupon) params.set('coupon', coupon);
         if (plan) params.set('plan', plan);
+        if (wpRef) params.set('wp_ref', wpRef);
         navigate(`/pricing?${params.toString()}`, { replace: true });
       } else if (action === 'upgrade') {
         const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
         if (plan) params.set('plan', plan);
+        if (wpRef) params.set('wp_ref', wpRef);
         navigate(`/settings/billing?${params.toString()}`, { replace: true });
       } else if (action === 'resubscribe') {
         navigate('/settings/billing?wp=1&action=resubscribe', { replace: true });
@@ -153,14 +164,25 @@ export default function LoginPage() {
     if (wp === '1' && action) {
       const coupon = searchParams.get('coupon');
       const plan = searchParams.get('plan');
+      // Post-login: keep the WingPoint provisioning ref with the flow
+      // (2026-10-28) — same reason as the redirect guard above. The ref
+      // reaches pricing → checkout so the eligibility guard can verify it
+      // against the provisioning ledger; without this, legacy accounts
+      // without marker fields hit 403 on the wingpoint plan.
+      const wpRef = pickWpRef([searchParams.get('wp_ref'), searchParams.get('ref')]);
+      if (wpRef) {
+        try { sessionStorage.setItem('wp_ref', wpRef); } catch (e) { /* storage blocked */ }
+      }
       if (action === 'subscribe') {
         const params = new URLSearchParams({ wp: '1', action: 'subscribe' });
         if (coupon) params.set('coupon', coupon);
         if (plan) params.set('plan', plan);
+        if (wpRef) params.set('wp_ref', wpRef);
         navigate(`/pricing?${params.toString()}`, { replace: true });
       } else if (action === 'upgrade') {
         const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
         if (plan) params.set('plan', plan);
+        if (wpRef) params.set('wp_ref', wpRef);
         navigate(`/settings/billing?${params.toString()}`, { replace: true });
       } else if (action === 'resubscribe') {
         navigate('/settings/billing?wp=1&action=resubscribe', { replace: true });
@@ -562,8 +584,11 @@ export default function LoginPage() {
                 <p className="text-sm text-muted-foreground">
                   Don't have an account?{' '}
                   <Link to={(() => {
-                    // Forward WingPoint attribution params to the signup page
-                    const wpRef = searchParams.get('wp_ref');
+                    // Forward WingPoint attribution params to the signup page.
+                    // pickWpRef accepts both `wp_ref` and the template's `ref`
+                    // (WP-XXXXXXXX-XXXX) so "Create account" keeps attribution
+                    // alive into /pricing (2026-10-28).
+                    const wpRef = pickWpRef([searchParams.get('wp_ref'), searchParams.get('ref')]);
                     const trustName = searchParams.get('trust_name');
                     const plan = searchParams.get('plan');
                     const coupon = searchParams.get('coupon');
