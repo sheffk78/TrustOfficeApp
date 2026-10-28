@@ -58,6 +58,7 @@ from dependencies import (
 )
 from email_service import email_service
 from routers.auth import rate_limit, validate_password_strength
+from services.wingpoint_identity import is_wingpoint_user
 from utils.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
@@ -736,10 +737,6 @@ async def _issue_session(user_doc: dict, response: Response) -> dict:
             "name": user_doc.get("name"),
             "is_admin": bool(user_doc.get("is_admin")),
             "wp_ref": user_doc.get("wp_ref"),
-            "is_wingpoint": bool(
-                user_doc.get("wp_ref")
-                or user_doc.get("source") == "wingpoint"
-                or user_doc.get("created_via") in ("wingpoint_provision", "wingpoint_connect")
-            ),
+            "is_wingpoint": is_wingpoint_user(user_doc),
         },
     }

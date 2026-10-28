@@ -20,6 +20,7 @@ from dependencies import (
     TRIAL_DAYS
 )
 from routers.auth import rate_limit
+from services.wingpoint_identity import is_wingpoint_user
 from models import SubscriptionResponse, CheckoutRequest, GuestCheckoutRequest, PortalRequest, ChangePlanRequest
 
 # Import email service
@@ -357,11 +358,7 @@ async def create_checkout_session(checkout: CheckoutRequest, user: dict = Depend
     # discounted rate via a direct API call.
     if checkout.plan_type == "wingpoint":
         user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        is_wingpoint = user_doc and (
-            user_doc.get("wp_ref")
-            or user_doc.get("source") == "wingpoint"
-            or user_doc.get("created_via") == "wingpoint_provision"
-        )
+        is_wingpoint = is_wingpoint_user(user_doc)
         if not is_wingpoint:
             raise HTTPException(
                 status_code=403,

@@ -35,6 +35,7 @@ from database import db
 from dependencies import get_current_user, hash_password, TRIAL_DAYS
 from email_service import email_service
 from services.security_events import record_security_event, alert_security_event
+from services.wingpoint_identity import is_wingpoint_user
 
 logger = logging.getLogger(__name__)
 
@@ -1003,11 +1004,7 @@ async def impersonate_user(
             "name": target_user.get("name", ""),
             "picture": target_user.get("picture"),
             "wp_ref": target_user.get("wp_ref"),
-            "is_wingpoint": bool(
-                target_user.get("wp_ref")
-                or target_user.get("source") == "wingpoint"
-                or target_user.get("created_via") == "wingpoint_provision"
-            )
+            "is_wingpoint": is_wingpoint_user(target_user)
         },
         "message": f"Now impersonating {target_user['email']}"
     }
