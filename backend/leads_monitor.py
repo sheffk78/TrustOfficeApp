@@ -85,6 +85,18 @@ NURTURE_SCHEDULE = {
 # to pick it up. The drip runs every 6 hours, so 12h = two full runs.
 DUE_GRACE = timedelta(hours=12)
 
+# 2026-10-28 fix: confirm-before-alert (two-strike rule).
+# Production evidence: at 2026-10-29T00:52:17Z the monitor paged RED claiming
+# "8 sends/24h < floor 30" while the drip batch that satisfied the floor
+# committed its 30 activity rows at 00:52:16.924Z — 0.9s BEFORE the embed.
+# The monitor ran mid-drip: it read demand (30 due, not yet advanced) and sends
+# (8, batch not yet counted) from a torn snapshot. A deploy-restart burst can
+# also fire monitor + drip jobs within the same second. A single RED snapshot
+# is therefore not trustworthy evidence of a real stall; two consecutive REDs
+# — the re-check >= one drip cycle later, after the batch settles — are.
+ALERT_RETRY_DELAY_S = 90.0  # re-check this long after a failed snapshot
+ALERT_LOG_PREFIX = "LEAD PIPELINE HEALTH CHECK FAILED (RED)"
+
 # Booking-reminder windows (mirror background_tasks.send_booking_reminder_emails)
 DAY_BEFORE_LOWER = timedelta(hours=23)
 DAY_BEFORE_UPPER = timedelta(hours=25)
@@ -127,10 +139,131 @@ async def check_leads_pipeline_health(
     `notify` is an async callable(title, message, details) used to raise RED
     alerts; defaults to discord_service.notify_pipeline_alert. Pass a stub in
     tests to capture alerts without touching Discord.
+
+    2026-10-28 (two-strike rule): a failing snapshot is re-checked after
+    ALERT_RETRY_DELAY_S; Discord is paged only if the second snapshot also
+    fails. Kills single-snapshot races (monitor running mid-drip-batch, or
+    against a just-restarted service whose jobs are still settling) without
+    weakening the assert itself — a real stall fails both snapshots.
+
+    Discord. Tests monkeypatch `leads_monitor._recheck_delay` to return 0 so
+    the two-strike flow runs instantly.
     """
+    import asyncio
+
     if notify is None:
         from discord_service import notify_pipeline_alert as notify  # late import
 
+    result = await _run_asserts(db, notify=notify)
+    if result["failures"]:
+        # Strike 1: log loudly, but do not page yet. Re-run after the delay.
+        logger.error(
+            "[pipeline-monitor] RED snapshot #1 (re-checking in %ss before paging): %s",
+            ALERT_RETRY_DELAY_S,
+            "; ".join(result["failures"]),
+        )
+        await asyncio.sleep(_recheck_delay(result))
+        second = await _run_asserts(db, notify=notify)
+        if not second["failures"]:
+            # Race resolved itself (e.g. the drip batch committed between the
+            # two snapshots). Log the resolution, page nobody.
+            logger.warning(
+                "[pipeline-monitor] RESOLVED between snapshots — no RED page. "
+                "first: %s || second: OK %s",
+                "; ".join(result["failures"]),
+                _summarize(second),
+            )
+            return second
+        result = second
+
+    await _alert_or_log(db, result, notify=notify)
+    return result
+
+
+def _recheck_delay(result: Dict[str, Any]) -> float:
+    """Seconds to wait before the confirming snapshot (test injection point).
+
+    The wrapper passes this to asyncio.sleep; tests monkeypatch it to 0 so the
+    two-strike flow runs instantly. Production keeps ALERT_RETRY_DELAY_S (90s)
+    — comfortably longer than a drip batch commit, far shorter than the 6h
+    drip cycle.
+    """
+    return ALERT_RETRY_DELAY_S
+
+
+def _summarize(result: Dict[str, Any]) -> str:
+    return (
+        f"eligible={result.get('eligible_cohort')}, "
+        f"sends_24h={result.get('sends_last_24h')}, "
+        f"due={result.get('sends_due_in_window')}, "
+        f"overdue={result.get('sends_overdue')}, "
+        f"booking_violations={result.get('booking_violations')}"
+    )
+
+
+async def _alert_or_log(db, result: Dict[str, Any], notify: Callable) -> None:
+    """Page Discord on a CONFIRMED RED; log INFO on green.
+
+    A failed assertion that fails to page anyone is worse than no assertion
+    at all: it converts a live RED into a silent one. Log at ERROR, and treat
+    a notifier that did not report success as a monitor failure in its own right.
+    """
+    failures = result["failures"]
+    all_ok = not failures
+    if not all_ok:
+        detail = {
+            "eligible_cohort": result["eligible_cohort"],
+            "sends_last_24h": result["sends_last_24h"],
+            "throughput_floor": result["throughput_floor"],
+            "sends_due_in_window": result["sends_due_in_window"],
+            "sends_overdue": result["sends_overdue"],
+            "booking_violations": result["booking_violations"],
+        }
+        logger.error(
+            ALERT_LOG_PREFIX + " - "
+            f"eligible={result['eligible_cohort']}, "
+            f"sends_last_24h={result['sends_last_24h']}, "
+            f"floor={result['throughput_floor']}, "
+            f"booking_violations={result['booking_violations']}: "
+            + "; ".join(failures)
+        )
+        try:
+            notify_result = await notify(
+                title="Lead pipeline health check FAILED (RED)",
+                message="; ".join(failures),
+                details=detail,
+                alert_level="red",
+            )
+            if isinstance(notify_result, dict) and not notify_result.get("success", True):
+                logger.error(
+                    "PIPELINE RED ALERT WAS NOT DELIVERED: "
+                    f"{notify_result.get('error') or notify_result} - "
+                    "the failure above is live but unannounced. Check the "
+                    "Discord webhook env vars (DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL "
+                    "/ DISCORD_ALERTS_WEBHOOK_URL)."
+                )
+        except Exception as e:
+            logger.error(
+                f"PIPELINE RED ALERT RAISED AN EXCEPTION AND WAS NOT DELIVERED: {e}",
+                exc_info=True,
+            )
+    else:
+        logger.info(
+            f"[pipeline-monitor] OK - {_summarize(result)}"
+        )
+
+
+async def _run_asserts(
+    db,
+    notify: Optional[Callable] = None,
+) -> Dict[str, Any]:
+    """One snapshot of the asserts: reads, math, failures list.
+
+    Split out from check_leads_pipeline_health so the two-strike wrapper can
+    run it twice (2026-10-28: the 00:52Z RED raced the drip batch by 0.9s and
+    paged on a torn snapshot). `notify` is unused here (paging lives in
+    _alert_or_log) and is kept only for signature symmetry.
+    """
     now = datetime.now(timezone.utc)
     day_ago = now - timedelta(hours=24)
 
@@ -283,56 +416,8 @@ async def check_leads_pipeline_health(
             + ("…" if len(booking_violations) > 5 else "")
         )
 
-    all_ok = len(failures) == 0
-
-    if not all_ok:
-        detail = {
-            "eligible_cohort": eligible,
-            "sends_last_24h": sends_last_24h,
-            "throughput_floor": floor,
-            "sends_due_in_window": due_in_window,
-            "sends_overdue": overdue_due,
-            "booking_violations": len(booking_violations),
-        }
-        # A failed assertion that fails to page anyone is worse than no
-        # assertion at all: it converts a live RED into a silent one. Log at
-        # ERROR, and treat a notifier that did not report success as a
-        # monitor failure in its own right.
-        logger.error(
-            "LEAD PIPELINE HEALTH CHECK FAILED (RED) - "
-            f"eligible={eligible}, sends_last_24h={sends_last_24h}, "
-            f"floor={floor}, booking_violations={len(booking_violations)}: "
-            + "; ".join(failures)
-        )
-        try:
-            notify_result = await notify(
-                title="Lead pipeline health check FAILED (RED)",
-                message="; ".join(failures),
-                details=detail,
-                alert_level="red",
-            )
-            if isinstance(notify_result, dict) and not notify_result.get("success", True):
-                logger.error(
-                    "PIPELINE RED ALERT WAS NOT DELIVERED: "
-                    f"{notify_result.get('error') or notify_result} - "
-                    "the failure above is live but unannounced. Check the "
-                    "Discord webhook env vars (DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL "
-                    "/ DISCORD_ALERTS_WEBHOOK_URL)."
-                )
-        except Exception as e:
-            logger.error(
-                f"PIPELINE RED ALERT RAISED AN EXCEPTION AND WAS NOT DELIVERED: {e}",
-                exc_info=True,
-            )
-    else:
-        logger.info(
-            f"[pipeline-monitor] OK - eligible={eligible}, sends_24h={sends_last_24h}, "
-            f"due_in_window={due_in_window}, overdue={overdue_due}, "
-            f"booking_violations={len(booking_violations)}"
-        )
-
     return {
-        "all_ok": all_ok,
+        "all_ok": len(failures) == 0,
         "eligible_cohort": eligible,
         "sends_last_24h": sends_last_24h,
         "throughput_floor": floor,

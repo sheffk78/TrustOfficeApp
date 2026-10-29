@@ -179,6 +179,19 @@ class BackgroundTaskRunner:
             replace_existing=True
         )
 
+        # 2026-10-28: scheduler heartbeat monitor — 6h.
+        # Detects DEAD JOBS, not bad outputs: each funnel job stamps a
+        # heartbeat (Mongo-backed) when it runs; this job pages RED when any
+        # tracked job's stamp goes stale (e.g. the 2026-10-28 outage where no
+        # job ran 09:10Z->18:10Z and a booking reminder was silently missed).
+        self.scheduler.add_job(
+            self.check_scheduler_heartbeat_health,
+            trigger=IntervalTrigger(hours=6),
+            id='scheduler_heartbeat_health',
+            name='Scheduler heartbeat monitor (dead-job detection)',
+            replace_existing=True
+        )
+
         # State compliance reminder monitor (asserts + RED alert) — 6h (item 4).
         self.scheduler.add_job(
             self.check_compliance_reminder_health,
@@ -877,6 +890,8 @@ class BackgroundTaskRunner:
         treated as sequence-complete (12 emails total) and is skipped.
         """
         logger.info("Running nurture drip check (7-email MailerCloud sequence)")
+        from heartbeat_monitor import stamp_heartbeat, stamp_heartbeat_done
+        await stamp_heartbeat(self.db, "nurture_drip")
         try:
             from mailercloud_service import (
                 send_nurture_email_via_mailercloud,
@@ -1063,6 +1078,10 @@ class BackgroundTaskRunner:
                 f"cap={DRIP_MAX_PER_RUN} ratio={ratio:.2%} "
                 f"sends_per_run={emails_sent}"
             )
+            await stamp_heartbeat_done(
+                self.db, "nurture_drip",
+                extra={"emails_sent": emails_sent, "eligible": eligible_count},
+            )
 
             # 2026-09-18 fix: standing lost-lead sweep. Every drip run, drop any
             # lead marked lost from the MailerCloud Leads list so stopped
@@ -1130,6 +1149,8 @@ class BackgroundTaskRunner:
         consistent with the existing booking_confirmation style.
         """
         logger.info("Running booking reminder check")
+        from heartbeat_monitor import stamp_heartbeat, stamp_heartbeat_done
+        await stamp_heartbeat(self.db, "booking_reminders")
         result: Dict[str, int] = {"day_before": 0, "one_hour": 0}
         try:
             from email_service import email_service
@@ -1213,6 +1234,10 @@ class BackgroundTaskRunner:
             logger.info(
                 f"[booking-reminder] day_before={result['day_before']} "
                 f"one_hour={result['one_hour']} eligible={len(leads)}"
+            )
+            await stamp_heartbeat_done(
+                self.db, "booking_reminders",
+                extra={"day_before": result["day_before"], "one_hour": result["one_hour"]},
             )
             return result
         except Exception as e:
@@ -1321,7 +1346,54 @@ class BackgroundTaskRunner:
     async def check_leads_pipeline_health(self) -> dict:
         """Run the leads pipeline monitor asserts and RED-alert on failure (item 4)."""
         from leads_monitor import check_leads_pipeline_health as _run
-        return await _run(self.db)
+        from heartbeat_monitor import stamp_heartbeat, stamp_heartbeat_done
+        await stamp_heartbeat(self.db, "leads_pipeline_health")
+        result = await _run(self.db)
+        await stamp_heartbeat_done(self.db, "leads_pipeline_health",
+                                   extra={"all_ok": result.get("all_ok")})
+        return result
+
+    async def check_scheduler_heartbeat_health(self) -> dict:
+        """Run the scheduler heartbeat monitor: page RED when a tracked job
+        (drip, booking reminders, pipeline monitor itself) stops running.
+
+        2026-10-28: the 09:10Z->18:10Z outage produced zero job activity for
+        9h and no monitor could catch it — they were dead too. Heartbeats are
+        the direct signal; a stale drip/reminder stamp is a real RED.
+        """
+        from heartbeat_monitor import (
+            stamp_heartbeat,
+            stamp_heartbeat_done,
+            check_scheduler_heartbeats,
+        )
+        from discord_service import notify_pipeline_alert
+
+        # Renew our own stamp FIRST: this job running is itself proof the
+        # scheduler is alive, and it covers the never-stamped first boot.
+        await stamp_heartbeat(self.db, "scheduler_heartbeat_check")
+        result = await check_scheduler_heartbeats(self.db)
+        if not result["all_ok"]:
+            try:
+                notify_result = await notify_pipeline_alert(
+                    title="Scheduler heartbeat: background job(s) STOPPED running",
+                    message="; ".join(result["failures"]),
+                    details={"stale_jobs": ", ".join(result["stale_jobs"]) or "none"},
+                    alert_level="red",
+                )
+                if isinstance(notify_result, dict) and not notify_result.get("success", True):
+                    logger.error(
+                        "HEARTBEAT RED ALERT WAS NOT DELIVERED: %s - "
+                        "jobs above are dead AND unannounced.",
+                        notify_result.get("error") or notify_result,
+                    )
+            except Exception as e:
+                logger.error("HEARTBEAT RED ALERT raised an exception: %s", e, exc_info=True)
+        else:
+            logger.info("[heartbeat-monitor] OK - all %d tracked jobs fresh",
+                        len(result.get("stale_jobs") or []) or 3)
+        await stamp_heartbeat_done(self.db, "scheduler_heartbeat_check",
+                                   extra={"stale": result["stale_jobs"]})
+        return result
 
     async def check_compliance_reminder_health(self) -> dict:
         """Run the state-compliance reminder monitor asserts + RED-alert (item 4)."""

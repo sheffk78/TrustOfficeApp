@@ -430,3 +430,117 @@ async def test_monitor_survives_notifier_exception(db, caplog):
     # The monitor must not crash, and must record the failure loudly.
     assert result["all_ok"] is False
     assert any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+# --------------------------------------------------------------------------- #
+# 4. Confirm-before-alert (two-strike rule, 2026-10-28)
+#
+# Production evidence: at 2026-10-29T00:52:17Z the monitor paged RED claiming
+# "8 sends/24h < floor 30" while the drip batch satisfying the floor committed
+# its 30 activity rows at 00:52:16.924Z — the monitor read a torn snapshot
+# 0.9s ahead of the batch. A single RED snapshot is not evidence; two
+# consecutive REDs (the re-check settling after the batch) are.
+# --------------------------------------------------------------------------- #
+@pytest.fixture(autouse=True)
+def zero_recheck(monkeypatch):
+    """Make the two-strike re-check instant in tests."""
+    monkeypatch.setattr(leads_monitor, "_recheck_delay", lambda result: 0.0)
+
+
+@pytest.mark.asyncio
+async def test_monitor_race_resolves_before_second_strike(db, caplog):
+    """The 00:52Z production race: snapshot #1 fails, the drip batch commits,
+    snapshot #2 is green -> NO Discord page. The RED must never leave the box."""
+    calls = []
+
+    async def _notify(**kwargs):
+        calls.append(kwargs)
+        return {"success": True}
+
+    # 5 leads due right now (anchor 5 days ago, step 2 due on day 3)...
+    for i in range(5):
+        await db.leads.insert_one(_lead(f"R{i}", 1, 76))
+    # ...and exactly the torn state the monitor saw mid-drip: sends not yet counted.
+    with caplog.at_level(logging.WARNING):
+        # Simulate the drip committing BETWEEN the two snapshots: the shared db
+        # object's leads collection returns fresh docs after the wrapper runs.
+        original = leads_monitor._run_asserts
+        first_done = []
+
+        async def _run_asserts_with_commit(db_arg, notify=None):
+            if not first_done:
+                first_done.append(True)
+                return await original(db_arg, notify=notify)
+            # Commit the drip batch BEFORE the confirming snapshot so snapshot
+            # #2 observes post-batch state (sends counted, steps advanced).
+            for i in range(5):
+                await db_arg.leads.update_one(
+                    {"lead_id": f"R{i}"},
+                    {"$set": {"nurture_step_sent": 2}},
+                )
+                await db_arg.lead_activities.insert_one({
+                    "activity_id": f"race{i}",
+                    "lead_id": f"R{i}",
+                    "action_type": "email",
+                    "content": "Sent nurture email 2/12 via MailerCloud",
+                    "created_at": datetime.now(timezone.utc),
+                })
+            return await original(db_arg, notify=notify)
+
+        leads_monitor._run_asserts = _run_asserts_with_commit
+        try:
+            result = await leads_monitor.check_leads_pipeline_health(db, notify=_notify)
+        finally:
+            leads_monitor._run_asserts = original
+
+    assert calls == [], "a race-resolved RED must never page Discord"
+    assert result["all_ok"] is True
+    assert any("RESOLVED between snapshots" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_monitor_pages_only_after_two_consecutive_reds(db, caplog):
+    """A real stall fails BOTH snapshots -> exactly one RED page, after re-check."""
+    calls = []
+
+    async def _notify(**kwargs):
+        calls.append(kwargs)
+        return {"success": True}
+
+    # Step 2 due on day 3; anchor 5 days ago -> due now; nothing ever sends.
+    for i in range(5):
+        await db.leads.insert_one(_lead(f"S{i}", 1, 76))
+
+    with caplog.at_level(logging.ERROR):
+        result = await leads_monitor.check_leads_pipeline_health(db, notify=_notify)
+
+    assert result["all_ok"] is False
+    assert len(calls) == 1, "one confirmed RED -> exactly one page"
+    assert calls[0]["alert_level"] == "red"
+    assert any("snapshot #1" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_monitor_single_snapshot_green_never_rechecks(db, caplog):
+    """Healthy pipeline: one snapshot, green, no re-check, no page."""
+    calls = []
+
+    async def _notify(**kwargs):
+        calls.append(kwargs)
+        return {"success": True}
+
+    await db.leads.insert_one(_lead("G1", 7, 24))
+    await db.lead_activities.insert_one({
+        "activity_id": "g1",
+        "lead_id": "G1",
+        "action_type": "email",
+        "content": "Sent nurture email 7/12 via MailerCloud",
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    with caplog.at_level(logging.INFO):
+        result = await leads_monitor.check_leads_pipeline_health(db, notify=_notify)
+
+    assert result["all_ok"] is True
+    assert not calls
+    assert not any("snapshot #1" in r.message for r in caplog.records)
