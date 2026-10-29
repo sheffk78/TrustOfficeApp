@@ -37,6 +37,10 @@ Given a user message in a trust administration context, classify it into exactly
 | `general_chat` | "Hello", "Thanks", "What can you do?", "Tell me a joke" | Greeting, casual, off-topic |
 | `emergency` | "I'm worried I messed up", "I think I missed a deadline", "I need help urgently" | Distress, concern, anxiety about trust duties |
 
+| `check_amendment_preconditions` | "Can I amend my trust?", "What would it take to amend?", "Amendment requirements", "Before I amend" | Review what the documents on file say about amendment prerequisites (read-only) |
+| `log_distribution_minutes` | "Document the distribution in the minutes", "Add minutes for the distribution", "Record the distribution in our meeting minutes" | Draft minutes linked to an existing distribution record (write, with duplicate guard) |
+| `run_minutes_cadence` | "When was my last minutes entry?", "Do I owe minutes this quarter?", "Minutes cadence" | Suggest the next minutes entry from last-minutes data and the state cadence (read-only) |
+
 ## Rules
 - If the message contains multiple intents, choose the PRIMARY intent (the action the user most needs)
 - Return `confidence` as a float between 0.0 and 1.0

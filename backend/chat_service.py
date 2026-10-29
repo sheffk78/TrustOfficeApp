@@ -109,6 +109,8 @@ ACTION_INTENTS = {
     "add_investment", "schedule_task", "add_transaction", "change_settings",
     "create_entity", "review_document", "dismiss_alert", "recommend_action",
     "check_deadlines", "health_check",
+    "check_amendment_preconditions", "run_minutes_cadence",
+    "log_distribution_minutes",
 }
 ESCALATION_INTENTS = ACTION_INTENTS | {"ask_knowledge", "emergency"}
 
@@ -161,6 +163,9 @@ INTENT_CONCEPTS = {
     "record_compensation_payment": ("compensation", "trustee"),
     "setup_compensation": ("compensation", "trustee"),
     "check_deadlines": ("deadline", "tax", "calendar", "filing"),
+    "check_amendment_preconditions": ("amendment", "amend", "restate", "modify", "trust agreement"),
+    "log_distribution_minutes": ("minutes", "distribution", "documentation", "record"),
+    "run_minutes_cadence": ("minutes", "cadence", "annual", "quarterly", "meeting"),
     "health_check": ("score", "risk", "defensib"),
     "review_document": ("document", "review", "vault"),
     "upload_document": ("document", "vault"),
@@ -877,7 +882,9 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
                 {"_id": str(state_code).upper()},
                 {"_id": 0, "state_name": 1, "utc_adopted": 1,
                  "accounting_frequency": 1, "notice_required": 1,
-                 "notice_timing_days": 1},
+                 "notice_timing_days": 1, "utc_note": 1,
+                 "utc_adoption_year": 1, "trustee_removal_standard": 1,
+                 "spendthrift_default": 1, "state_profile_verified": 1},
             )
         except Exception as e:  # never let a compliance lookup break the turn
             logger.warning(f"state_compliance_profiles lookup failed for {state_code}: {e}")
@@ -889,6 +896,11 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
                 "utc_adopted": profile.get("utc_adopted", ""),
                 "accounting_frequency": profile.get("accounting_frequency", ""),
                 "notice_required": profile.get("notice_required"),
+                "utc_note": profile.get("utc_note", ""),
+                "utc_adoption_year": profile.get("utc_adoption_year"),
+                "trustee_removal_standard": profile.get("trustee_removal_standard", ""),
+                "spendthrift_default": profile.get("spendthrift_default"),
+                "state_profile_verified": profile.get("state_profile_verified", False),
             }
         else:
             # Trust has a state on file but no compliance profile — the guard
@@ -1171,6 +1183,86 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
             powers_detail = {}
         context["trust_document"]["distribution_rules"] = dist_rules
         context["trust_document"]["trustee_powers_detail"] = powers_detail
+        # Amendment-clause capture (2026-10-29, check_amendment_preconditions):
+        # the analysis schema has no dedicated amendment field; older runs may
+        # have stashed it under any key mentioning "amend" - surface the best
+        # candidate rather than losing it to the whitelist.
+        _amp_txt = ""
+        for k, v in fields.items():
+            if "amend" in k.lower():
+                cand = v.get("summary") if isinstance(v, dict) else v
+                if isinstance(cand, str) and cand.strip():
+                    _amp_txt = cand.strip()
+                    break
+        context["trust_document"]["amendment_provisions"] = _amp_txt
+
+    # 8b. Computed blocks for the two new readonly intents (2026-10-29).
+    # check_amendment_preconditions: deterministic preconditions from the
+    # document analysis + governance state, narrated by the model - never
+    # legal advice, always framed as "what this trust says".
+    if intent == "check_amendment_preconditions":
+        pre: dict[str, Any] = {"intent_note": "deterministic precondition check"}
+        fields_pre = context.get("trust_document") or {}
+        checks = []
+        has_doc = bool(fields_pre.get("grantor") or fields_pre.get("distribution_standard"))
+        checks.append({
+            "check": "Trust instrument on file",
+            "status": "ready" if has_doc else "missing",
+            "detail": "" if has_doc else "Upload the trust instrument in Documents so the assistant reads the actual amendment clause.",
+        })
+        amp = fields_pre.get("amendment_provisions")
+        if isinstance(amp, dict):
+            amp = amp.get("summary", "")
+        if isinstance(amp, str) and amp.strip():
+            checks.append({"check": "Amendment clause already extracted", "status": "ready", "detail": amp.strip()[:280]})
+        else:
+            checks.append({"check": "Amendment clause extracted", "status": "not_found", "detail": "No amendment provision was found in the document analysis; the precondition review reads the instrument text directly."})
+        if not fields_pre.get("distribution_standard"):
+            checks.append({"check": "Distribution standard on file", "status": "missing", "detail": "The amendment review cannot assess affected beneficiary rights without it."})
+        trustees = (context.get("trust") or {}).get("trustees") or []
+        checks.append({
+            "check": "Current trustee(s) identified",
+            "status": "ready" if trustees else "missing",
+            "detail": ", ".join(t for t in trustees if t) if trustees else "No trustee on file - the executed amendment must name the current trustee(s).",
+        })
+        status_bit = (context.get("trust") or {}).get("status", "")
+        pre["revocability_note"] = (
+            "Trust status on file: " + (status_bit or "unknown")
+            + ". If revocable, the grantor may amend - verify the instrument and the state rule with counsel. "
+            "If irrevocable, amendment power comes ONLY from the instrument amendment clause."
+        )
+        pre["checks"] = checks
+        pre["reminder"] = ("This review explains what the documents on file say about amending this trust. "
+                           "It is not legal advice; the executed amendment itself should be reviewed by an attorney in this state.")
+        context["amendment_preconditions"] = pre
+
+    # run_minutes_cadence: last minutes record + the state profile's accounting
+    # frequency -> deterministic cadence suggestion the model renders as a card.
+    if intent == "run_minutes_cadence":
+        last = await db.minutes_records.find(
+            {"trust_id": trust_id, "user_id": user_id},
+            {"_id": 0, "meeting_date": 1, "minutes_type": 1, "created_at": 1, "status": 1},
+        ).sort("created_at", -1).limit(1).to_list(1)
+        last_minutes = last[0] if last else None
+        freq = (context.get("state_compliance") or {}).get("accounting_frequency", "")
+        last_date = (last_minutes or {}).get("meeting_date") or (last_minutes or {}).get("created_at", "")
+        days_since = None
+        if last_date:
+            try:
+                d0 = str(last_date)[:10]
+                days_since = (datetime.now(timezone.utc) - datetime.fromisoformat(d0 + "T00:00:00+00:00")).days
+            except Exception:
+                days_since = None
+        context["minutes_cadence"] = {
+            "last_minutes_date": str(last_date or "")[:10] or None,
+            "last_minutes_type": (last_minutes or {}).get("minutes_type"),
+            "last_minutes_status": (last_minutes or {}).get("status"),
+            "days_since_last_minutes": days_since,
+            "state_accounting_frequency": freq or "unknown",
+            "suggestion_note": ("Suggest the next minutes entry from this data: the state profile accounting frequency "
+                                "and the date of the last minutes. Never invent a missed deadline - an overdue cadence is a "
+                                "suggestion the member confirms."),
+        }
 
     # 9. Vault document metadata (titles, categories, descriptions — no file content)
     # This is queried for every request but only injected into the prompt when relevant
@@ -1392,6 +1484,9 @@ TD_INTENT_FIELD_MAP: dict[str, set[str]] = {
     "check_deadlines": TD_BASELINE_FIELDS,
     "add_asset": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS,
     "contribute_asset": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS,
+    "check_amendment_preconditions": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS | TD_BENEFICIARY_FIELDS,
+    "log_distribution_minutes": TD_BASELINE_FIELDS | TD_DISTRIBUTION_FIELDS | TD_BENEFICIARY_FIELDS,
+    "run_minutes_cadence": TD_BASELINE_FIELDS | TD_AUTHORITY_FIELDS,
 }
 
 # Keyword triggers for field-group expansion in general_chat
@@ -1881,6 +1976,28 @@ When a user asks about evaluating a distribution request, help them evaluate it 
 6. Draft a beneficiary notification if the distribution is approved
 
 When evaluating, always cite the specific trust document language and article references you're basing the recommendation on.
+"""
+
+    # New-intent guidance (2026-10-29): the two readonly checks render their
+    # computed blocks as answers; the distribution-minutes intent says what it
+    # will draft so the system can build the write card.
+    if intent == "check_amendment_preconditions":
+        system_prompt_base += """
+
+## Amendment Preconditions Review (read-only)
+The computed block above (amendment_preconditions) is your answer skeleton. Walk the member through each check with its status in plain language, then the revocability note. Explain what the documents ON FILE say - never what the law requires in general. End with the reminder line: not legal advice, attorney review for the executed amendment. Do NOT create an action card.
+"""
+    if intent == "run_minutes_cadence":
+        system_prompt_base += """
+
+## Minutes Cadence Suggestion (read-only)
+Use the minutes_cadence block: last-minutes date, type, days-since, and the state accounting frequency from the compliance profile. Suggest the next minutes entry (type + timing) as a SUGGESTION, not a deadline - never invent a missed deadline or a penalty. Offer to draft it now (that creates the action card through log_minutes). Do NOT create an action card in this turn.
+"""
+    if intent == "log_distribution_minutes":
+        system_prompt_base += """
+
+## Distribution Minutes (write, confirm-first)
+The member wants the minutes book to document an existing distribution. Use the distributions context to find the distribution they mean (ID, date, amount, beneficiary). The card you describe is type `distribution_minutes_preview` with fields: distribution_id, meeting_date, participants, decisions (optional). Say plainly: minutes will be drafted as a DRAFT linked to that distribution. The system enforces a duplicate guard - if minutes already exist for that distribution, nothing is created twice.
 """
 
     shared_header = f"""{system_prompt_base}

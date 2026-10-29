@@ -140,10 +140,12 @@ def _render_jurisdiction(trust: dict, sc: dict) -> list[str]:
     lines.append(label)
 
     utc = (sc.get("utc_adopted") or "").strip().lower()
+    year = sc.get("utc_adoption_year")
+    year_bit = f", enacted {year}" if year else ""
     if utc == "full":
-        lines.append("Uniform Trust Code: fully adopted in this state")
+        lines.append(f"Uniform Trust Code: fully adopted in this state{year_bit}")
     elif utc == "partial":
-        lines.append("Uniform Trust Code: partially adopted in this state (model act where not adopted)")
+        lines.append(f"Uniform Trust Code: partially adopted in this state (model act where not adopted){year_bit}")
     elif utc == "no":
         lines.append(
             "Uniform Trust Code: NOT adopted in this state — it is a model act; "
@@ -153,6 +155,24 @@ def _render_jurisdiction(trust: dict, sc: dict) -> list[str]:
         lines.append(
             "Uniform Trust Code: adoption status unknown for this state — "
             "the model act is not the law governing this trust unless the state has adopted it"
+        )
+    # Source-verified note (2026-10-29 two-source pass): the code chapter /
+    # UTC-modeled nuance the assistant should cite instead of guessing.
+    utc_note = (sc.get("utc_note") or "").strip()
+    if utc_note:
+        lines.append(f"State trust code (verified): {utc_note}")
+    removal = (sc.get("trustee_removal_standard") or "").strip()
+    if removal:
+        lines.append(f"Trustee removal standard on file for this state: {removal}")
+    st = sc.get("spendthrift_default")
+    if st is True:
+        lines.append("Spendthrift protection: recognized by default in this state (instrument may override)")
+    elif st is False:
+        lines.append("Spendthrift protection: NOT presumptive in this state (instrument must provide it)")
+    if not sc.get("state_profile_verified", False):
+        lines.append(
+            "State profile: NOT yet source-verified — present state facts as "
+            "on-file values, recommend confirming with an attorney in this state"
         )
 
     freq = sc.get("accounting_frequency")

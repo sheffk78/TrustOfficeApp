@@ -28,6 +28,33 @@ ACTION_REGISTRY = {
         "description": "Return upcoming deadlines and pending tasks",
         "fields": [],
     },
+    "log_distribution_minutes": {
+        "type": "distribution_minutes_preview",
+        "requires_write": True,
+        "confirmation_required": True,
+        "description": "Draft distribution minutes linked to a completed distribution, with duplicate guard",
+        "api_endpoint": "POST /api/minutes",
+        "fields": [
+            {"name": "meeting_date", "type": "string", "required": True, "description": "ISO date of the distribution action"},
+            {"name": "distribution_id", "type": "string", "required": True, "description": "ID of the distribution this minutes entry documents"},
+            {"name": "participants", "type": "list", "required": True, "description": "Meeting participants (default: current trustee(s))"},
+            {"name": "decisions", "type": "list", "required": False, "description": "Extra decisions or notes beyond the distribution record"},
+        ],
+    },
+    "check_amendment_preconditions": {
+        "type": "amendment_precondition_check",
+        "requires_write": False,
+        "confirmation_required": False,
+        "description": "Check what the trust documents on file say about amendment prerequisites (not legal advice)",
+        "fields": [],
+    },
+    "run_minutes_cadence": {
+        "type": "minutes_cadence_suggestion",
+        "requires_write": False,
+        "confirmation_required": False,
+        "description": "Suggest the next minutes entry from the last minutes date and the state's accounting cadence",
+        "fields": [],
+    },
     "health_check": {
         "type": "health_status",
         "requires_write": False,

@@ -315,6 +315,21 @@ async def upload_document(
     now = datetime.now(timezone.utc).isoformat()
     doc_id = f"doc_{uuid.uuid4().hex[:12]}"
 
+    # Doc-type inference (2026-10-29, council doc-recognition scaffold):
+    # deterministic filename+title match, no LLM. The member's explicit
+    # choice always wins — we only fill in when they left the default or
+    # picked "other", and we tag the record so the override is auditable.
+    inferred_category = None
+    try:
+        from doc_type_inference import infer_doc_type
+        inferred_category = infer_doc_type(file.filename or "", title or "", content_type)
+    except Exception as inf_err:  # inference must never block an upload
+        logger.warning(f"doc type inference failed (doc={doc_id}): {inf_err}")
+    category_note = None
+    if inferred_category and category in ("", "other"):
+        category_note = "auto-inferred from filename/title at upload"
+        category = inferred_category
+
     record = {
         "doc_id": doc_id,
         "trust_id": trust_id,
@@ -322,6 +337,7 @@ async def upload_document(
         "title": title,
         "category": category,
         "category_label": DOC_CATEGORIES.get(category, "Other"),
+        "doc_type_inferred": bool(inferred_category and category == inferred_category),
         "date": date,
         "description": description,
         "storage_provider": "trustoffice",

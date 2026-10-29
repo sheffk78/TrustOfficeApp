@@ -642,6 +642,15 @@ ACTION_EXECUTION_MAP = {
             "notes": "notes",
         },
     },
+    "distribution_minutes_preview": {
+        "endpoint_type": "distribution_minutes",
+        "field_map": {
+            "distribution_id": "distribution_id",
+            "meeting_date": "meeting_date",
+            "participants": "participants_text",
+            "decisions": "decisions_text",
+        },
+    },
     "minutes_preview": {
         "endpoint_type": "minutes",
         "field_map": {
@@ -2405,6 +2414,8 @@ async def _execute_approved_action(
         "add_transaction": "transaction_preview",
         "dismiss_alert_preview": "alert_dismiss",
         "create_minutes": "minutes_preview",
+        "log_distribution_minutes": "distribution_minutes_preview",
+        "distribution_minutes": "distribution_minutes_preview",
     }
     card_type = TYPE_ALIASES.get(card_type, card_type)
     
@@ -2447,6 +2458,43 @@ async def _execute_approved_action(
             trust_id=trust_id,
             action_type=card_type or endpoint_type,
         )
+
+    if endpoint_type == "distribution_minutes":
+        # Distribution minutes (2026-10-29): document an existing distribution
+        # in the minutes book. Duplicate guard FIRST: one distribution gets
+        # one minutes entry, or the double-approve path creates two records.
+        distribution_id = mapped_data.get("distribution_id", "")
+        if not distribution_id:
+            return {"success": False, "error": "No distribution selected — pick the distribution this minutes entry documents."}
+        dup = await db.minutes_records.find_one(
+            {"trust_id": trust_id, "user_id": user_id, "distribution_id": distribution_id},
+            {"_id": 0, "minutes_id": 1, "status": 1},
+        )
+        if dup:
+            return {
+                "success": True,
+                "duplicate_guard": True,
+                "record_id": dup.get("minutes_id", ""),
+                "endpoint": "minutes",
+                "status": dup.get("status", ""),
+                "review_link": f"/minutes/{dup.get('minutes_id', '')}",
+                "message": "This distribution already has minutes on file — nothing was created twice.",
+            }
+        mapped_data.setdefault("minutes_type", "distribution")
+        result = await _exec_minutes(mapped_data, trust_id, user_id)
+        if result.get("success") and result.get("record_id"):
+            link_res = await db.minutes_records.update_one(
+                {"minutes_id": result["record_id"], "user_id": user_id},
+                {"$set": {"distribution_id": distribution_id}},
+            )
+            if link_res.modified_count != 1:
+                logger.error(
+                    "DISTRIBUTION_MINUTES_LINK_FAILED | minutes=%s distribution=%s | minutes created but distribution link missing",
+                    result["record_id"], distribution_id,
+                )
+                result["distribution_link_failed"] = True
+        result.pop("prefilled", None)
+        return result
 
     if endpoint_type == "minutes":
         # Chat minutes cards carry participants_text / decisions_text and

@@ -45,6 +45,7 @@ Design notes:
     row cannot be found we fall back to "impersonated" with no admin id
     rather than silently claiming "self".
 """
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -430,20 +431,119 @@ async def verify_exec_write(
         endpoint_type, missing_desc, action_type, user_id, trust_id,
     )
 
-    # Fire the alert. Never let a Discord failure change the outcome.
+    # ── Two-strike confirm-before-alert (2026-10-29) ──
+    # An immediate Discord page MISSED REASONS that are transient: a
+    # deploy-restart churn race (same miss pattern false-paged twice at
+    # 01:30Z 2026-10-29) or a Mongo secondary lag on a just-written key.
+    # Strike 1 (immediate) is the log line above. Strike 2 fires ONLY if the
+    # record is STILL absent 90s later, checked in a background task so the
+    # member's HTTP turn is never delayed. If the record appears, the action
+    # result is repaired (success=True, verified=True) and an audit line
+    # records the recovery — no page.
+    result["readback_recheck_pending"] = True
+    asyncio.get_running_loop().create_task(
+        _deferred_miss_recheck(
+            db,
+            targets=targets,
+            missing=missing,
+            result=result,
+            endpoint_type=endpoint_type,
+            action_type=action_type,
+            user_id=user_id,
+            trust_id=trust_id,
+            first_ts=ts,
+            first_missing_desc=missing_desc,
+        )
+    )
+    return result
+
+
+_MISS_RECHECK_SECONDS = 90
+
+
+async def _deferred_miss_recheck(
+    db,
+    targets: list[tuple[str, str, str, str]],
+    missing: list[tuple[str, str]],
+    result: dict,
+    endpoint_type: str,
+    action_type: str,
+    user_id: str,
+    trust_id: str,
+    first_ts: str,
+    first_missing_desc: str,
+) -> None:
+    """Strike 2: re-read the missing targets 90s later; page only if still gone."""
+    try:
+        await asyncio.sleep(_MISS_RECHECK_SECONDS)
+    except asyncio.CancelledError:  # pragma: no cover — shutdown race
+        return
+
+    still_missing: list[tuple[str, str]] = []
+    # missing carries (collection, key_value); recover key_field/scope_field
+    # from the targets list so the recheck query matches strike-1's exactly.
+    _tmap = {(t[0], t[2]): t for t in targets}
+    for collection, key_value in missing:
+        _t = _tmap.get((collection, key_value))
+        key_field = _t[1] if _t else key_value
+        scope_field = _t[3] if _t else "user_id"
+        query: dict[str, Any] = {key_field: key_value}
+        if scope_field and user_id:
+            query[scope_field] = user_id
+        try:
+            found = await db[collection].find_one(query, {"_id": 0})
+        except Exception as e:  # noqa: BLE001 — a broken read must not block the alert
+            still_missing.append((collection, key_value))
+            logger.warning(
+                "EXEC_READBACK_RECHECK_READFAIL | collection=%s key=%s error=%s",
+                collection, key_value, e,
+            )
+            continue
+        if found is None:
+            still_missing.append((collection, key_value))
+
+    if not still_missing:
+        # Recovered — repair the stored result envelope so the member's
+        # action card and any persisted exec envelope reflect reality.
+        result["success"] = True
+        result["verified"] = True
+        result.pop("error", None)
+        result.pop("readback_missing_collection", None)
+        result.pop("readback_missing_key", None)
+        result.pop("readback_recheck_pending", None)
+        result["readback_recovered"] = True
+        result["readback_recovered_at"] = datetime.now(timezone.utc).isoformat()
+        logger.info(
+            "EXEC_READBACK_RECOVERED | endpoint_type=%s key=%s action=%s "
+            "user=%s | record appeared after strike-1 miss (transient miss, no page)",
+            endpoint_type, first_missing_desc, action_type, user_id,
+        )
+        return
+
+    # STILL missing — this is the real thing. Page Discord (strike 2).
+    ts2 = datetime.now(timezone.utc).isoformat()
+    missing_desc2 = ", ".join(f"{c}/{k}" for c, k in still_missing)
+    result["readback_recheck_pending"] = False
+    result["readback_confirmed_miss"] = True
+    logger.error(
+        "EXEC_READBACK_MISS_STRIKE2 | endpoint_type=%s missing=%s action=%s "
+        "user=%s trust=%s | still absent after 90s recheck",
+        endpoint_type, missing_desc2, action_type, user_id, trust_id,
+    )
     try:
         from discord_service import notify_alert
         await notify_alert(
-            title="Trust Assistant: exec read-back MISS",
+            title="Trust Assistant: exec read-back MISS (confirmed)",
             message=(
                 f"A chat action reported success but its record was not found "
-                f"after the write.\n"
+                f"after the write, and is STILL absent after a 90s recheck.\n"
                 f"action_type: {action_type or endpoint_type}\n"
                 f"endpoint_type: {endpoint_type}\n"
                 f"user_id: {user_id}\n"
                 f"trust_id: {trust_id or '(none)'}\n"
-                f"record id: {missing_desc}\n"
-                f"timestamp: {ts}\n"
+                f"record id: {missing_desc2}\n"
+                f"first seen: {first_ts}\n"
+                f"confirmed: {ts2}\n"
                 f"result: the member was told the action succeeded, but no "
                 f"record exists. The action has been flipped to success=false."
             ),
@@ -453,10 +553,8 @@ async def verify_exec_write(
     except Exception as e:  # noqa: BLE001 — the alert must never mask the failure
         logger.error(
             "EXEC_READBACK_ALERT_FAILED | endpoint_type=%s missing=%s error=%s",
-            endpoint_type, missing_desc, e,
+            endpoint_type, missing_desc2, e,
         )
-
-    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

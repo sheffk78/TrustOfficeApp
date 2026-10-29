@@ -1,0 +1,103 @@
+[
+ {
+  "applied_at": "2026-10-29T21:55:00Z",
+  "verified_by": "kit-two-source-2026-10-29",
+  "note": "Two-source verification: ULC 36-state list, ACTEC survey, mytrusts.us (2026-07-05), primary legislature sources (ncleg 36C, IA ch633A text + Begleiter 59 Drake L.Rev. 265, OK SB444/Westlaw, NRS 163, WA L.Rev. 2014).",
+  "changes": [
+   {
+    "state": "NC",
+    "changes": {
+     "utc_adopted": "no -> full",
+     "utc_adoption_year": 2005
+    }
+   },
+   {
+    "state": "WA",
+    "changes": {
+     "utc_adopted": "full -> no",
+     "stale_adoption_date": "removed"
+    }
+   },
+   {
+    "state": "NV",
+    "changes": {
+     "utc_adopted": "partial -> no"
+    }
+   },
+   {
+    "state": "MS",
+    "changes": {
+     "utc_adopted": "partial -> full",
+     "utc_adoption_year": 2014
+    }
+   },
+   {
+    "state": "AL",
+    "changes": {
+     "utc_adopted": "partial -> full",
+     "utc_adoption_year": 2006
+    }
+   },
+   {
+    "state": "AR",
+    "changes": {
+     "utc_adopted": "partial -> full",
+     "utc_adoption_year": 2005
+    }
+   },
+   {
+    "state": "FL",
+    "changes": {
+     "utc_adopted": "partial -> full",
+     "utc_adoption_year": 2006
+    }
+   },
+   {
+    "state": "MO",
+    "changes": {
+     "utc_adopted": "partial -> full",
+     "utc_adoption_year": 2004
+    }
+   },
+   {
+    "state": "SC",
+    "changes": {
+     "utc_adopted": "partial -> full",
+     "utc_adoption_year": 2005
+    }
+   },
+   {
+    "state": "OK",
+    "changes": {
+     "utc_adoption_year": 2025,
+     "note": "seed already correct"
+    }
+   },
+   {
+    "state": "UT",
+    "changes": {
+     "utc_adoption_year": 2004,
+     "note": "enacted 2004; legacy date = era confusion"
+    }
+   },
+   {
+    "state": "IA",
+    "changes": {
+     "note_added": "UTC-modeled independent code 633A; not ULC; duty to account 633A.4213"
+    }
+   },
+   {
+    "state": "GA",
+    "changes": {
+     "note_added": "GTC modeled on UTC, not ULC"
+    }
+   },
+   {
+    "state": "TX",
+    "changes": {
+     "note_added": "113.151 accounting-on-demand added to guide todo"
+    }
+   }
+  ]
+ }
+]

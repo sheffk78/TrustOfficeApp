@@ -224,7 +224,9 @@ async def test_readback_miss_flips_success_and_fires_alert(seeded, monkeypatch):
     created, but no record existed. The read-back flips success to false,
     sets error='record not found after write', and fires notify_alert.
     """
+    import asyncio as _asyncio
     import exec_hardening
+    exec_hardening._MISS_RECHECK_SECONDS = 1  # deterministic strike-2 pacing
 
     alerts = []
 
@@ -251,21 +253,83 @@ async def test_readback_miss_flips_success_and_fires_alert(seeded, monkeypatch):
         action_type="minutes_preview",
     )
 
+    # 2026-10-29 two-strike: strike-1 records the miss but does NOT page.
     assert out["success"] is False, "a missing record must NOT report success"
     assert out["error"] == "record not found after write"
     assert out["verified"] is False
     assert out["readback_missing_collection"] == "minutes_records"
     assert out["readback_missing_key"] == "minutes_ghost_123"
     assert out["readback_missing_at"], "the miss must be timestamped"
+    assert out["readback_recheck_pending"] is True, "strike-1 must defer the alert"
+    assert alerts == [], "NO alert on strike-1 — a transient miss must not page"
 
-    assert len(alerts) == 1, "exactly one alert must fire on a read-back miss"
+    # Strike 2: the recheck task paces on _MISS_RECHECK_SECONDS (1s in test).
+    await _asyncio.sleep(1.6)
+
+    assert len(alerts) == 1, "exactly ONE alert after strike-2 confirm"
     alert = alerts[0]
     assert "read-back MISS" in alert["title"]
+    assert "confirmed" in alert["title"]
     assert "minutes_preview" in alert["message"]
     assert "user_test_harden" in alert["message"]
     assert "minutes_ghost_123" in alert["message"]
-    assert alert["message"].count("timestamp:") == 1
+    assert "confirmed:" in alert["message"]
     assert alert["ping_kit"] is True, "the alert must be loud"
+
+
+@pytest.mark.asyncio
+async def test_readback_transient_miss_recovers_without_alert(seeded, monkeypatch):
+    """A record that appears within the recheck window repairs the result.
+
+    The deploy-restart churn false-paged twice at 01:30Z 2026-10-29: the
+    write lagged its own read-back. Two-strike: strike-2 finds the record,
+    the result flips back to success+verified, NO Discord page.
+    """
+    import asyncio
+    import exec_hardening
+    exec_hardening._MISS_RECHECK_SECONDS = 1
+
+    alerts = []
+
+    async def _fake_notify_alert(title, message, color=0, ping_kit=False):
+        alerts.append({"title": title})
+        return {"ok": True}
+
+    import discord_service
+    monkeypatch.setattr(discord_service, "notify_alert", _fake_notify_alert)
+
+    result = {
+        "success": True,
+        "record_id": "minutes_late_landing",
+        "endpoint": "minutes",
+    }
+    out = await exec_hardening.verify_exec_write(
+        seeded,
+        endpoint_type="minutes",
+        result=result,
+        user_id="user_test_harden",
+        trust_id="trust_test_harden",
+        action_type="minutes_preview",
+    )
+    assert out["success"] is False
+    assert out["readback_recheck_pending"] is True
+
+    # The record lands late — inside the recheck window.
+    await asyncio.sleep(0.3)
+    await seeded.minutes_records.insert_one({
+        "minutes_id": "minutes_late_landing",
+        "user_id": "user_test_harden",
+        "trust_id": "trust_test_harden",
+        "status": "draft",
+    })
+
+    await asyncio.sleep(1.4)  # strike-2 recheck fires (1s pacing)
+
+    assert out["readback_recovered"] is True
+    assert out["success"] is True, "a late-landing record must repair success"
+    assert out["verified"] is True
+    assert "error" not in out
+    assert alerts == [], "a recovered miss must NEVER page"
 
 
 @pytest.mark.asyncio
