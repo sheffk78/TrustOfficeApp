@@ -493,7 +493,7 @@ async def test_welcome_dedupe_postmark_fallback_when_mailercloud_fails(runner, d
 # We load the real module fresh and out-of-band to lock the contract.
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_real_notify_pipeline_alert_accepts_alert_level_kw():
+async def test_real_notify_pipeline_alert_accepts_alert_level_kw(monkeypatch):
     import importlib.util
     import os
 
@@ -502,7 +502,25 @@ async def test_real_notify_pipeline_alert_accepts_alert_level_kw():
     real_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(real_mod)
 
-    # No webhook configured in the test env -> returns gracefully, no network.
+    # 2026-10-29 incident gate: this test loads the REAL module OUT-OF-BAND,
+    # so conftest's env scrub cannot be relied on (module-level webhook
+    # resolution ran at exec_module time). The contract under test is the
+    # SIGNATURE, not delivery — force the "no webhook configured" branch and
+    # capture the dropped call explicitly. A lane that runs the suite with
+    # Railway parity env vars set must NEVER page Kenneth with test data again
+    # (7 fake "RED eligible=12 sends=0" pages went to the live channel).
+    captured: list[dict] = []
+
+    async def _capture_send(webhook_url, *a, **k):
+        captured.append({"webhook_url": webhook_url})
+        return {"success": False, "dropped": True}
+
+    monkeypatch.setattr(real_mod, "DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL", None)
+    monkeypatch.setattr(real_mod, "DISCORD_ALERTS_WEBHOOK_URL", None)
+    monkeypatch.setattr(real_mod, "DISCORD_ALERT_FALLBACK_WEBHOOK_URL", None)
+    monkeypatch.setattr(real_mod, "send_discord_message", _capture_send)
+
+    # No webhook configured -> returns gracefully, no network.
     res = await real_mod.notify_pipeline_alert(
         title="Lead pipeline health check FAILED (RED)",
         message="nurture throughput floor missed",
@@ -510,6 +528,12 @@ async def test_real_notify_pipeline_alert_accepts_alert_level_kw():
         alert_level="red",
     )
     assert isinstance(res, dict)
+    assert res.get("dropped") is True, (
+        "with all webhooks unset the real module must report the alert as dropped"
+    )
+    assert captured == [], (
+        "real notify_pipeline_alert attempted a Discord POST in a test env"
+    )
     # And calling without alert_level must still work (backward compatible).
     res2 = await real_mod.notify_pipeline_alert(title="t", message="m")
     assert isinstance(res2, dict)

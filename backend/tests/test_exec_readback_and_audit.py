@@ -178,6 +178,38 @@ def _patch_motor():
         yield client
 
 
+# 2026-10-29 incident gate (autouse seal): several tests here deliberately drive
+# the read-back MISS / removal-verification failure paths, and prod calls
+# notify_alert (late import) on each miss. Tests that assert alert payloads
+# stub notify_alert themselves; tests that DON'T previously let the real one
+# through — which paged the live #trustoffice-main channel 7 times overnight
+# (user_test_harden / dist_still_here fixtures) when the lane ran the suite
+# with Railway parity webhook env vars set. Both Discord entry points are now
+# sealed for the whole module; teardown fails any test that touched delivery.
+@pytest.fixture(autouse=True)
+def _seal_discord(monkeypatch):
+    import discord_service
+
+    delivered: list[dict] = []
+
+    async def _capture_alert(*a, **k):
+        return {"ok": True, "captured": True}
+
+    async def _capture_deliver(*a, **k):
+        delivered.append({"args": a, "kwargs": k})
+        raise AssertionError(
+            "unit test attempted REAL Discord delivery via send_discord_message"
+        )
+
+    monkeypatch.setattr(discord_service, "notify_alert", _capture_alert)
+    monkeypatch.setattr(discord_service, "send_discord_message", _capture_deliver)
+    yield
+    assert not delivered, (
+        f"{len(delivered)} Discord delivery attempt(s) leaked out of this test: "
+        f"{delivered[0].get('kwargs', {}) or delivered[0].get('args')}"
+    )
+
+
 @pytest.fixture
 def seeded(_patch_motor):
     """A seeded in-memory DB with a user, a trust and a subscription."""

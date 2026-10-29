@@ -101,3 +101,32 @@ def pytest_collection_modifyitems(config, items):
         ),
         returncode=3,
     )
+
+
+# ---------------------------------------------------------------------------
+# Test-environment Discord scrub (2026-10-29 incident gate).
+#
+# The 2026-10-29 overnight storm paged Kenneth with FAKE alerts from unit
+# tests: test_lead_pipeline_fixes.py ran the REAL discord_service
+# notify_pipeline_alert via importlib (title "Lead pipeline health check
+# FAILED (RED)", details eligible=12/sends=0) and the exec_readback suite
+# fired 7 real "removal read-back MISS" pages (user_test_harden /
+# dist_still_here) — both because the lane running the suite had Railway
+# parity webhook env vars set, so discord_service's "unconfigured → drop"
+# branch never triggered.
+#
+# Gate: unit-test collection MUST start with every Discord webhook var
+# unset. Any suite that genuinely needs a webhook URL monkeypatches one;
+# nothing may inherit the host's real webhooks into a test process.
+# ---------------------------------------------------------------------------
+_DISCORD_WEBHOOK_ENV_VARS = (
+    "DISCORD_ALERTS_WEBHOOK_URL",
+    "DISCORD_TRUSTOFFICE_MAIN_WEBHOOK_URL",
+    "DISCORD_ALERT_FALLBACK_WEBHOOK_URL",
+    "DISCORD_LEADS_WEBHOOK_URL",
+)
+
+
+def pytest_configure(config):
+    for _var in _DISCORD_WEBHOOK_ENV_VARS:
+        os.environ.pop(_var, None)
