@@ -45,6 +45,12 @@ STRIPE_ADVISOR_MONTHLY_PRICE_ID = os.environ.get('STRIPE_ADVISOR_MONTHLY_PRICE_I
 STRIPE_ADVISOR_ANNUAL_PRICE_ID = os.environ.get('STRIPE_ADVISOR_ANNUAL_PRICE_ID')
 STRIPE_WINGPOINT_ANNUAL_PRICE_ID = os.environ.get('STRIPE_WINGPOINT_ANNUAL_PRICE_ID')
 STRIPE_WINGPOINT_MONTHLY_PRICE_ID = os.environ.get('STRIPE_WINGPOINT_MONTHLY_PRICE_ID')
+# WingPoint gated-discount tier (commit 5049499) — these two definitions were
+# missing, NameError-ing the module import at Docker build (import-check RUN
+# step) and failing every deploy after 2026-10-28T18:03Z. Price IDs are staged
+# on Railway separately per the same commit's plan.
+STRIPE_WPTRUSTEE_MONTHLY_PRICE_ID = os.environ.get('STRIPE_WPTRUSTEE_MONTHLY_PRICE_ID')
+STRIPE_WPTRUSTEE_ANNUAL_PRICE_ID = os.environ.get('STRIPE_WPTRUSTEE_ANNUAL_PRICE_ID')
 
 # Price ID lookup: (plan_type, billing_period) -> stripe_price_id
 PRICE_IDS = {
