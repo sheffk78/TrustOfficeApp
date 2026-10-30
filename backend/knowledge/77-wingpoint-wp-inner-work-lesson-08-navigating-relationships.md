@@ -1,3 +1,8 @@
+---
+title: Lesson 8: The People Around You — Navigating Relationships After the Shift
+audiences: ['wingpoint']
+---
+
 # Lesson 8: The People Around You — Navigating Relationships After the Shift
 
 **Course:** Inner Work — The Enemy Construct  

@@ -1,3 +1,8 @@
+---
+title: First Time in the Trust — The Questions People Ask When Getting Into an Ecclesiastical Trust
+audiences: ['wingpoint']
+---
+
 # First Time in the Trust — The Questions People Ask When Getting Into an Ecclesiastical Trust
 
 **WingPoint · Draft for review · August 21, 2026**

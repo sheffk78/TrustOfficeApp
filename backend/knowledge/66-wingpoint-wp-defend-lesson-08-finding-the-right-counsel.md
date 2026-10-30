@@ -1,3 +1,8 @@
+---
+title: Lesson 8: When You Need Help — Finding the Right Counsel
+audiences: ['wingpoint']
+---
+
 # Lesson 8: When You Need Help — Finding the Right Counsel
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

@@ -1,3 +1,8 @@
+---
+title: Lesson 3: The Withholding Illusion
+audiences: ['wingpoint']
+---
+
 # Lesson 3: The Withholding Illusion
 
 **Course:** WP-TAX-101 — The Tax Question  

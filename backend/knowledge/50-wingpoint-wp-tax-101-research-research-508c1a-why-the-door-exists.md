@@ -1,3 +1,8 @@
+---
+title: Research Briefing: Why 508(c)(1)(a) Exists — The Constitutional and Legal Foundation
+audiences: ['wingpoint']
+---
+
 # Research Briefing: Why 508(c)(1)(a) Exists — The Constitutional and Legal Foundation
 
 **Purpose:** Answer the question "Why did the IRS provide this exemption? Why couldn't they close the door?" for potential integration into Lesson 8 or as a supplementary resource.

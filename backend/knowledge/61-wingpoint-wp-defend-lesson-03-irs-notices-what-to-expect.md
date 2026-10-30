@@ -1,3 +1,8 @@
+---
+title: Lesson 3: IRS Notices — What to Expect and How to Handle Them
+audiences: ['wingpoint']
+---
+
 # Lesson 3: IRS Notices — What to Expect and How to Handle Them
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

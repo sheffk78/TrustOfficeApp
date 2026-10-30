@@ -1,3 +1,8 @@
+---
+title: Inner Work – The Enemy Construct
+audiences: ['wingpoint']
+---
+
 # Inner Work – The Enemy Construct
 ### A WingPoint Course
 

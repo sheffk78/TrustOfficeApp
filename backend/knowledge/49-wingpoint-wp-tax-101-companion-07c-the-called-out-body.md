@@ -1,3 +1,8 @@
+---
+title: The Called-Out Body: What an Ecclesiastical Organization Actually Is
+audiences: ['wingpoint']
+---
+
 # The Called-Out Body: What an Ecclesiastical Organization Actually Is
 
 **WingPoint · WP-TAX-101 companion lesson · Draft 7 (intro revision) for Jeff review**

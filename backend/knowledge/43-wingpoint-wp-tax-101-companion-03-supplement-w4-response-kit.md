@@ -1,3 +1,8 @@
+---
+title: W-4 Response Kit — Supplemental Materials for Lesson 3
+audiences: ['wingpoint']
+---
+
 # W-4 Response Kit — Supplemental Materials for Lesson 3
 
 **Course:** WP-TAX-101 — The Tax Question  

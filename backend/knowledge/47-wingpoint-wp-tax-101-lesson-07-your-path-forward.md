@@ -1,3 +1,8 @@
+---
+title: Lesson 7: Standing Firm — Handling Challenges to Your 508(c)(1)(a) Status
+audiences: ['wingpoint']
+---
+
 # Lesson 7: Standing Firm — Handling Challenges to Your 508(c)(1)(a) Status
 
 **Course:** WP-TAX-101 — The Tax Question  

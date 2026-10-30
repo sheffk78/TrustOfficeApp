@@ -1,3 +1,8 @@
+---
+title: Lesson 2: Your Power Position — Why the Law Is on Your Side
+audiences: ['wingpoint']
+---
+
 # Lesson 2: Your Power Position — Why the Law Is on Your Side
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

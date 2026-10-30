@@ -1,3 +1,8 @@
+---
+title: Lesson 1: Why Challenges Come and What They Really Mean
+audiences: ['wingpoint']
+---
+
 # Lesson 1: Why Challenges Come and What They Really Mean
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

@@ -1,3 +1,8 @@
+---
+title: Lesson 4: Who the Law Actually Addresses
+audiences: ['wingpoint']
+---
+
 # Lesson 4: Who the Law Actually Addresses
 
 **Course:** WP-TAX-101 — The Tax Question  

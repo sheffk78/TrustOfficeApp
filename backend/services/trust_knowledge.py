@@ -592,7 +592,7 @@ def retrieve_passages(
         rows = con.execute(
             """
             SELECT p.passage_id, p.document_id, p.doc_title, p.section, p.text,
-                   p.source_ref, bm25(fts_passages, 0.0, 0.0, 3.0, 2.0, 1.0) AS rank
+                   p.source_ref, p.audience, bm25(fts_passages, 0.0, 0.0, 3.0, 2.0, 1.0) AS rank
               FROM fts_passages f
               JOIN passages p ON p.passage_id = f.passage_id
              WHERE fts_passages MATCH ?

@@ -1,3 +1,8 @@
+---
+title: Lesson 4: When They Push Back — Escalation, Your Rights, and Making the IRS Prove Its Position
+audiences: ['wingpoint']
+---
+
 # Lesson 4: When They Push Back — Escalation, Your Rights, and Making the IRS Prove Its Position
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

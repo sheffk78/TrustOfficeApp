@@ -1,3 +1,8 @@
+---
+title: Lesson 9: Court Cases and Precedent — What Has Actually Been Tested
+audiences: ['wingpoint']
+---
+
 # Lesson 9: Court Cases and Precedent — What Has Actually Been Tested
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

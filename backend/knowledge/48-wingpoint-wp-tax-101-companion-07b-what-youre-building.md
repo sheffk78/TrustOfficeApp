@@ -1,3 +1,8 @@
+---
+title: Lesson 7b: First Time in the Trust — What You're Actually Building
+audiences: ['wingpoint']
+---
+
 # Lesson 7b: First Time in the Trust — What You're Actually Building
 
 **Course:** WP-TAX-101 — The Tax Question

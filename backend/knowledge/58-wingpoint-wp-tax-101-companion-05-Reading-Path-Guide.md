@@ -1,3 +1,8 @@
+---
+title: WP-TAX-101 — Reading Path Guide
+audiences: ['wingpoint']
+---
+
 # WP-TAX-101 — Reading Path Guide
 
 **WingPoint Course Companion | Version 1.0 | April 2026**

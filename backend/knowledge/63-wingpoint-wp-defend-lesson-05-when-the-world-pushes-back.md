@@ -1,3 +1,8 @@
+---
+title: Lesson 5: When the World Pushes Back — Standing as a Trustee
+audiences: ['wingpoint']
+---
+
 # Lesson 5: When the World Pushes Back — Standing as a Trustee
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

@@ -1,3 +1,8 @@
+---
+title: Lesson 5: The Consent Problem Starts Inside
+audiences: ['wingpoint']
+---
+
 # Lesson 5: The Consent Problem Starts Inside
 
 **Course:** Inner Work — The Enemy Construct  

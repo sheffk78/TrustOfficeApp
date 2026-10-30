@@ -1,3 +1,8 @@
+---
+title: Lesson 2: The Constitutional Question
+audiences: ['wingpoint']
+---
+
 # Lesson 2: The Constitutional Question
 
 **Course:** WP-TAX-101 — The Tax Question  

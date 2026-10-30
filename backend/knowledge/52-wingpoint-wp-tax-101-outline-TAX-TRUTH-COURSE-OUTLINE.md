@@ -1,3 +1,8 @@
+---
+title: Course Outline — The Tax Question: What You Were Never Told
+audiences: ['wingpoint']
+---
+
 # Course Outline — The Tax Question: What You Were Never Told
 
 **Brand:** WingPoint  

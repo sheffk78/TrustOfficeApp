@@ -1,3 +1,8 @@
+---
+title: Lesson 10: The Quiet Confidence of Clean Hands
+audiences: ['wingpoint']
+---
+
 # Lesson 10: The Quiet Confidence of Clean Hands
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

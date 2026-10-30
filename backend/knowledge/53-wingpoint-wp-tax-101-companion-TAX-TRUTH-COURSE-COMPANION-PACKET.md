@@ -1,3 +1,8 @@
+---
+title: Course Companion Packet — The Tax Question: What You Were Never Told
+audiences: ['wingpoint']
+---
+
 # Course Companion Packet — The Tax Question: What You Were Never Told
 
 **Brand:** WingPoint  

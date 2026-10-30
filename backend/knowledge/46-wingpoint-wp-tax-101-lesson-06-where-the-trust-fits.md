@@ -1,3 +1,8 @@
+---
+title: Lesson 6: Where the Trust Fits — 508(c)(1)(a) and the Church Question
+audiences: ['wingpoint']
+---
+
 # Lesson 6: Where the Trust Fits — 508(c)(1)(a) and the Church Question
 
 **Course:** WP-TAX-101 — The Tax Question  

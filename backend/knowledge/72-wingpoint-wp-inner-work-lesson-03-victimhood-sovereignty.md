@@ -1,3 +1,8 @@
+---
+title: Lesson 3: Victimhood and Sovereignty Cannot Coexist
+audiences: ['wingpoint']
+---
+
 # Lesson 3: Victimhood and Sovereignty Cannot Coexist
 
 **Course:** Inner Work — The Enemy Construct  

@@ -1,3 +1,8 @@
+---
+title: WP-TAX-101 — Key Cases & Statutes Reference Card
+audiences: ['wingpoint']
+---
+
 # WP-TAX-101 — Key Cases & Statutes Reference Card
 
 **WingPoint Course Companion | Version 1.0 | April 2026**

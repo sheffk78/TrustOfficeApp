@@ -1,3 +1,8 @@
+---
+title: Lesson 7: Your Records Are Your Defense
+audiences: ['wingpoint']
+---
+
 # Lesson 7: Your Records Are Your Defense
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

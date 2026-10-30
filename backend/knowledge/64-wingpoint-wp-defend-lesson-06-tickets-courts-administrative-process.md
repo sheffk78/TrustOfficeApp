@@ -1,3 +1,8 @@
+---
+title: Lesson 6: Tickets, Courts, and the Administrative Process
+audiences: ['wingpoint']
+---
+
 # Lesson 6: Tickets, Courts, and the Administrative Process
 
 **Course:** WP-DEFEND — Standing Strong: Defending Your Trust and Your Position  

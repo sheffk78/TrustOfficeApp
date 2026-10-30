@@ -1,3 +1,8 @@
+---
+title: Lesson 7: Standing — Who You Are When No One Is Watching
+audiences: ['wingpoint']
+---
+
 # Lesson 7: Standing — Who You Are When No One Is Watching
 
 **Course:** Inner Work — The Enemy Construct  

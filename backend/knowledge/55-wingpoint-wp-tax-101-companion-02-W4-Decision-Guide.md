@@ -1,3 +1,8 @@
+---
+title: WP-TAX-101 — W-4 Decision Guide
+audiences: ['wingpoint']
+---
+
 # WP-TAX-101 — W-4 Decision Guide
 
 **WingPoint Course Companion | Version 1.0 | April 2026**

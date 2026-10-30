@@ -1,3 +1,8 @@
+---
+title: Lesson 1: What You Were Never Told
+audiences: ['wingpoint']
+---
+
 # Lesson 1: What You Were Never Told
 
 **Course:** WP-TAX-101 — The Tax Question  

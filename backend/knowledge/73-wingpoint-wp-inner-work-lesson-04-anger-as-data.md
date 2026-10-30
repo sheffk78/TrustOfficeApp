@@ -1,3 +1,8 @@
+---
+title: Lesson 4: Anger as Data, Not Fuel
+audiences: ['wingpoint']
+---
+
 # Lesson 4: Anger as Data, Not Fuel
 
 **Course:** Inner Work — The Enemy Construct  

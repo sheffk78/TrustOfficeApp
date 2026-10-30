@@ -1,3 +1,8 @@
+---
+title: Course: Standing Strong: Defending Your Trust and Your Position
+audiences: ['wingpoint']
+---
+
 # Course: Standing Strong: Defending Your Trust and Your Position
 **Detailed Lesson Outline — 8 Lessons**
 

@@ -1,3 +1,8 @@
+---
+title: Lesson 5: Correcting the Record — W-2s, 1099s, K-1s, and Your Return
+audiences: ['wingpoint']
+---
+
 # Lesson 5: Correcting the Record — W-2s, 1099s, K-1s, and Your Return
 
 **Course:** WP-TAX-101 — The Tax Question  

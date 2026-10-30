@@ -1,3 +1,8 @@
+---
+title: Lesson 2: Clean Hands — What Equity Actually Requires of You
+audiences: ['wingpoint']
+---
+
 # Lesson 2: Clean Hands — What Equity Actually Requires of You
 
 **Course:** Inner Work — The Enemy Construct  

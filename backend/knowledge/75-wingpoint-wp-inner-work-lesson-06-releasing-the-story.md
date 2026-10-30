@@ -1,3 +1,8 @@
+---
+title: Lesson 6: Releasing the Story — From Identity to Posture
+audiences: ['wingpoint']
+---
+
 # Lesson 6: Releasing the Story — From Identity to Posture
 
 **Course:** Inner Work — The Enemy Construct  

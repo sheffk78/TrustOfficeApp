@@ -1,3 +1,8 @@
+---
+title: Lesson 1: The Construct Itself — What Is an "Enemy" and Why You Built One
+audiences: ['wingpoint']
+---
+
 # Lesson 1: The Construct Itself — What Is an "Enemy" and Why You Built One
 
 **Course:** Inner Work — The Enemy Construct  
