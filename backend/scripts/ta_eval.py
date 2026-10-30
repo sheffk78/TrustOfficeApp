@@ -3,9 +3,10 @@
 TA Evaluation Harness — measures intent classification and extraction accuracy.
 
 Usage:
-  python backend/scripts/ta_eval.py
+  python backend/scripts/ta_eval.py                 # intent/extraction mode (live API + LLM)
+  python backend/scripts/ta_eval.py --mode knowledge  # knowledge golden-set mode (deterministic)
 
-Requires:
+Requires (intent mode only):
   - .env with TEST_EMAIL and TEST_PASSWORD for the demo account
   - Backend running or accessible at API_BASE
 
@@ -17,11 +18,19 @@ What it does:
      c. Compares against expected values
   3. Reports: pass/fail per test, overall accuracy, field-level extraction rates
   4. Saves detailed results to ta_eval_results.json
+
+KNOWLEDGE MODE (--mode knowledge, 2026-10-30 Phase A-2):
+  Deterministic, NO LLM and NO login: runs the 40-question golden set
+  (ta_golden_knowledge.GOLDEN_SET) against services.trust_knowledge.retrieve_passages()
+  and asserts (a) expected source lands top-2, (b) key facts present in top-4 passages,
+  (c) wingpoint-tier isolation (fail-closed) for granted questions. This is the
+  pre-merge gate for any prompts/*.md or retrieval-scoring change (council spec 2026-10-30).
 """
 
 import os
 import sys
 import json
+import re
 import asyncio
 from datetime import datetime
 
@@ -298,5 +307,219 @@ async def run_eval():
         return overall
 
 
+# ═══════════════════════════════════════════════════════════════════
+# KNOWLEDGE MODE — deterministic golden-set eval (Phase A-2, 2026-10-30)
+# ═══════════════════════════════════════════════════════════════════
+
+def run_knowledge_eval() -> int:
+    """Run the 40-question golden set against the PRODUCTION knowledge surface.
+
+    Deterministic: no LLM, no login, no network. Returns 0 iff every check passes.
+
+    What is measured — exactly what a member's chat prompt receives:
+      - the prompt knowledge slice: chat_service._format_knowledge_context(
+        user_message, intent="ask_knowledge", audiences=grant)
+      - the retrieval block: trust_retrieval.fetch_doctrine(message,
+        allowed_audiences=grant) — production defaults (limit=6, max_chars=3600),
+        trigger-gated exactly as in prod.
+
+    Per question (scripts/ta_golden_knowledge.py):
+      - source hit (top-2): one of expected_sources appears among the first two
+        topic blocks / retrieved sources of that union
+      - key facts: every phrase present verbatim (case-insensitive) in the union
+        text of the two surfaces (what the LLM would actually see)
+      - isolation: for wingpoint-tier questions, the same message with an EMPTY
+        grant must contain ZERO wingpoint-tier sources on either surface
+      - education_not_advice: course/education questions must not be topped by a
+        product doc (12/13/14/15-*) among the first two surfaces
+    """
+    from scripts.ta_golden_knowledge import GOLDEN_SET
+
+    backend_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    os.chdir(backend_root)
+    if backend_root not in sys.path:
+        sys.path.insert(0, backend_root)
+    os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
+    os.environ.setdefault("DB_NAME", "ta_golden_eval")
+    os.environ.setdefault("JWT_SECRET", "ta-golden-eval")
+
+    import importlib
+    import chat_service as cs
+    import trust_retrieval as tr
+    importlib.reload(cs)  # pick up the real corpus AFTER chdir (cache safety)
+    importlib.reload(tr)
+
+    # Ensure the FTS index exists so fetch_doctrine's ensure_index() hits the
+    # same built index the intent mode verifies.
+    from services import trust_knowledge
+    db_path = trust_knowledge.default_db_path()
+    if not os.path.exists(db_path):
+        build = trust_knowledge.build_index(
+            trust_knowledge.default_registry_path(),
+            trust_knowledge.default_knowledge_dir(),
+            db_path,
+        )
+        print(f"(built index: {build['documents']} docs / {build['passages']} passages)")
+
+    print(f"\n{'=' * 60}")
+    print(f"TA Knowledge Golden Set — {datetime.now().isoformat()}")
+    print(f"{'=' * 60}")
+    print(f"Surface: prompt knowledge slice + fetch_doctrine (production path)")
+    print(f"Index:   {db_path}")
+    print(f"Questions: {len(GOLDEN_SET)}")
+    print(f"{'=' * 60}\n")
+
+    results = []
+    n_pass = 0
+    n_fail = 0
+    for g in GOLDEN_SET:
+        gid = g["id"]
+        aud = g.get("audience") or ""
+        grant = [aud] if isinstance(aud, str) and aud else list(aud)
+
+        # Surface 1 — the prompt knowledge slice (member-facing prompt).
+        try:
+            slice_text = cs._format_knowledge_context(
+                user_message=g["query"], intent="ask_knowledge", audiences=grant
+            )
+        except Exception as e:
+            slice_text = f"(slice error: {e})"
+
+        # Surface 2 — the doctrine retrieval block (trigger-gated in prod).
+        try:
+            doctrine = tr.fetch_doctrine(g["query"], allowed_audiences=grant) or []
+        except Exception as e:
+            doctrine = []
+        doctrine_sources = [p.get("source_ref") or "" for p in doctrine]
+
+        # Union sources: slice topic headers first, then doctrine source refs.
+        # WP-granted topics render as `wingpoint/<stem>` — strip the prefix
+        # so the stem comparison is uniform across universals and tiered.
+        slice_topics = [
+            t.split("/", 1)[-1]
+            for t in re.findall(r"(?m)^### (?:wingpoint/)?([0-9][^\n]*)", slice_text or "")
+        ]
+        union_sources = slice_topics + doctrine_sources
+        union_text = (slice_text or "") + "\n" + " ".join(
+            (p.get("text") or "") for p in doctrine
+        )
+        union_lower = union_text.lower()
+
+        checks = {}
+
+        # 1. expected source among the first two surfaced sources. Golden
+        # expected_sources are FILENAMES ("24-utc-02-trustee-duties.md"); the
+        # prompt slice emits STEM headers ("24-utc-02-trustee-duties — Loyalty").
+        # Compare on the stem so the check tests retrieval, not formatting.
+        def _stem_of(src: str) -> str:
+            base = os.path.basename((src or "").split(" — ")[0].strip())
+            return base[:-3] if base.endswith(".md") else base
+
+        expected_stems = [os.path.basename(e)[:-3] if e.endswith(".md") else e
+                          for e in g["expected_sources"]]
+        checks["source_top2"] = any(
+            exp in _stem_of(s) for exp in expected_stems for s in union_sources[:2]
+        )
+
+        # 2. key facts verbatim in the union text the model would see
+        missing = [k for k in g.get("key_facts", []) if k.lower() not in union_lower]
+        checks["key_facts"] = not missing
+
+        # 3. isolation — same message, empty grant, no WP-tier content anywhere
+        if g.get("forbidden_for_no_grant"):
+            try:
+                ng_slice = cs._format_knowledge_context(
+                    user_message=g["query"], intent="ask_knowledge", audiences=[]
+                )
+            except Exception:
+                ng_slice = ""
+            try:
+                ng_doctrine = tr.fetch_doctrine(g["query"], allowed_audiences=[]) or []
+            except Exception:
+                ng_doctrine = []
+            leak = (
+                "wingpoint" in (ng_slice or "").lower()
+                or any("wingpoint" in (p.get("source_ref") or "").lower() for p in ng_doctrine)
+            )
+            checks["isolation_fail_closed"] = not leak
+        else:
+            checks["isolation_fail_closed"] = True  # universal question, N/A
+
+        # 4. education_not_advice — product docs must not top course questions
+        if g.get("education_not_advice"):
+            top = union_sources[0] if union_sources else ""
+            checks["education_not_advice"] = not re.match(
+                r"^(12|13|14|15)-", os.path.basename(top or "")
+            )
+        else:
+            checks["education_not_advice"] = True  # N/A
+
+        passed = all(checks.values())
+        n_pass += passed
+        n_fail += (not passed)
+
+        mark = "✅" if passed else "❌"
+        print(f"  [{gid}] {mark} {g['query'][:58]}")
+        if not passed:
+            for name, ok in checks.items():
+                if not ok:
+                    if name == "source_top2":
+                        print(f"      source_top2: expected any-of {[os.path.basename(x) for x in g['expected_sources']]} | got {union_sources[:2]}")
+                    elif name == "key_facts":
+                        print(f"      key_facts missing: {missing}")
+                    elif name == "isolation_fail_closed":
+                        print(f"      ISOLATION LEAK: empty-grant surface contains wingpoint material")
+                    elif name == "education_not_advice":
+                        print(f"      education_not_advice: product doc topped the course question: {union_sources[0]}")
+
+        results.append({
+            "id": gid,
+            "category": g["category"],
+            "query": g["query"],
+            "audience": grant,
+            "union_sources": union_sources[:6],
+            "doctrine_triggered": bool(doctrine),
+            "checks": checks,
+            "missing_key_facts": missing,
+            "passed": passed,
+        })
+
+    total = len(GOLDEN_SET)
+    print(f"\n{'=' * 60}")
+    print(f"RESULTS")
+    print(f"{'=' * 60}")
+    print(f"  Total golden questions: {total}")
+    print(f"  Passed:                 {n_pass}")
+    print(f"  Failed:                 {n_fail}")
+    print(f"  Accuracy:               {n_pass / total * 100:.1f}%")
+    tri = sum(1 for r in results if r["doctrine_triggered"])
+    print(f"  Doctrine-triggered:     {tri}/{total}")
+    print(f"{'=' * 60}\n")
+
+    output = {
+        "timestamp": datetime.now().isoformat(),
+        "mode": "knowledge",
+        "surface": "prompt_slice+fetch_doctrine",
+        "total": total,
+        "passed": n_pass,
+        "failed": n_fail,
+        "accuracy_pct": round(n_pass / total * 100, 1),
+        "results": results,
+    }
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ta_golden_results.json")
+    with open(out_path, "w") as f:
+        json.dump(output, f, indent=2, default=str)
+    print(f"Detailed results saved to: {out_path}")
+
+    return 0 if n_fail == 0 else 1
+
+
 if __name__ == "__main__":
+    import argparse
+    _parser = argparse.ArgumentParser(description="TA evaluation harness")
+    _parser.add_argument("--mode", choices=["intent", "knowledge"], default="intent",
+                         help="intent = live API intent/extraction eval; knowledge = deterministic golden-set eval")
+    _args = _parser.parse_args()
+    if _args.mode == "knowledge":
+        sys.exit(run_knowledge_eval())
     asyncio.run(run_eval())

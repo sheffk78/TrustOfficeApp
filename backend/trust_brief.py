@@ -186,6 +186,26 @@ def _render_jurisdiction(trust: dict, sc: dict) -> list[str]:
     return lines
 
 
+def _render_plan_persona(persona: dict) -> list[str]:
+    """Render the Plan section for the Trust Brief (Phase B #4, 2026-10-30).
+
+    One or two lines — it tells the AI which voice frame to use, it does not
+    change capability. WP members get the education frame with an execution
+    reminder (their plans DO write); everyone else is execution-forward.
+    """
+    if not isinstance(persona, dict) or not persona:
+        return []
+    if persona.get("is_wingpoint"):
+        return [
+            "Member plan: WingPoint (education-framed).",
+            "Frame: teach while executing — connect the action to the WingPoint course doctrine it came from, then do it. WingPoint members' plans DO execute writes; never tell them their plan is read-only.",
+        ]
+    return [
+        "Member plan: Trustee (execution-forward).",
+        "Frame: get the task done — prepare the action card, cite the trust's own provisions, keep doctrine notes brief.",
+    ]
+
+
 def _render_identity(trust: dict, td: dict) -> list[str]:
     lines = [
         f"Trust: {trust.get('name', 'Unknown')}",
@@ -353,6 +373,12 @@ def build_trust_brief(ctx: dict) -> dict:
     jurisdiction = _render_jurisdiction(trust, ctx.get("state_compliance", {}) or {})
     if jurisdiction:
         core_parts.append(("Jurisdiction", jurisdiction, -1))
+
+    # Plan persona (Phase B #4, 2026-10-30): which voice frame the AI uses for
+    # THIS member. Priority 5 — it sheds before Beneficiaries/Deadlines do.
+    persona = _render_plan_persona(ctx.get("plan_persona", {}) or {})
+    if persona:
+        core_parts.append(("Plan", persona, 5))
 
     bens = _render_beneficiaries(ctx.get("beneficiaries", []) or [],
                                  ctx.get("class_beneficiaries", []) or [])

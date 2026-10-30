@@ -1,0 +1,977 @@
+{
+  "timestamp": "2026-10-30T16:42:50.764347",
+  "mode": "knowledge",
+  "surface": "prompt_slice+fetch_doctrine",
+  "total": 40,
+  "passed": 22,
+  "failed": 18,
+  "accuracy_pct": 55.0,
+  "results": [
+    {
+      "id": "utc-01",
+      "category": "utc_doctrine",
+      "query": "What must exist for a settlor to create a trust under the Uniform Trust Code?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "18-state-compliance-utah \u2014 Beneficiary Notice Requirements",
+        "24-utc-05-amendments-revocation \u2014 The irrevocable trust: what the Code itself provides",
+        "17-blind-trust \u2014 Key Governance Requirements",
+        "24-utc-01-definitions-scope.md",
+        "24-utc-01-definitions-scope.md",
+        "24-utc-01-definitions-scope.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": false,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": false
+    },
+    {
+      "id": "utc-02",
+      "category": "utc_doctrine",
+      "query": "What does the duty of loyalty mean for a trustee?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "03-trustee-duties \u2014 Duty of Loyalty",
+        "24-utc-02-trustee-duties \u2014 Loyalty",
+        "11-video-library \u2014 Lesson 2: Your Fiduciary Duties"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "reasonable care, skill, and caution"
+      ],
+      "passed": false
+    },
+    {
+      "id": "utc-03",
+      "category": "utc_doctrine",
+      "query": "How much discretion does a trustee have over distributions?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-03-distributions \u2014 The discretion is real, and it is also constrained",
+        "17-spendthrift-trust \u2014 Distribution Rules",
+        "07-distributions \u2014 HEMS Distributions",
+        "07-distributions \u2014 Discretionary Distributions",
+        "07-distributions.md",
+        "24-utc-03-distributions.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "utc-04",
+      "category": "utc_doctrine",
+      "query": "What reports must a trustee send to beneficiaries?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "12-trustoffice-features \u2014 Common User Questions & Where to Send Them",
+        "24-utc-04-accounting-reports \u2014 Informing and reporting",
+        "18-state-compliance-maine \u2014 Beneficiary Notice Requirements"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "duty to inform, the duty to account"
+      ],
+      "passed": false
+    },
+    {
+      "id": "utc-05",
+      "category": "utc_doctrine",
+      "query": "Does irrevocable mean the trust can never be changed or amended?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-05-amendments-revocation \u2014 What this means for a trustee",
+        "06-state-compliance \u2014 Notice of Changes",
+        "24-utc-05-amendments-revocation \u2014 What the amendment guidance already gets right",
+        "15-trustoffice-scenarios \u2014 Scenario: Trust Amendment or Modification",
+        "16-trust-amendments.md",
+        "24-utc-05-amendments-revocation.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "\"irrevocable\" is not the same as \"unchangeable\"",
+        "attorney question"
+      ],
+      "passed": false
+    },
+    {
+      "id": "utc-06",
+      "category": "utc_doctrine",
+      "query": "Who becomes the successor trustee when the current trustee resigns?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-09-notification-register \u2014 Phase 1 \u2014 On becoming trustee",
+        "24-utc-06-successor-trustees-vacancy \u2014 What this means for a trustee",
+        "24-utc-06-successor-trustees-vacancy \u2014 Becoming trustee: accepting, declining, and the duty that starts",
+        "16-trust-amendments \u2014 Scenario: Beneficiary Becoming Trustee (Conflict of Interest Resolution)",
+        "24-utc-06-successor-trustees-vacancy.md",
+        "24-utc-06-successor-trustees-vacancy.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "utc-07",
+      "category": "utc_doctrine",
+      "query": "Can a creditor reach trust assets when the trust has a spendthrift clause?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-03-distributions \u2014 Creditor reach on distributions",
+        "24-utc-07-creditors-protection \u2014 Section 502: what a spendthrift provision does",
+        "17-spendthrift-trust \u2014 What It Is",
+        "17-spendthrift-trust \u2014 Key Governance Requirements",
+        "24-utc-07-creditors-protection",
+        "17-spendthrift-trust.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "judgment creditor"
+      ],
+      "passed": false
+    },
+    {
+      "id": "utc-08",
+      "category": "utc_doctrine",
+      "query": "How do I properly close a trust and distribute the remaining property?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        " Final Distribution",
+        "24-utc-08-termination \u2014 Common question we get",
+        "11-video-library \u2014 Lesson 13: When and How to Distribute",
+        "17-minors-trust \u2014 Key Governance Requirements",
+        "24-utc-08-termination.md",
+        "24-utc-03-distributions.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "final report, expeditious delivery of the property, and a claim window"
+      ],
+      "passed": false
+    },
+    {
+      "id": "utc-09",
+      "category": "utc_doctrine",
+      "query": "What notices am I required to send as trustee, and by when?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "12-trustoffice-features \u2014 Common User Questions & Where to Send Them",
+        "06-state-compliance \u2014 Ongoing Notices",
+        "24-utc-01-definitions-scope \u2014 What this means for a trustee",
+        "29-trustee-101-trust-tax-calendar \u2014 How to use this calendar",
+        "29-trustee-101-trust-tax-calendar.md",
+        "24-utc-09-notification-register.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": false,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": false
+    },
+    {
+      "id": "law-01",
+      "category": "state_law",
+      "query": "Is trust law federal or state \u2014 what governs my trust?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "06-state-compliance \u2014 Why State Law Matters",
+        "24-utc-01-definitions-scope \u2014 Knowledge, governing law, and where the trust is run",
+        "18-state-compliance-idaho \u2014 State Income Tax on Trusts",
+        "24-utc-07-creditors-protection \u2014 What this means for a trustee"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "law-02",
+      "category": "state_law",
+      "query": "What does Utah law require for trust administration?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-01-definitions-scope \u2014 Knowledge, governing law, and where the trust is run",
+        "18-state-compliance-utah \u2014 Beneficiary Notice Requirements",
+        "18-state-compliance-utah \u2014 Key State-Specific Rules"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "t101-01",
+      "category": "trustee101",
+      "query": "What is the 4-question HEMS test before making a distribution?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "27-trustee-101-hems-decision-framework \u2014 & Quick Reference Card The 4-Question Test",
+        "07-distributions \u2014 HEMS Distributions",
+        "11-video-library \u2014 Lesson 4: HEMS Decoded",
+        "01-hems-standard \u2014 Why HEMS Matters",
+        "07-distributions \u2014 Common Pitfalls",
+        "01-hems-standard \u2014 What Is HEMS?"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "t101-02",
+      "category": "trustee101",
+      "query": "What is the commingling problem and how do I keep accounts separate?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "11-video-library \u2014 Lesson 5: The Commingling Trap",
+        "10-getting-started \u2014 Commingling Funds",
+        " Personal vs Trust Funds Confusion",
+        "18-benevolence-policy-requirements \u2014 5. Common Compliance Pitfalls",
+        "20-trust-lifecycle-stages \u2014 Stage 1: Initial Setup (First 90 Days)",
+        "28-trustee-101-separation-checklist.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": false,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": false
+    },
+    {
+      "id": "t101-03",
+      "category": "trustee101",
+      "query": "What minute templates are available for trust meetings?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "26-trustee-101-minute-templates \u2014 These five templates cover the most common trustee decisions that need documented minutes. Print them. Keep them with your trust documents. Use them every single time you make a decision. Each template follows the 5-Minute Minute system: Date the decision, what was decided, why it was decided, who was informed, sign it, file it. Five minutes. Four questions. Every time. These templates are for educational purposes. They are not a substitute for legal advice. For complex decisions, consult a qualified attorney. Templates Included:",
+        "26-trustee-101-minute-templates \u2014 Minute Templates",
+        "09-guided-minutes \u2014 What Types of Meetings It Covers",
+        "05-trust-minutes \u2014 Types of Trust Meetings",
+        "28-trustee-101-separation-checklist \u2014 Monthly Five Minute Check",
+        "13-trustoffice-workflows \u2014 Workflow: Run and Document Trustee Meetings"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "ratification"
+      ],
+      "passed": false
+    },
+    {
+      "id": "t101-04",
+      "category": "trustee101",
+      "query": "What is the prudent investor rule for trust investments?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "11-video-library \u2014 Lesson 7: Prudent Investor Rule",
+        "11-video-library \u2014 Lesson 11: The Prudent Investor Rule",
+        "20-trust-lifecycle-stages \u2014 Stage 2: Ongoing Administration (Years 2+)",
+        "18-state-compliance-pennsylvania \u2014 Key State-Specific Rules",
+        "30-trustee-101-investment-policy-statement.md",
+        "30-trustee-101-investment-policy-statement.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": false,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": false
+    },
+    {
+      "id": "prod-01",
+      "category": "product",
+      "query": "Why do trust meeting minutes matter \u2014 what do they prove?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "05-trust-minutes \u2014 Why Minutes Matter",
+        "11-video-library \u2014 Lesson 16: Meeting Minutes That Protect You",
+        "11-video-library \u2014 Lesson 3: Meeting Minutes Are Not Optional",
+        "15-trustoffice-scenarios \u2014 Scenario: Need to Prove a Decision Was Proper",
+        "13-trustoffice-workflows \u2014 \"How do I prove I made this decision properly?\"",
+        "12-trustoffice-features \u2014 Meeting Minutes"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "prod-02",
+      "category": "product",
+      "query": "How does Guided Minutes work?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "09-guided-minutes \u2014 How to Use Guided Minutes",
+        "09-guided-minutes \u2014 What Are Guided Minutes?",
+        "05-trust-minutes \u2014 Tips for Good Minutes",
+        "16-minutes-types-and-templates \u2014 Creating Minutes \u2014 Assistant Behavior",
+        "16-minutes-types-and-templates \u2014 How to Create Minutes in TrustOffice",
+        "05-trust-minutes \u2014 Why Minutes Matter"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "prod-03",
+      "category": "product",
+      "query": "What is the Defensibility Score?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "08-defensibility-score \u2014 What Is the Defensibility Score?",
+        "15-trustoffice-scenarios \u2014 Scenario: Low Defensibility Score",
+        "08-defensibility-score \u2014 What the Score Measures",
+        "12-trustoffice-features \u2014 Trust Health & Score",
+        "17-irrevocable-life-insurance-trust \u2014 How TrustOffice Helps",
+        "16-minutes-types-and-templates \u2014 Trust Data Available in Context"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "prod-04",
+      "category": "product",
+      "query": "What is a quarterly review and what does it cover?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "22-quarterly-review-guide \u2014 What a Quarterly Review Covers",
+        "24-utc-04-accounting-reports \u2014 The quarterly review, in statutory terms",
+        "22-quarterly-review-guide \u2014 TrustOffice Workflow for Quarterly Reviews",
+        "11-video-library \u2014 Lesson 17: Annual and Quarterly Reviews",
+        "16-minutes-types-and-templates \u2014 Mapping User Requests to Template Types"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "every three months to review the trust's financial status, beneficiary circumstances, and administrative compliance"
+      ],
+      "passed": false
+    },
+    {
+      "id": "prod-05",
+      "category": "product",
+      "query": "What beneficiary types and allocation modes does TrustOffice support?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "23-beneficiary-types-and-allocations \u2014 Overview",
+        "23-beneficiary-types-and-allocations \u2014 Total Allocation",
+        "16-minutes-types-and-templates \u2014 Mapping User Requests to Template Types"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "prod-06",
+      "category": "product",
+      "query": "How do I record a distribution in the app for education expenses?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "13-trustoffice-workflows \u2014 Workflow: Prepare and Document a Distribution",
+        "01-hems-standard \u2014 Education",
+        "12-trustoffice-features \u2014 Distributions",
+        "07-distributions \u2014 HEMS Distributions",
+        "13-trustoffice-workflows \u2014 Workflow: Track Trust Money Movement"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "type-01",
+      "category": "trust_types",
+      "query": "What is a spendthrift trust?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-07-creditors-protection \u2014 Section 502: what a spendthrift provision does",
+        "17-spendthrift-trust \u2014 Distribution Rules",
+        "24-utc-07-creditors-protection.md",
+        "17-spendthrift-trust.md",
+        "24-utc-07-creditors-protection.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "before those assets are actually distributed"
+      ],
+      "passed": false
+    },
+    {
+      "id": "type-02",
+      "category": "trust_types",
+      "query": "What is a special needs trust and how does it protect government benefits?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "17-special-needs-trust \u2014 What It Is",
+        "18-state-compliance-mississippi \u2014 Key State-Specific Rules",
+        "11-video-library \u2014 Lesson 16: Meeting Minutes That Protect You",
+        "24-utc-03-distributions \u2014 The discretion is real, and it is also constrained",
+        "17-special-needs-trust",
+        "24-utc-04-accounting-reports \u2014 Money damages, and the duties that produce them"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "type-03",
+      "category": "trust_types",
+      "query": "Can I amend or revoke a revocable living trust?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "24-utc-05-amendments-revocation \u2014 The revocable trust: settlor's power",
+        "17-revocable-living-trust \u2014 What It Is",
+        "24-utc-01-definitions-scope \u2014 The words that carry the most weight",
+        "17-revocable-living-trust.md",
+        "24-utc-05-amendments-revocation.md",
+        "17-revocable-living-trust.md"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "type-04",
+      "category": "trust_types",
+      "query": "How do beneficiary-to-trustee changes work when someone becomes their own trustee?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "16-trust-amendments \u2014 Scenario: Beneficiary Becoming Trustee (Conflict of Interest Resolution)",
+        "24-utc-09-notification-register \u2014 Phase 1 \u2014 On becoming trustee",
+        "24-utc-07-creditors-protection \u2014 Common question we get"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "tax-01",
+      "category": "tax",
+      "query": "What is Form 1041 and when is the trust tax return due?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "02-1041-tax-returns \u2014 When Is It Due?",
+        "02-1041-tax-returns \u2014 What Is Form 1041?",
+        "18-state-compliance-texas \u2014 State Income Tax on Trusts",
+        "13-trustoffice-workflows \u2014 Workflow: Update Trust Settings and Tax Calendar",
+        "11-video-library \u2014 Lesson 19: Trust Tax Basics",
+        "29-trustee-101-trust-tax-calendar \u2014 How to use this calendar"
+      ],
+      "doctrine_triggered": true,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "tax-02",
+      "category": "tax",
+      "query": "What tax deadlines should a trustee track during the year?",
+      "audience": [
+        "universal"
+      ],
+      "union_sources": [
+        "20-trust-lifecycle-stages \u2014 Stage 1: Initial Setup (First 90 Days)",
+        "11-video-library \u2014 Lesson 21: Filing Deadlines and Extensions",
+        "11-video-library \u2014 Lesson 6: Trust Taxes in Plain English",
+        "13-trustoffice-workflows \u2014 Workflow: Track Trust Money Movement"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": false,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "April 15"
+      ],
+      "passed": false
+    },
+    {
+      "id": "wp-tax-01",
+      "category": "wp_tax101",
+      "query": "What does \u00a73401(a) actually define as wages?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "40-wingpoint-wp-tax-101-lesson-01-what-you-were-never-told \u2014 What \"Wages\" Actually Means",
+        "51-wingpoint-wp-tax-101-walkthrough-508c1aet-first-time-trust-questions \u2014 4. \"The code doesn't define 'church.' Isn't that a problem?\"",
+        "48-wingpoint-wp-tax-101-companion-07b-what-youre-building \u2014 4. \"The code doesn't define 'church.' Isn't that a problem?\"",
+        "78-wingpoint-wp-inner-work-outline-outline-inner-work-enemy-construct \u2014 Lesson 2 \u2014 Clean Hands: What Equity Actually Requires of You"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-tax-02",
+      "category": "wp_tax101",
+      "query": "W-4 exempt claiming rules for federal income tax withholding",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "43-wingpoint-wp-tax-101-companion-03-supplement-w4-response-kit \u2014 Document 3: W-4 Exempt Filing Guide \u2014 If You Must File a W-4",
+        "43-wingpoint-wp-tax-101-companion-03-supplement-w4-response-kit \u2014 Document 1: Letter to Employer \u2014 Notification of Exempt Status and Withholding Position",
+        "53-wingpoint-wp-tax-101-companion-TAX-TRUTH-COURSE-COMPANION-PACKET \u2014 2. W-4 Decision Guide",
+        "2. W-4 Decision Guide"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-tax-03",
+      "category": "wp_tax101",
+      "query": "How do I correct the record on a W-2 or 1099 that was filed with the wrong characterization?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "52-wingpoint-wp-tax-101-outline-TAX-TRUTH-COURSE-OUTLINE \u2014 Lesson 7: Correcting the Record \u2014 W-2s, 1099s, K-1s, and Your Return",
+        "45-wingpoint-wp-tax-101-lesson-05-correcting-the-record \u2014 Correcting 1099s \u2014 Zeroing Out False Characterizations"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-tax-04",
+      "category": "wp_tax101",
+      "query": "Why did the IRS provide the 508(c)(1)(a) exemption \u2014 why does the door exist?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "46-wingpoint-wp-tax-101-lesson-06-where-the-trust-fits \u2014 Why the Door Had to Stay Open"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": false,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "Why 508(c)(1)(a) Exists \u2014 The Constitutional and Legal Foundation"
+      ],
+      "passed": false
+    },
+    {
+      "id": "wp-tax-05",
+      "category": "wp_tax101",
+      "query": "What does the Tax Question course cover?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "74-wingpoint-wp-inner-work-lesson-05-consent-problem-inside \u2014 The Hardest Question in the Course",
+        "26-trustee-101-minute-templates \u2014 These five templates cover the most common trustee decisions that need documented minutes. Print them. Keep them with your trust documents. Use them every single time you make a decision. Each template follows the 5-Minute Minute system: Date the decision, what was decided, why it was decided, who was informed, sign it, file it. Five minutes. Four questions. Every time. These templates are for educational purposes. They are not a substitute for legal advice. For complex decisions, consult a qualified attorney. Templates Included:",
+        "63-wingpoint-wp-defend-lesson-05-when-the-world-pushes-back \u2014 When Law Enforcement or Border Officials Question Your Documents"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": false,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "Course Outline \u2014 The Tax Question"
+      ],
+      "passed": false
+    },
+    {
+      "id": "wp-def-01",
+      "category": "wp_defend",
+      "query": "Why do challenges to my position come, and what do they really mean?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "59-wingpoint-wp-defend-lesson-01-why-challenges-come",
+        "41-wingpoint-wp-tax-101-lesson-02-the-constitutional-question \u2014 Where the Limits Come From \u2014 Law, Nature, and God",
+        "77-wingpoint-wp-inner-work-lesson-08-navigating-relationships \u2014 The Spouse Who Didn't Come With You"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-def-02",
+      "category": "wp_defend",
+      "query": "What is a CP2000 notice and how do I respond to it?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "61-wingpoint-wp-defend-lesson-03-irs-notices-what-to-expect \u2014 How to Respond to Any Notice",
+        "61-wingpoint-wp-defend-lesson-03-irs-notices-what-to-expect \u2014 The Notice You're Most Likely to Receive",
+        "65-wingpoint-wp-defend-lesson-07-your-records-are-your-defense \u2014 How to Respond in Hours, Not Weeks"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-def-03",
+      "category": "wp_defend",
+      "query": "What should I do when my employer pushes back on my status change?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "63-wingpoint-wp-defend-lesson-05-when-the-world-pushes-back \u2014 When Your Employer Pushes Back",
+        "63-wingpoint-wp-defend-lesson-05-when-the-world-pushes-back \u2014 When a Bank Pushes Back"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-def-04",
+      "category": "wp_defend",
+      "query": "When do I actually need an attorney or counsel?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "66-wingpoint-wp-defend-lesson-08-finding-the-right-counsel \u2014 How to Vet Counsel: Questions to Ask and Red Flags to Watch For",
+        "66-wingpoint-wp-defend-lesson-08-finding-the-right-counsel \u2014 The Difference Between Legal Counsel, Tax Professionals, and Advocates"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "Finding the Right Counsel"
+      ],
+      "passed": false
+    },
+    {
+      "id": "wp-inw-01",
+      "category": "wp_inner_work",
+      "query": "What is the enemy construct and why did I build one?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "78-wingpoint-wp-inner-work-outline-outline-inner-work-enemy-construct \u2014 Lesson 1 \u2014 The Construct Itself: What Is an \"Enemy\" and Why You Built One",
+        "70-wingpoint-wp-inner-work-lesson-01-the-construct-itself \u2014 What the Enemy Construct Is",
+        "78-wingpoint-wp-inner-work-outline-outline-inner-work-enemy-construct \u2014 Lesson 7 \u2014 Standing: Who You Are When No One Is Watching"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-inw-02",
+      "category": "wp_inner_work",
+      "query": "Can victimhood and sovereignty coexist?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "78-wingpoint-wp-inner-work-outline-outline-inner-work-enemy-construct \u2014 Lesson 3 \u2014 Victimhood and Sovereignty Cannot Coexist",
+        "72-wingpoint-wp-inner-work-lesson-03-victimhood-sovereignty \u2014 What Victimhood Language Sounds Like",
+        "72-wingpoint-wp-inner-work-lesson-03-victimhood-sovereignty"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": true,
+        "key_facts": true,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [],
+      "passed": true
+    },
+    {
+      "id": "wp-inw-03",
+      "category": "wp_inner_work",
+      "query": "What does standing mean when no one is watching?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "78-wingpoint-wp-inner-work-outline-outline-inner-work-enemy-construct \u2014 Lesson 7 \u2014 Standing: Who You Are When No One Is Watching",
+        "66-wingpoint-wp-defend-lesson-08-finding-the-right-counsel \u2014 How to Vet Counsel: Questions to Ask and Red Flags to Watch For"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": false,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "watching and there is nothing to prove"
+      ],
+      "passed": false
+    },
+    {
+      "id": "wp-inw-04",
+      "category": "wp_inner_work",
+      "query": "What courses are in the Inner Work series?",
+      "audience": [
+        "wingpoint"
+      ],
+      "union_sources": [
+        "74-wingpoint-wp-inner-work-lesson-05-consent-problem-inside \u2014 The Outer vs. The Inner",
+        "68-wingpoint-wp-defend-lesson-10-quiet-confidence-clean-hands \u2014 The Posture That Carries You Forward",
+        "74-wingpoint-wp-inner-work-lesson-05-consent-problem-inside",
+        "77-wingpoint-wp-inner-work-lesson-08-navigating-relationships",
+        "70-wingpoint-wp-inner-work-lesson-01-the-construct-itself"
+      ],
+      "doctrine_triggered": false,
+      "checks": {
+        "source_top2": false,
+        "key_facts": false,
+        "isolation_fail_closed": true,
+        "education_not_advice": true
+      },
+      "missing_key_facts": [
+        "Inner Work \u2013 The Enemy Construct"
+      ],
+      "passed": false
+    }
+  ]
+}

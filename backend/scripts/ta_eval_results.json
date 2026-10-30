@@ -1,101 +1,703 @@
 {
-  "timestamp": "2026-06-18T13:01:35.829562",
+  "timestamp": "2026-10-30T16:24:47.144204",
+  "api_base": "https://api.trustoffice.app",
+  "account": "demovideo@trustoffice.app",
+  "trust": "Test Trust",
+  "total": 25,
+  "passed": 9,
+  "failed": 16,
+  "intent_accuracy_pct": 64.0,
+  "field_accuracy_pct": 64.0,
+  "overall_accuracy_pct": 36.0,
   "results": [
     {
+      "id": "dist-01",
+      "query": "Record a $5,000 distribution to my daughter Sarah for college tuition",
+      "expected_intent": "create_distribution",
+      "actual_intent": "create_distribution",
+      "intent_pass": true,
+      "expected_fields": {
+        "beneficiary_name": "Sarah",
+        "amount": 5000.0,
+        "purpose": "education"
+      },
+      "actual_fields": {
+        "beneficiary": "Sarah",
+        "amount": 5000.0,
+        "purpose": "college tuition",
+        "hems_category": "Education"
+      },
+      "field_results": {
+        "beneficiary_name": {
+          "expected": "Sarah",
+          "actual": null,
+          "match": false
+        },
+        "amount": {
+          "expected": 5000.0,
+          "actual": 5000.0,
+          "match": true
+        },
+        "purpose": {
+          "expected": "education",
+          "actual": "college tuition",
+          "match": false
+        }
+      },
+      "field_pass": false,
+      "passed": false
+    },
+    {
       "id": "dist-02",
-      "expected": "create_distribution",
-      "actual": "create_distribution",
-      "pass": true
+      "query": "I need to give $2,500 to my brother Tom for medical expenses",
+      "expected_intent": "create_distribution",
+      "actual_intent": "create_distribution",
+      "intent_pass": true,
+      "expected_fields": {
+        "beneficiary_name": "Tom",
+        "amount": 2500.0,
+        "purpose": "medical_expenses"
+      },
+      "actual_fields": {
+        "beneficiary_name": "Tom",
+        "amount": 2500.0,
+        "purpose": "medical_expenses",
+        "hems_category": "Health"
+      },
+      "field_results": {
+        "beneficiary_name": {
+          "expected": "Tom",
+          "actual": "Tom",
+          "match": true
+        },
+        "amount": {
+          "expected": 2500.0,
+          "actual": 2500.0,
+          "match": true
+        },
+        "purpose": {
+          "expected": "medical_expenses",
+          "actual": "medical_expenses",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "dist-03",
-      "expected": "create_distribution",
-      "actual": "create_distribution",
-      "pass": true
+      "query": "Pay $1,200 to Mary for housing assistance this month",
+      "expected_intent": "create_distribution",
+      "actual_intent": "create_distribution",
+      "intent_pass": true,
+      "expected_fields": {
+        "beneficiary_name": "Mary",
+        "amount": 1200.0,
+        "purpose": "housing"
+      },
+      "actual_fields": {
+        "beneficiary_name": "Mary",
+        "amount": 1200.0,
+        "purpose": "housing assistance",
+        "status": "pending"
+      },
+      "field_results": {
+        "beneficiary_name": {
+          "expected": "Mary",
+          "actual": "Mary",
+          "match": true
+        },
+        "amount": {
+          "expected": 1200.0,
+          "actual": 1200.0,
+          "match": true
+        },
+        "purpose": {
+          "expected": "housing",
+          "actual": "housing assistance",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "dist-04",
-      "expected": "cancel_distribution",
-      "actual": "cancel_distribution",
-      "pass": true
+      "query": "Cancel the $5,000 distribution I just made to Sarah",
+      "expected_intent": "cancel_distribution",
+      "actual_intent": "ask_knowledge",
+      "intent_pass": false,
+      "expected_fields": {
+        "beneficiary_name": "Sarah",
+        "amount": 5000.0
+      },
+      "actual_fields": {},
+      "field_results": {
+        "beneficiary_name": {
+          "expected": "Sarah",
+          "actual": null,
+          "match": false
+        },
+        "amount": {
+          "expected": 5000.0,
+          "actual": null,
+          "match": false
+        }
+      },
+      "field_pass": false,
+      "passed": false
+    },
+    {
+      "id": "mins-01",
+      "query": "I had a trustee meeting last Tuesday and we decided to approve the annual budget",
+      "expected_intent": "log_minutes",
+      "actual_intent": "log_minutes",
+      "intent_pass": true,
+      "expected_fields": {
+        "meeting_date": null,
+        "minutes_type": "annual"
+      },
+      "actual_fields": {
+        "template_type": "general_meeting",
+        "meeting_date": "last Tuesday",
+        "decision_summary": "approved the annual budget"
+      },
+      "field_results": {
+        "meeting_date": {
+          "expected": null,
+          "actual": "last Tuesday",
+          "match": true
+        },
+        "minutes_type": {
+          "expected": "annual",
+          "actual": null,
+          "match": false
+        }
+      },
+      "field_pass": false,
+      "passed": false
     },
     {
       "id": "mins-02",
-      "expected": "log_minutes",
-      "actual": "log_minutes",
-      "pass": true
+      "query": "Draft minutes for a meeting on June 15, 2026 where we discussed distributions",
+      "expected_intent": "log_minutes",
+      "actual_intent": "log_minutes",
+      "intent_pass": true,
+      "expected_fields": {
+        "meeting_date": "2026-06-15",
+        "minutes_type": "distribution"
+      },
+      "actual_fields": {
+        "meeting_date": "2026-06-15",
+        "template_type": "distribution_to_beneficiaries"
+      },
+      "field_results": {
+        "meeting_date": {
+          "expected": "2026-06-15",
+          "actual": "2026-06-15",
+          "match": true
+        },
+        "minutes_type": {
+          "expected": "distribution",
+          "actual": null,
+          "match": false
+        }
+      },
+      "field_pass": false,
+      "passed": false
+    },
+    {
+      "id": "mins-03",
+      "query": "I need to document a decision to hire a new CPA for the trust",
+      "expected_intent": "log_minutes",
+      "actual_intent": "log_minutes",
+      "intent_pass": true,
+      "expected_fields": {
+        "minutes_type": null
+      },
+      "actual_fields": {
+        "minutes_type": "general_meeting",
+        "title": "Decision to Hire CPA",
+        "notes": "Decision to hire a new CPA for the trust."
+      },
+      "field_results": {
+        "minutes_type": {
+          "expected": null,
+          "actual": "general_meeting",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
+    },
+    {
+      "id": "ben-01",
+      "query": "Add a new beneficiary named John Smith with email john@example.com",
+      "expected_intent": "create_beneficiary",
+      "actual_intent": "create_beneficiary",
+      "intent_pass": true,
+      "expected_fields": {
+        "name": "John Smith",
+        "email": "john@example.com"
+      },
+      "actual_fields": {
+        "name": "John Smith",
+        "email": "john@example.com"
+      },
+      "field_results": {
+        "name": {
+          "expected": "John Smith",
+          "actual": "John Smith",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "ben-02",
-      "expected": "update_beneficiary",
-      "actual": "ask_knowledge",
-      "pass": false
+      "query": "Update Jane's email to jane.new@email.com",
+      "expected_intent": "update_beneficiary",
+      "actual_intent": "update_beneficiary",
+      "intent_pass": true,
+      "expected_fields": {
+        "beneficiary_name": "Jane",
+        "email": "jane.new@email.com"
+      },
+      "actual_fields": {
+        "beneficiary_name": "Jane",
+        "email": "jane.new@email.com"
+      },
+      "field_results": {
+        "beneficiary_name": {
+          "expected": "Jane",
+          "actual": "Jane",
+          "match": true
+        },
+        "email": {
+          "expected": "jane.new@email.com",
+          "actual": "jane.new@email.com",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "ben-03",
-      "expected": "remove_beneficiary",
-      "actual": "remove_beneficiary",
-      "pass": true
+      "query": "Remove Bob from the trust beneficiaries",
+      "expected_intent": "remove_beneficiary",
+      "actual_intent": "remove_beneficiary",
+      "intent_pass": true,
+      "expected_fields": {
+        "beneficiary_name": "Bob"
+      },
+      "actual_fields": {
+        "beneficiary_name": "Bob"
+      },
+      "field_results": {
+        "beneficiary_name": {
+          "expected": "Bob",
+          "actual": "Bob",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
+    },
+    {
+      "id": "asset-01",
+      "query": "I bought a rental property at 123 Main St for $350,000 on June 1st",
+      "expected_intent": "add_asset",
+      "actual_intent": "add_asset",
+      "intent_pass": true,
+      "expected_fields": {
+        "asset_type": "real_property",
+        "description": null,
+        "value": 350000.0
+      },
+      "actual_fields": {
+        "asset_type": "Real Property",
+        "name": "Rental Property at 123 Main St",
+        "value": 350000.0,
+        "valuation_date": "2024-06-01",
+        "source": "Purchase",
+        "notes": "Purchased for $350,000 on June 1st"
+      },
+      "field_results": {
+        "asset_type": {
+          "expected": "real_property",
+          "actual": "Real Property",
+          "match": false
+        },
+        "value": {
+          "expected": 350000.0,
+          "actual": 350000.0,
+          "match": true
+        }
+      },
+      "field_pass": false,
+      "passed": false
     },
     {
       "id": "asset-02",
-      "expected": "add_asset",
-      "actual": "add_asset",
-      "pass": true
+      "query": "Add a new bank account with $25,000 to the trust assets",
+      "expected_intent": "add_asset",
+      "actual_intent": "contribute_asset",
+      "intent_pass": false,
+      "expected_fields": {
+        "asset_type": "financial_accounts",
+        "value": 25000.0
+      },
+      "actual_fields": {
+        "asset_name": "New Bank Account",
+        "asset_type": "Cash",
+        "value": 25000.0,
+        "description": "New bank account contributed to the trust",
+        "date_acquired": null
+      },
+      "field_results": {
+        "asset_type": {
+          "expected": "financial_accounts",
+          "actual": "Cash",
+          "match": false
+        },
+        "value": {
+          "expected": 25000.0,
+          "actual": 25000.0,
+          "match": true
+        }
+      },
+      "field_pass": false,
+      "passed": false
     },
     {
       "id": "comp-01",
-      "expected": "setup_compensation",
-      "actual": "setup_compensation",
-      "pass": true
+      "query": "Set up trustee compensation of $500 per month for myself starting July 1st",
+      "expected_intent": "setup_compensation",
+      "actual_intent": "setup_compensation",
+      "intent_pass": true,
+      "expected_fields": {
+        "amount": 500.0,
+        "frequency": "monthly"
+      },
+      "actual_fields": {
+        "trustee_name": "myself",
+        "amount": 500,
+        "frequency": "monthly",
+        "effective_date": "2024-07-01"
+      },
+      "field_results": {
+        "amount": {
+          "expected": 500.0,
+          "actual": 500,
+          "match": true
+        },
+        "frequency": {
+          "expected": "monthly",
+          "actual": "monthly",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "task-01",
-      "expected": "schedule_task",
-      "actual": "schedule_task",
-      "pass": true
+      "query": "Remind me to file the 1041 by October 15th",
+      "expected_intent": "schedule_task",
+      "actual_intent": "schedule_task",
+      "intent_pass": true,
+      "expected_fields": {
+        "task_type": "tax_filing",
+        "due_date": null
+      },
+      "actual_fields": {
+        "task_name": "File Form 1041",
+        "due_date": "2026-10-15",
+        "description": "File Form 1041 for the trust. Consult with a CPA or tax professional.",
+        "category": "Tax"
+      },
+      "field_results": {
+        "task_type": {
+          "expected": "tax_filing",
+          "actual": null,
+          "match": false
+        },
+        "due_date": {
+          "expected": null,
+          "actual": "2026-10-15",
+          "match": true
+        }
+      },
+      "field_pass": false,
+      "passed": false
     },
     {
       "id": "txn-01",
-      "expected": "add_transaction",
-      "actual": "ask_knowledge",
-      "pass": false
+      "query": "Record a $750 payment for trust insurance premium",
+      "expected_intent": "add_transaction",
+      "actual_intent": "add_transaction",
+      "intent_pass": true,
+      "expected_fields": {
+        "type": "expense",
+        "amount": 750.0,
+        "category": "insurance"
+      },
+      "actual_fields": {
+        "amount": 750.0,
+        "description": "Trust insurance premium payment",
+        "type": "expense",
+        "category": "Insurance",
+        "date": null
+      },
+      "field_results": {
+        "type": {
+          "expected": "expense",
+          "actual": "expense",
+          "match": true
+        },
+        "amount": {
+          "expected": 750.0,
+          "actual": 750.0,
+          "match": true
+        },
+        "category": {
+          "expected": "insurance",
+          "actual": "Insurance",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "doc-01",
-      "expected": "upload_document",
-      "actual": "upload_document",
-      "pass": true
+      "query": "Upload the EIN letter to the vault under tax documents",
+      "expected_intent": "upload_document",
+      "actual_intent": "upload_document",
+      "intent_pass": true,
+      "expected_fields": {
+        "title": "EIN letter",
+        "category": "tax"
+      },
+      "actual_fields": {
+        "title": "EIN Letter",
+        "category": "tax_return"
+      },
+      "field_results": {
+        "title": {
+          "expected": "EIN letter",
+          "actual": "EIN Letter",
+          "match": true
+        },
+        "category": {
+          "expected": "tax",
+          "actual": "tax_return",
+          "match": true
+        }
+      },
+      "field_pass": true,
+      "passed": true
     },
     {
       "id": "doc-02",
-      "expected": "review_document",
-      "actual": "review_document",
-      "pass": true
+      "query": "Find the trust deed in the vault",
+      "expected_intent": "review_document",
+      "actual_intent": "document_search",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {
+        "query": "trust deed",
+        "category": "trust_document"
+      },
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
+    },
+    {
+      "id": "know-01",
+      "query": "What is the HEMS standard for distributions?",
+      "expected_intent": "ask_knowledge",
+      "actual_intent": "health_check",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {},
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
+    },
+    {
+      "id": "know-02",
+      "query": "What's my defensibility score?",
+      "expected_intent": "health_check",
+      "actual_intent": "health_status",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {
+        "score": 1,
+        "max_score": 100,
+        "status": "red",
+        "criteria_breakdown": [
+          "Formation Date",
+          "EIN",
+          "Trust Document",
+          "EIN Letter",
+          "Beneficiaries",
+          "Bank Account",
+          "First Meeting",
+          "Tax Calendar"
+        ],
+        "insights": [
+          "N of your assets haven't been revalued in over a year.",
+          "Your {form} filing was due {date} and isn't marked complete.",
+          "You have N distribution(s) without meeting minutes."
+        ]
+      },
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
     },
     {
       "id": "know-03",
-      "expected": "recommend_action",
-      "actual": "check_deadlines",
-      "pass": false
+      "query": "What deadlines are coming up this month?",
+      "expected_intent": "check_deadlines",
+      "actual_intent": "deadlines_summary",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {
+        "deadlines": [
+          {
+            "name": "Monthly Transaction Classification Review",
+            "due_date": "2026-09-30",
+            "status": "upcoming"
+          }
+        ],
+        "overdue": [
+          {
+            "name": "Quarterly trust performance review",
+            "due_date": "2026-09-08",
+            "status": "overdue"
+          }
+        ]
+      },
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
     },
     {
       "id": "know-04",
-      "expected": "emergency",
-      "actual": "check_deadlines",
-      "pass": false
+      "query": "What should I do first as a new trustee?",
+      "expected_intent": "recommend_action",
+      "actual_intent": "action_recommendations",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {
+        "recommendations": [
+          {
+            "action": "update_settings",
+            "description": "Confirm trust name, formation date, EIN, jurisdiction, and trustee profile."
+          },
+          {
+            "action": "upload_document",
+            "description": "Upload trust instrument, amendments, EIN letter, and acceptance/resignation documents to the Vault."
+          },
+          {
+            "action": "create_beneficiary",
+            "description": "Add all beneficiaries and their contact information."
+          },
+          {
+            "action": "add_asset",
+            "description": "Inventory all known trust assets on Schedule A."
+          },
+          {
+            "action": "log_minutes",
+            "description": "Create initial trustee meeting minutes to document your acceptance and initial actions.",
+            "template_type": "initial_trustee_meeting"
+          },
+          {
+            "action": "schedule_task",
+            "description": "Schedule annual and quarterly reviews, and tax deadlines on the Calendar."
+          }
+        ]
+      },
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
+    },
+    {
+      "id": "know-05",
+      "query": "I think I missed a deadline and I'm worried",
+      "expected_intent": "emergency",
+      "actual_intent": "check_deadlines",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {},
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
+    },
+    {
+      "id": "edge-01",
+      "query": "Hello, what can you help me with?",
+      "expected_intent": "general_chat",
+      "actual_intent": "check_deadlines",
+      "intent_pass": false,
+      "expected_fields": {},
+      "actual_fields": {},
+      "field_results": {},
+      "field_pass": true,
+      "passed": false
     },
     {
       "id": "edge-02",
-      "expected": "dismiss_alert",
-      "actual": "dismiss_alert",
-      "pass": true
+      "query": "Dismiss the alert about quarterly minutes",
+      "expected_intent": "dismiss_alert",
+      "actual_intent": "dismiss_alert",
+      "intent_pass": true,
+      "expected_fields": {
+        "criterion_name": "quarterly minutes"
+      },
+      "actual_fields": {
+        "alert_id": "quarterly_minutes_overdue"
+      },
+      "field_results": {
+        "criterion_name": {
+          "expected": "quarterly minutes",
+          "actual": null,
+          "match": false
+        }
+      },
+      "field_pass": false,
+      "passed": false
     },
     {
       "id": "edge-03",
-      "expected": "change_settings",
-      "actual": "ask_knowledge",
-      "pass": false
+      "query": "Change the trust name to Smith Family Trust",
+      "expected_intent": "change_settings",
+      "actual_intent": "change_settings",
+      "intent_pass": true,
+      "expected_fields": {
+        "field": "trust_name",
+        "value": "Smith Family Trust"
+      },
+      "actual_fields": {
+        "name": "Smith Family Trust"
+      },
+      "field_results": {
+        "field": {
+          "expected": "trust_name",
+          "actual": null,
+          "match": false
+        },
+        "value": {
+          "expected": "Smith Family Trust",
+          "actual": null,
+          "match": false
+        }
+      },
+      "field_pass": false,
+      "passed": false
     }
   ]
 }

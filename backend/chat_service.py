@@ -557,6 +557,22 @@ def _ranked_knowledge_slice(
     parts = []
     used = 0
     per_topic: dict = {}
+    # FAMILY CAP (2026-10-30, golden-eval finding): the 50 state-compliance
+    # files are one template with state-specific deltas, and their shared
+    # boilerplate sections score nearly identically — without a family cap
+    # they flood the whole 4,500-char budget on generic doctrine questions
+    # (e.g. "requirements to create a valid trust" retrieved 8× the same
+    # state-file section and crowded out 24-utc-01, the file that actually
+    # answers it). The beneficiary-communication template copies are the same
+    # pattern. A question that names a specific state is unaffected: its
+    # keyword-selected (pinned) topic still ranks with the +2.0 pinned bonus.
+    # Cap is 1: on a generic question even ONE boilerplate excerpt adds little
+    # beyond the doctrinal file that outranks it; the family's real answers
+    # surface only when the member names their state (cap waived).
+    _FAMILY_RE = re.compile(r"^(18-state-compliance-.+|31-trustee-101-beneficiary-communication-templates-\d+)$")
+    _FAMILY_RE_STATE_NAMED = re.compile(r"\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new\s+hampshire|new\s+jersey|new\s+mexico|new\s+york|north\s+carolina|north\s+dakota|ohio|oklahoma|oregon|pennsylvania|rhode\s+island|south\s+carolina|south\s+dakota|tennessee|texas|utah|vermont|virginia|washington|west\s+virginia|wisconsin|wyoming)\b")
+    _family_cap_waived = bool(_FAMILY_RE_STATE_NAMED.search((user_message or "").lower()))
+    per_family: dict = {}
     for score, topic, heading, text in candidates:
         if used >= budget:
             break
@@ -564,6 +580,14 @@ def _ranked_knowledge_slice(
         # most 2 passages per file before moving on.
         if per_topic.get(topic, 0) >= 2:
             continue
+        # ...and at most 2 passages per template family (state files, comm
+        # template copies), so 50 near-identical boilerplates can't crowd
+        # out the single file that actually answers the question.
+        if not _family_cap_waived and _FAMILY_RE.match(topic):
+            family = topic.rsplit("-", 1)[0] if topic.startswith("18-state-compliance-") else "31-comm-templates"
+            if per_family.get(family, 0) >= 1:
+                continue
+            per_family[family] = per_family.get(family, 0) + 1
         block = f"### {topic}"
         if heading:
             block += f" — {heading}"
@@ -1077,6 +1101,37 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
     else:
         context["trust"] = {"name": "Unknown Trust"}
         context["audiences"] = []
+
+    # 1a. Plan persona (Phase B #4, council 2026-10-30): execution-forward for
+    # trustee-plan members, education-framed for WingPoint members. The persona
+    # keys on the USER-DOCUMENT identity SSOT (services.wingpoint_identity.
+    # is_wingpoint_user — wp_ref / source / created_via) with the trust's own
+    # provenance as a fallback when the user doc is missing or unmarked but the
+    # trust is WP-provisioned. This is a PROMPT frame only: write authority is
+    # still owned by the action layer's plan write-gate — the persona never
+    # grants or revokes capability. Fail-safe default is the trustee persona.
+    try:
+        _user_doc = await db.users.find_one(
+            {"user_id": user_id},
+            {"_id": 0, "wp_ref": 1, "source": 1, "created_via": 1},
+        )
+    except Exception as e:
+        logger.warning(f"plan persona user lookup failed for {user_id}: {e}")
+        _user_doc = None
+    from services.wingpoint_identity import is_wingpoint_user
+    is_wp_member = is_wingpoint_user(_user_doc)
+    if not is_wp_member and "wingpoint" in (context.get("audiences") or []):
+        # Trust is WP-provisioned but the user doc carries no marker (legacy
+        #/admin-created trust holder). Same education frame, sourced from the
+        # trust — the brief must not contradict what the audience gate grants.
+        is_wp_member = True
+    context["plan_persona"] = {
+        "is_wingpoint": bool(is_wp_member),
+        # Execution frame: WP members are full TrustOffice subscribers — their
+        # plans execute writes. The difference is FRAMING (teach-while-doing,
+        # connect answers back to the course doctrine), not capability.
+        "execution_frame": "education" if is_wp_member else "execution",
+    }
 
     # 1b. State compliance facts (one indexed find on the state's profile).
     # The jurisdiction guard in the practice core needs utc_adopted /
