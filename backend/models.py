@@ -525,6 +525,12 @@ class TrustResponse(BaseModel):
     org_grant_level: Optional[str] = None
     org_grant_expires_at: Optional[str] = None
     granted_via_org_id: Optional[str] = None
+    # WingPoint provenance surface (2026-10-30): set on WP-provisioned trusts
+    # so the frontend can tailor the assistant's empty state. `source` is the
+    # legacy direct marking; `wingpoint_ref` the referral provisioning key.
+    # Standard trusts come back with these as None.
+    source: Optional[str] = None
+    wingpoint_ref: Optional[str] = None
 
 
 # ==================== ENTITY MODELS ====================
