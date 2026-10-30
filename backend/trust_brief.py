@@ -194,6 +194,15 @@ def _render_identity(trust: dict, td: dict) -> list[str]:
     ]
     if trust.get("start_date"):
         lines.append(f"Established: {trust['start_date']}")
+    # WingPoint doctrine state (2026-10-30): show benevolence/508 doctrine
+    # status in the identity block so the AI reasons from the trust's actual
+    # doctrine rather than assuming conventional statutory-trust treatment.
+    # Non-benevolence trusts get no line at all — the neutral core rule
+    # already forbids assuming 508/benevolence status when it's not flagged.
+    if trust.get("benevolence_enabled"):
+        lines.append(
+            f"Benevolence mode: enabled{' (508)' if trust.get('tax_status') == '508' else ''}"
+        )
     if trust.get("beneficiary_standard"):
         lines.append(f"Beneficiary standard: {trust['beneficiary_standard']}")
     trustees = trust.get("trustees", "")

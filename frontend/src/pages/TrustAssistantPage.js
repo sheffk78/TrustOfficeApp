@@ -307,6 +307,7 @@ const TrustAssistantPage = () => {
               loadingConversation={loadingConversation}
               trustId={selectedTrust?.trust_id}
               onFileUploaded={handleFileUploaded}
+              activeTrust={selectedTrust}
             />
           </div>
         </div>

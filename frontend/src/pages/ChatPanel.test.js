@@ -57,3 +57,70 @@ describe('ChatPanel regression: messages may be undefined', () => {
     expect(screen.getAllByTestId('message-bubble').length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('ChatPanel WingPoint empty state (2026-10-30)', () => {
+  const chipLabels = () =>
+    screen.queryAllByRole('button').map((b) => b.textContent);
+
+  it('shows the WingPoint subline + WP chips for a wingpoint-sourced trust', () => {
+    render(
+      <ChatPanel
+        {...baseProps}
+        messages={undefined}
+        activeTrust={{ trust_id: 't_wp', source: 'wingpoint' }}
+      />
+    );
+    expect(screen.getByText(/This trust came from WingPoint/)).toBeInTheDocument();
+    const labels = chipLabels();
+    expect(labels.some((t) => t.includes('WingPoint Training'))).toBe(true);
+    expect(labels.some((t) => t.includes('508 Tax Status'))).toBe(true);
+    expect(labels.some((t) => t.includes('508 Money Flow'))).toBe(true);
+    // Standard chips are hidden on the WP empty state
+    expect(labels.some((t) => t.includes('Check Deadlines'))).toBe(false);
+  });
+
+  it('shows the WingPoint subline for a trust carrying wingpoint_ref', () => {
+    render(
+      <ChatPanel
+        {...baseProps}
+        messages={undefined}
+        activeTrust={{ trust_id: 't_ref', wingpoint_ref: 'wp-abc' }}
+      />
+    );
+    expect(screen.getByText(/This trust came from WingPoint/)).toBeInTheDocument();
+  });
+
+  it('renders the standard empty state for standard trusts (no WP text, no WP chips)', () => {
+    render(
+      <ChatPanel
+        {...baseProps}
+        messages={undefined}
+        activeTrust={{ trust_id: 't_std' }}
+      />
+    );
+    expect(screen.getByText(/Ask about deadlines/)).toBeInTheDocument();
+    expect(screen.queryByText(/This trust came from WingPoint/)).toBeNull();
+    expect(chipLabels().some((t) => t.includes('508 Tax Status'))).toBe(false);
+  });
+
+  it('renders the standard empty state when no trust doc rides in (back-compat)', () => {
+    render(<ChatPanel {...baseProps} messages={undefined} />);
+    expect(screen.getByText(/Ask about deadlines/)).toBeInTheDocument();
+    expect(screen.queryByText(/This trust came from WingPoint/)).toBeNull();
+  });
+
+  it('standard chips fill the input via onSendMessage when clicked', () => {
+    const onSendMessage = jest.fn();
+    render(
+      <ChatPanel
+        {...baseProps}
+        messages={undefined}
+        onSendMessage={onSendMessage}
+        activeTrust={{ trust_id: 't_wp', source: 'wingpoint' }}
+      />
+    );
+    const chip = screen.getByText('508 Tax Status');
+    chip.click();
+    expect(onSendMessage).toHaveBeenCalledWith("Explain my trust's 508 tax status");
+  });
+});

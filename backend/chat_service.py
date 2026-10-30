@@ -61,6 +61,23 @@ with open(os.path.join(PROMPTS_DIR, "chat_system_escalation.md"), "r") as f:
 with open(os.path.join(PROMPTS_DIR, "chat_system_practice.md"), "r") as f:
     CHAT_SYSTEM_PRACTICE = f.read()
 
+# WingPoint doctrine overlay (2026-10-30) — appended ONLY when the requesting
+# trust context grants the "wingpoint" audience. Lazy-loaded + cached (same
+# pattern as the split-constitution reads above) so non-WP turns never pay
+# for it and the file is read at most once per process.
+CHAT_SYSTEM_WINGPOINT: Optional[str] = None
+
+
+def _wingpoint_doctrine_prompt() -> str:
+    global CHAT_SYSTEM_WINGPOINT
+    if CHAT_SYSTEM_WINGPOINT is None:
+        try:
+            with open(os.path.join(PROMPTS_DIR, "chat_system_wingpoint.md"), "r") as f:
+                CHAT_SYSTEM_WINGPOINT = f.read()
+        except FileNotFoundError:
+            CHAT_SYSTEM_WINGPOINT = ""
+    return CHAT_SYSTEM_WINGPOINT
+
 # Legacy full prompt kept for backward compatibility (unused in split mode)
 with open(os.path.join(PROMPTS_DIR, "chat_system.md"), "r") as f:
     CHAT_SYSTEM_PROMPT = f.read()
@@ -70,32 +87,161 @@ with open(os.path.join(PROMPTS_DIR, "action_extractor.md"), "r") as f:
     ACTION_EXTRACTOR_PROMPT = f.read()
 
 
+# --------------------------------------------------------------------------- #
+# Audience-tiered knowledge (WingPoint isolation, 2026-10-30)                  #
+# --------------------------------------------------------------------------- #
+# Every knowledge file carries (or defaults to) an audience. Retrieval and
+# prompt assembly are GATED at the allowlist level: a file is injected into a
+# prompt only when its audience is "universal" OR the requesting trust context
+# explicitly grants that audience. WingPoint-only material must never be
+# reachable through a code path that a non-WingPoint trust can trigger — the
+# gate is structural (allowlist intersection), never prompt-instruction-only,
+# and it FAILS CLOSED: no audiences context → universal files only.
+KNOWN_AUDIENCES = ("universal", "wingpoint")
+
+AUDIENCE_FRONT_MATTER_RE = re.compile(r"^---\s*$", re.MULTILINE)
+
+
+def _normalize_audiences(value) -> list:
+    """Normalize an audiences value to a list of known audience strings.
+
+    Accepts None, a bare string, or a list; drops unknown/empty entries and
+    de-duplicates while preserving order.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw = [value]
+    elif isinstance(value, (list, tuple, set)):
+        raw = list(value)
+    else:
+        return []
+    out: list = []
+    for v in raw:
+        if not isinstance(v, str):
+            continue
+        v = v.strip().lower()
+        if v in KNOWN_AUDIENCES and v not in out:
+            out.append(v)
+    return out
+
+
+def _parse_front_matter(text: str) -> tuple:
+    """Parse a light front-matter block from a knowledge markdown file.
+
+    Supported shape (YAML-ish "key: value" lines, no nesting):
+        ---
+        title: ...
+        audiences: wingpoint        # or ['wingpoint', 'universal']
+        ---
+
+    Returns (meta_dict, body). Files without front-matter return ({}, text) —
+    they default to audience "universal" at the caller.
+    """
+    if not text.startswith("---"):
+        return {}, text
+    m = AUDIENCE_FRONT_MATTER_RE.search(text, 3)
+    if not m:
+        return {}, text
+    header = text[3:m.start()]
+    body = text[m.end():].lstrip("\n")
+    meta: dict = {}
+    for line in header.splitlines():
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip().lower()
+        value = value.strip()
+        # Light list support: ['a', 'b'] or [a, b]
+        if value.startswith("[") and value.endswith("]"):
+            inner = value[1:-1].strip()
+            if inner:
+                parsed = [p.strip().strip("'\"") for p in inner.split(",")]
+                meta[key] = [p for p in parsed if p]
+            else:
+                meta[key] = []
+        else:
+            meta[key] = value.strip("'\"")
+    return meta, body
+
+
+# Cache of audience meta per file stem: {stem: audience_set}
+_KNOWLEDGE_AUDIENCE_META: Optional[Dict[str, list]] = None
+
+
 def _load_knowledge_base() -> Dict[str, str]:
-    """Load all knowledge base markdown files into a dict."""
-    kb = {}
-    if not os.path.isdir(KNOWLEDGE_DIR):
-        return kb
-    for fname in os.listdir(KNOWLEDGE_DIR):
-        if fname.endswith(".md"):
+    """Load all knowledge base markdown files into a dict.
+
+    Audience-aware cache (WingPoint isolation, 2026-10-30): files are stored
+    in per-audience partitions. A file without front-matter defaults to the
+    "universal" audience — identical to the previous behavior. WingPoint-tier
+    files live in their own partition so the universal slice is byte-identical
+    to the pre-isolation corpus for all existing users.
+    """
+    universal: Dict[str, str] = {}
+    wingpoint: Dict[str, str] = {}
+    meta_by_stem: Dict[str, list] = {}
+    if os.path.isdir(KNOWLEDGE_DIR):
+        for fname in os.listdir(KNOWLEDGE_DIR):
+            if not fname.endswith(".md"):
+                continue
             path = os.path.join(KNOWLEDGE_DIR, fname)
             try:
                 with open(path, "r") as f:
-                    kb[fname.replace(".md", "")] = f.read()
+                    full_text = f.read()
             except Exception as e:
                 logger.warning(f"Failed to load knowledge file {fname}: {e}")
-    return kb
+                continue
+            meta, body = _parse_front_matter(full_text)
+            audiences = _normalize_audiences(meta.get("audiences"))
+            stem = fname.replace(".md", "")
+            meta_by_stem[stem] = audiences
+            if not audiences:
+                # No (or unparsable) front-matter → universal: byte-identical
+                # to the legacy behavior for every pre-existing file.
+                audiences = ["universal"]
+            # Front-matter-stripped body goes into its audience partitions.
+            if "universal" in audiences:
+                universal[stem] = body
+            if "wingpoint" in audiences:
+                wingpoint[stem] = body
+    global _KNOWLEDGE_AUDIENCE_META
+    _KNOWLEDGE_AUDIENCE_META = meta_by_stem
+    return {"universal": universal, "wingpoint": wingpoint}
 
 
-# Cache knowledge base at module level
-_KNOWLEDGE_BASE_CACHE: Optional[Dict[str, str]] = None
+# Audience-partitioned module cache (WingPoint isolation, 2026-10-30).
+# The old single dict was identity-blind; this one keys each file to the
+# audiences that may see it, so a non-WingPoint assembly can never receive
+# a WP-tier file — the partition itself is the gate.
+_KNOWLEDGE_BASE_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 
 
-def get_knowledge_base() -> Dict[str, str]:
-    """Get knowledge base, loading from disk if not cached."""
+def get_knowledge_base() -> Dict[str, Dict[str, str]]:
+    """Get the audience-partitioned knowledge base, loading from disk if needed.
+
+    Returns {"universal": {stem: body}, "wingpoint": {stem: body}}.
+    """
     global _KNOWLEDGE_BASE_CACHE
     if _KNOWLEDGE_BASE_CACHE is None:
         _KNOWLEDGE_BASE_CACHE = _load_knowledge_base()
     return _KNOWLEDGE_BASE_CACHE
+
+
+def _knowledge_for_audiences(audiences: Optional[list]) -> Dict[str, str]:
+    """Return the KB slice a trust with `audiences` may see.
+
+    Positive allowlist (fail closed): no/empty audiences → universal only.
+    A tiered file is included ONLY when the caller's audience list contains it.
+    """
+    kb = get_knowledge_base()
+    universal = dict(kb.get("universal", {}))
+    granted = set(audiences or [])
+    out = dict(universal)
+    if "wingpoint" in granted:
+        out.update(kb.get("wingpoint", {}))
+    return out
 
 
 # Unified intent classification sets — derived once, used by both
@@ -240,15 +386,19 @@ def _term_document_frequency(term: str) -> int:
     if not _TERM_DF_CACHE:
         kb = get_knowledge_base()
         counts: dict = {}
-        for content in kb.values():
-            for _, text in _split_kb_passages(content):
-                for t in set(_content_tokens(text)):
-                    counts[t] = counts.get(t, 0) + 1
+        total_passage_count = 0
+        # ALL partitions feed the IDF statistics so a WP-tier passage ranks
+        # on the same scale when it is legitimately granted, but the SLICE
+        # gating in _knowledge_for_audiences is what controls reachability.
+        for partition in kb.values():
+            for content in partition.values():
+                for _, text in _split_kb_passages(content):
+                    total_passage_count += 1
+                    for t in set(_content_tokens(text)):
+                        counts[t] = counts.get(t, 0) + 1
         _TERM_DF_CACHE.update(counts)
         global _TOTAL_PASSAGES
-        _TOTAL_PASSAGES = max(1, sum(counts.values()) and len(
-            [1 for content in kb.values() for _ in _split_kb_passages(content)]
-        ))
+        _TOTAL_PASSAGES = max(1, total_passage_count)
         _TERM_IDF_CACHE.update(
             {
                 t: math.log((_TOTAL_PASSAGES + 1) / (c + 0.5))
@@ -393,8 +543,16 @@ def _ranked_knowledge_slice(
     if not candidates:
         return ""
 
-    # Highest score first; ties broken by topic name for determinism.
-    candidates.sort(key=lambda c: (-c[0], c[1]))
+    # Highest score first; ties broken by topic name for determinism. When an
+    # audience-tiered corpus is in play, granted (e.g. `wingpoint/`-prefixed)
+    # topics tie-break FIRST so the members' granted doctrine outranks
+    # incidental universal matches on equal score.
+    def _tie_break(c):
+        topic = c[1]
+        tier_rank = 0 if topic.startswith("wingpoint/") else 1
+        return (c[0], tier_rank, topic)
+
+    candidates.sort(key=_tie_break, reverse=True)
 
     parts = []
     used = 0
@@ -423,8 +581,18 @@ def _ranked_knowledge_slice(
     return "\n\n".join(parts)
 
 
-def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
+def _format_knowledge_context(
+    user_message: str = "",
+    intent: str = "",
+    audiences: Optional[list] = None,
+) -> str:
     """Format relevant knowledge base entries into a single context string.
+
+    AUDIENCE GATE (WingPoint isolation, 2026-10-30): `audiences` is the
+    allowlist granted by the requesting trust context. Only UNIVERSAL files
+    — plus files whose audience is explicitly granted — can enter the slice.
+    Empty/None audiences → universal only, byte-identical to the legacy
+    behavior for every existing (non-WingPoint) user. Fail closed.
 
     The Trust Assistant's product/workflow files are long. If we blindly append
     every file and then truncate the combined context, the newer workflow guide
@@ -433,7 +601,7 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     relevant topical files. For knowledge/chat intents, skip product files to
     save tokens and avoid drowning out trust-type knowledge.
     """
-    kb = get_knowledge_base()
+    kb = _knowledge_for_audiences(audiences)
     if not kb:
         return "No curated knowledge base entries available."
 
@@ -665,7 +833,26 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
     # Now: rank every candidate passage by relevance to THIS message and
     # intent, and take the top slice within the same budget. The relevant
     # text wins the budget instead of losing it to position.
-    ranked = _ranked_knowledge_slice(user_message, intent, kb, selected)
+    #
+    # AUDIENCE ORDERING (2026-10-30, revised): when WP-tier slices are granted,
+    # tag the granted (non-universal) topics so they tie-break FIRST in the
+    # same char budget — the member came for their WingPoint doctrine. The old
+    # revision prefixed `wingpoint/` onto a dict that no longer had a
+    # "wingpoint" partition key (_knowledge_for_audiences returns the flat
+    # merged slice), so the ordering branch was dead code and WP files ranked
+    # as ordinary topics.
+    ranking_kb = dict(kb)
+    if audiences and ("wingpoint" in audiences):
+        # Prefix WP-partition topics with `wingpoint/` so the slice tie-break
+        # (below, in _ranked_knowledge_slice) sorts the granted doctrine first.
+        # A merged-slice key can collide with a universal stem of the same name,
+        # so the WP copy REPLACES the universal entry rather than sharing a key.
+        granted_partitions = get_knowledge_base().get("wingpoint", {}) or {}
+        ranking_kb = {
+            **{f"wingpoint/{stem}": body for stem, body in granted_partitions.items()},
+            **{k: v for k, v in ranking_kb.items() if k not in granted_partitions},
+        }
+    ranked = _ranked_knowledge_slice(user_message, intent, ranking_kb, selected)
     if ranked:
         return ranked
 
@@ -693,7 +880,15 @@ def _format_knowledge_context(user_message: str = "", intent: str = "") -> str:
                     trust_knowledge.build_index(registry_path, KNOWLEDGE_DIR, db_path)
                 fts_result = trust_knowledge.retrieve(
                     user_message,
-                    {"db_path": db_path, "limit": 3, "status": "live"},
+                    {
+                        "db_path": db_path,
+                        "limit": 3,
+                        "status": "live",
+                        # AUDIENCE GRANT (2026-10-30): the FTS fallback must
+                        # respect the same allowlist as the prompt slice —
+                        # no grant here means universal docs only.
+                        "allowed_audiences": list(audiences or []),
+                    },
                 )
                 existing = "\n".join(sections)
                 for item in fts_result.get("results", [])[:2]:
@@ -855,6 +1050,10 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
         {"_id": 0}
     )
     if trust:
+        is_wp_trust = (
+            trust.get("source") == "wingpoint"
+            or bool(trust.get("wingpoint_ref"))
+        )
         context["trust"] = {
             "name": trust.get("name", "Unknown Trust"),
             "type": trust.get("trust_type", "Not specified"),
@@ -864,9 +1063,20 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
             "start_date": trust.get("start_date", ""),
             "status": trust.get("status", "active"),
             "trustees": _normalize_trustees(trust.get("trustees", "")),
+            # WingPoint-aware identity (2026-10-30): doctrine state rides in
+            # the identity block so the brief shows benevolence/508 status.
+            "benevolence_enabled": bool(trust.get("benevolence_enabled", False)),
+            "tax_status": trust.get("tax_status", "private"),
         }
+        # Provenance surface (2026-10-30): audiences is the KNOWLEDGE
+        # allowlist, derived ONLY from the trust's own provenance markers —
+        # never from request data. A WP-provisioned trust grants the
+        # "wingpoint" knowledge audience; everything else stays empty, and
+        # empty means universal-only downstream (fail closed).
+        context["audiences"] = ["wingpoint"] if is_wp_trust else []
     else:
         context["trust"] = {"name": "Unknown Trust"}
+        context["audiences"] = []
 
     # 1b. State compliance facts (one indexed find on the state's profile).
     # The jurisdiction guard in the practice core needs utc_adopted /
@@ -935,6 +1145,52 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
     # the expensive sections 3-11 below. The AI only needs trust profile +
     # health score for general knowledge questions. This saves 8+ DB queries.
     now = datetime.now(timezone.utc)
+
+    # 1c. Benevolence policy + summary (WingPoint doctrine state, 2026-10-30).
+    # These brief keys are referenced by _build_system_prompt (_fmt_benevolence_policy)
+    # but were never populated — the "## Benevolence Policy" block always showed
+    # the not-on-file fallback even when a policy existed. Two lightweight
+    # queries when the trust has benevolence mode; skipped entirely on the
+    # three lightweight intents to keep the lightweight path cheap.
+    context["benevolence_policy"] = None
+    context["benevolence_summary"] = None
+    if not lightweight and (trust or {}).get("benevolence_enabled"):
+        try:
+            benpol = await db.benevolence_policies.find_one(
+                {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
+            )
+            if benpol and benpol.get("current_version_id"):
+                version = await db.benevolence_policy_versions.find_one(
+                    {
+                        "policy_version_id": benpol["current_version_id"],
+                        "user_id": user_id,
+                    },
+                    {"_id": 0},
+                )
+                if version:
+                    benpol["current_version"] = {
+                        "version_label": version.get("version_label", ""),
+                        "version_number": version.get("version_number"),
+                        "status": version.get("status", ""),
+                        "charitable_class": version.get("charitable_class", ""),
+                        "per_recipient_annual_limit": version.get("per_recipient_annual_limit"),
+                        "approval_threshold": version.get("approval_threshold"),
+                        "assistance_types": version.get("assistance_types", []),
+                    }
+                    context["benevolence_policy"] = benpol
+            if benpol:
+                ben_records = await db.benevolence_records.find(
+                    {"trust_id": trust_id, "user_id": user_id},
+                    {"_id": 0, "amount": 1, "date": 1},
+                ).to_list(1000)
+                context["benevolence_summary"] = {
+                    "total_count": len(ben_records),
+                    "total_amount": sum(r.get("amount", 0) or 0 for r in ben_records),
+                }
+        except Exception as e:  # never let a benevolence lookup break the turn
+            logger.warning(f"benevolence policy/summary lookup failed for {trust_id}: {e}")
+            context["benevolence_policy"] = None
+            context["benevolence_summary"] = None
 
     if lightweight:
         context["upcoming_deadlines"] = []
@@ -1856,7 +2112,10 @@ def _build_trust_type_guidance(trust_type: str) -> str:
         return ""
 
     type_lower = trust_type.lower().strip()
-    kb = get_knowledge_base()
+    # Trust-type doctrine files are universal-tier corpus; pull the universal
+    # partition explicitly so an accidental WP marking on a 17-* file could
+    # not silently inject WP-only content for non-WP viewers of the same type.
+    kb = get_knowledge_base().get("universal", {})
 
     # Try exact match, then partial match (keyword must be at least 4 chars
     # and only match keyword-in-type_lower, not the reverse, to avoid
@@ -1920,7 +2179,12 @@ def _build_system_prompt(
 
     ctx = trust_context
 
-    knowledge_context = _format_knowledge_context(user_message=user_message, intent=intent)
+    # Audience-tiered knowledge (WingPoint isolation, 2026-10-30): the trust
+    # context carries the audience allowlist; empty/absent = universal only.
+    audiences = (ctx or {}).get("audiences") or []
+    knowledge_context = _format_knowledge_context(
+        user_message=user_message, intent=intent, audiences=audiences
+    )
     trust_type_guidance = _build_trust_type_guidance((ctx.get("trust", {}) or {}).get("type", ""))
 
     # Trust Brief (council-approved two-layer architecture, 2026-09-14):
@@ -1947,6 +2211,13 @@ def _build_system_prompt(
     if intent in ESCALATION_INTENTS:
         system_prompt_base += "\n\n" + CHAT_SYSTEM_ESCALATION
     system_prompt_base += "\n\n" + CHAT_SYSTEM_PRACTICE
+
+    # WingPoint doctrine overlay (2026-10-30): appended ONLY for a trust whose
+    # audience context grants the wingpoint audience — never on general Chat.
+    if "wingpoint" in (audiences or []):
+        wp_prompt = _wingpoint_doctrine_prompt()
+        if wp_prompt:
+            system_prompt_base += "\n\n" + wp_prompt
 
     # Approval-response guidance: the model should never re-ask for approval.
     # When the deterministic interception didn't fire (no pending card found),

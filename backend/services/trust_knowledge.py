@@ -277,10 +277,10 @@ def build_index(registry_path, knowledge_dir, db_path) -> dict:
         CREATE TABLE registry_items (item_id TEXT PRIMARY KEY, kind TEXT, name TEXT, status TEXT,
           summary TEXT, body TEXT, routes TEXT, aliases TEXT, tags TEXT, scenarios TEXT,
           supported_actions TEXT, available_in TEXT, visibility TEXT, source_refs TEXT, data TEXT);
-        CREATE TABLE documents (document_id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT, source_hash TEXT, meta TEXT);
+        CREATE TABLE documents (document_id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT, source_hash TEXT, meta TEXT, audience TEXT DEFAULT 'universal');
         CREATE TABLE chunks (chunk_id INTEGER PRIMARY KEY, item_id TEXT, document_id TEXT, kind TEXT, text TEXT, source_ref TEXT);
         CREATE TABLE passages (passage_id INTEGER PRIMARY KEY, document_id TEXT, doc_title TEXT,
-          section TEXT, ordinal INTEGER, text TEXT, source_ref TEXT);
+          section TEXT, ordinal INTEGER, text TEXT, source_ref TEXT, audience TEXT DEFAULT 'universal');
         CREATE VIRTUAL TABLE fts_content USING fts5(item_id UNINDEXED, name, aliases, actions, tags, scenarios, summary, body,
           tokenize='unicode61 remove_diacritics 2');
         CREATE VIRTUAL TABLE fts_passages USING fts5(passage_id UNINDEXED, document_id UNINDEXED, doc_title, section, text,
@@ -306,21 +306,44 @@ def build_index(registry_path, knowledge_dir, db_path) -> dict:
         for docid, filename, body, meta in docs:
             dh = hashlib.sha256(body.encode()).hexdigest()
             doc_title = str(meta.get("title", filename))
-            con.execute("INSERT INTO documents VALUES (?,?,?,?,?,?)", (docid, doc_title, body, str(meta.get("status", "published")), dh, _j(meta)))
+            # AUDIENCE (WingPoint isolation, 2026-10-30): a doc's audience
+            # comes from front-matter. A file that declares NO audiences is
+            # universal (legacy default), EXCEPT when it lives under
+            # knowledge/wingpoint/ — those must declare their audience;
+            # validate_knowledge.py enforces that at build/ci time and we
+            # mirror the rule here so a missed validator cannot index a
+            # WP-tier file as public. Tiered docs are EXCLUDED from the
+            # passages/FTS surfaces unless the caller passes a matching
+            # audience grant at retrieval time.
+            raw_aud = meta.get("audiences") or meta.get("audience")
+            if isinstance(raw_aud, str):
+                aud_list = [a.strip().lower() for a in re.split(r"[,\[\]]", raw_aud) if a.strip()]
+            elif isinstance(raw_aud, (list, tuple)):
+                aud_list = [str(a).strip().lower() for a in raw_aud if str(a).strip()]
+            else:
+                aud_list = []
+            known = {"universal", "wingpoint"}
+            aud_list = [a for a in aud_list if a in known] or ["universal"]
+            doc_audience = ",".join(sorted(set(aud_list)))
+            tiered = any(a != "universal" for a in aud_list)
+            con.execute(
+                "INSERT INTO documents VALUES (?,?,?,?,?,?,?)",
+                (docid, doc_title, body, str(meta.get("status", "published")), dh, _j(meta), doc_audience),
+            )
             links = _as_list(meta.get("feature_ids")) + _as_list(meta.get("item_ids")) + _as_list(meta.get("scenario_ids"))
             links = links or [docid]
             for iid in links:
                 if iid not in item_ids:
                     iid = docid
                     if not con.execute("SELECT 1 FROM registry_items WHERE item_id=?", (iid,)).fetchone():
-                        con.execute("INSERT INTO registry_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (iid, "document", doc_title, "live", "", "", "[]", "[]", "[]", "[]", "[]", "[]", "public", _j([filename]), _j({"id": iid})))
+                        con.execute("INSERT INTO registry_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (iid, "document", doc_title, "live", "", "", "[]", "[]", "[]", "[]", "[]", "[]", "public" if not tiered else "private", _j([filename]), _j({"id": iid})))
                         con.execute("INSERT INTO fts_content VALUES (?,?,?,?,?,?,?,?)", (iid, doc_title, "", "", "", "", "", body))
                 con.execute("INSERT INTO chunks(item_id,document_id,kind,text,source_ref) VALUES (?,?,?,?,?)", (iid, docid, "document", body, filename))
             # Section-level passages for precise retrieval.
             for ordinal, (section, text) in enumerate(_split_sections(body, doc_title)):
                 cur = con.execute(
-                    "INSERT INTO passages(document_id, doc_title, section, ordinal, text, source_ref) VALUES (?,?,?,?,?,?)",
-                    (docid, doc_title, section, ordinal, text, filename),
+                    "INSERT INTO passages(document_id, doc_title, section, ordinal, text, source_ref, audience) VALUES (?,?,?,?,?,?,?)",
+                    (docid, doc_title, section, ordinal, text, filename, doc_audience),
                 )
                 passage_id = cur.lastrowid
                 con.execute(
@@ -521,6 +544,12 @@ def retrieve_passages(
     db_path = _db_from_context(ctx)
     if not Path(db_path).exists():
         return {"results": [], "not_found": True, "reason": "no-index", "db_path": db_path}
+    # AUDIENCE GRANT (WingPoint isolation, 2026-10-30): positive allowlist,
+    # fail closed — no grant means universal-audience passages only. Tiered
+    # docs stay in the index but are unreachable without the grant.
+    allowed_audiences = {
+        str(a).strip().lower() for a in (ctx.get("allowed_audiences") or []) if str(a).strip()
+    }
     con = sqlite3.connect(db_path)
     con.row_factory = sqlite3.Row
     try:
@@ -582,6 +611,13 @@ def retrieve_passages(
         for r in rows:
             text = r["text"] or ""
             if not text.strip():
+                continue
+            # AUDIENCE GATE (2026-10-30): a passage is eligible only when its
+            # document's audience is fully inside the caller's grant. Fail
+            # closed: no grant → universal-audience docs only.
+            doc_aud = (r["audience"] if "audience" in r.keys() else "") or "universal"
+            doc_auds = {a.strip() for a in doc_aud.split(",") if a.strip()}
+            if not doc_auds <= allowed_audiences and not doc_auds == {"universal"}:
                 continue
             body_tokens = set(_tokens(text))
             title_tokens = set(_tokens(r["doc_title"]))
@@ -678,6 +714,15 @@ def retrieve(query, context=None) -> dict:
         allowed_status = ctx.get("status", "live"); allowed = {allowed_status} if isinstance(allowed_status, str) else set(allowed_status)
         visibility = ctx.get("visibility", "public"); public = visibility != "private" and not ctx.get("internal", False)
         plan = ctx.get("plan")
+        # AUDIENCE GRANT (WingPoint isolation, 2026-10-30): positive
+        # allowlist, fail closed. The caller must pass the audiences its
+        # trust context grants; default/empty = universal documents only.
+        # The legacy `internal: True` bypass is removed: an unauthenticated
+        # internal flag can never widen what retrieval returns.
+        allowed_audiences = {str(a).strip().lower() for a in (ctx.get("allowed_audiences") or []) if str(a).strip()}
+        audience_ok = (lambda doc_aud: bool(set((doc_aud or "universal").split(",")) & allowed_audiences))
+        universal_only = lambda doc_aud: (doc_aud or "universal") == "universal"
+        doc_gate = audience_ok if allowed_audiences else universal_only
         rows = []
         nq = _norm(str(query)); exact = []
         for r in con.execute("SELECT * FROM registry_items"):
@@ -703,6 +748,13 @@ def retrieve(query, context=None) -> dict:
         rows.sort(key=lambda x: x[1], reverse=True); results = []
         for r, score in rows[:8]:
             routes = json.loads(r["routes"] or "[]"); refs = json.loads(r["source_refs"] or "[]")
+            doc_aud = ""
+            try:
+                drow = con.execute("SELECT audience FROM documents WHERE document_id=?", (r["item_id"],)).fetchone()
+                doc_aud = drow[0] if drow else ""
+            except sqlite3.Error:
+                doc_aud = ""
+            if not doc_gate(doc_aud): continue
             body = (r["summary"] + " " + r["body"]).strip(); snippet = re.sub(r"\s+", " ", body)[:280]
             results.append({"item_id":r["item_id"],"kind":r["kind"],"status":r["status"],"score":round(score, 4),"title":r["name"],"snippet":snippet,"route":routes[0] if routes else None,"supported_actions":json.loads(r["supported_actions"] or "[]"),"source_refs":refs})
         return {"registry_version": version, "results": results, "warnings": [], "not_found": not bool(results)}

@@ -236,6 +236,10 @@ async def _build_trust_doc(trust_id: str, user: dict, trust: TrustCreate, jurisd
         "tax_status": "private",
         "benevolence_mission": None,
         "determination_letter_date": None,
+        # Standard signup path: no WingPoint provenance (2026-10-30). WP
+        # provisioning stamps these itself (wingpoint_connect.py).
+        "source": None,
+        "wingpoint_ref": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
@@ -337,7 +341,7 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
 _GRANTED_TRUST_PROJECTION = {
     "_id": 0, "trust_id": 1, "name": 1, "trust_type": 1, "status": 1,
     "created_at": 1, "is_demo": 1, "description": 1, "review_cadence": 1,
-    "jurisdiction": 1, "benevolence_enabled": 1,
+    "jurisdiction": 1, "benevolence_enabled": 1, "source": 1, "wingpoint_ref": 1,
 }
 
 
@@ -451,6 +455,7 @@ def _safe_grant_trust_response(trust: dict, grant: dict, governance_score: int):
         governance_score=governance_score,
         is_demo=False, status=trust.get("status") or "active",
         description=trust.get("description"), review_cadence=trust.get("review_cadence") or "quarterly",
+        source=trust.get("source"), wingpoint_ref=trust.get("wingpoint_ref"),
         org_grant_level=grant.get("level"),
         org_grant_expires_at=grant.get("expires_at"),
         granted_via_org_id=grant.get("org_id"),

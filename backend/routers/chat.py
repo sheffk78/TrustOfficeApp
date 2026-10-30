@@ -354,7 +354,10 @@ async def chat(
     # On-demand retrieval (Layer 2, council-approved 2026-09-14): minutes
     # search / vault doc detail fetched only when this message needs it.
     from trust_retrieval import retrieve_for_message, inject_into_user_content
-    retrieval_block = await retrieve_for_message(db, trust_id, user_id, intent, request.message)
+    retrieval_block = await retrieve_for_message(
+        db, trust_id, user_id, intent, request.message,
+        allowed_audiences=list((trust_context or {}).get("audiences") or []),
+    )
 
     # 5b. AI budget gate (2026-10-17 deep-audit C1): chat was the untracked AI
     # spend hole — 120/hour + 200/day caps + monthly budget + usage recording now
@@ -2866,7 +2869,12 @@ async def _chat_stream_generator(
         # On-demand retrieval (Layer 2): fetch before streaming starts so the
         # injected detail rides in the user content for this turn only.
         from trust_retrieval import retrieve_for_message, inject_into_user_content
-        retrieval_block = await retrieve_for_message(db, trust_id, user_id, intent, message)
+        retrieval_block = await retrieve_for_message(
+            db, trust_id, user_id, intent, message,
+            # Audience grant from the trust context (WingPoint isolation,
+            # 2026-10-30): empty trust_context → universal corpus only.
+            allowed_audiences=list((trust_context or {}).get("audiences") or []),
+        )
         # AI budget gate (2026-10-17 deep-audit C1): stream path shares the batch
         # endpoint's caps — 120/hour + 200/day + monthly budget. Recorded after
         # the stream completes, below.

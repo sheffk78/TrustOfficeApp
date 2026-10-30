@@ -462,7 +462,8 @@ class TestNoReviewDraftAnywhere:
     def test_the_rendered_knowledge_slice_contains_no_review_banner(self):
         import chat_service as cs
 
-        kb = cs.get_knowledge_base()
+        _part = cs.get_knowledge_base()
+        kb = {**_part.get('universal', {}), **_part.get('wingpoint', {})}
         for message in list(UTC_QUESTIONS.values()) + [
             "What are my duties as trustee?",
             "What is HEMS?",
