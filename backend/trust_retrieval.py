@@ -489,6 +489,7 @@ def fetch_doctrine(
     limit: int = 6,
     max_chars: int = 3600,
     db_path: Optional[str] = None,
+    allowed_audiences: Optional[list] = None,
 ) -> list:
     """Fetch the top KB passages for a doctrine question.
 
@@ -496,6 +497,10 @@ def fetch_doctrine(
     metadata (source file, section heading, title). Returns [] when the
     message does not raise a doctrine trigger, or when the index cannot be
     built — retrieval must never break the chat.
+
+    AUDIENCE GATE (WingPoint isolation, 2026-10-30): `allowed_audiences` is
+    the trust context's knowledge grant passed by the caller. Default empty
+    denies every tiered document — universal corpus only. Fails closed.
     """
     concepts = _match_doctrine_concepts(message)
     if not concepts:
@@ -511,7 +516,11 @@ def fetch_doctrine(
             boost.extend(DOCTRINE_VOCABULARY.get(concept, ()))
         result = trust_knowledge.retrieve_passages(
             _doctrine_query(message, concepts),
-            {"db_path": resolved, "boost_terms": boost},
+            {
+                "db_path": resolved,
+                "boost_terms": boost,
+                "allowed_audiences": list(allowed_audiences or []),
+            },
             limit=limit,
             max_chars=max_chars,
         )
@@ -921,8 +930,14 @@ async def retrieve_for_message(
     user_id: str,
     intent: str,
     message: str,
+    allowed_audiences: Optional[list] = None,
 ) -> RetrievalBlock:
-    """Main entry: decide what to fetch, fetch it, return the block."""
+    """Main entry: decide what to fetch, fetch it, return the block.
+
+    AUDIENCE GATE (WingPoint isolation, 2026-10-30): `allowed_audiences` is
+    the requesting trust context's knowledge grant. Default/empty denies
+    every tiered knowledge document — universal corpus only (fail closed).
+    """
     block = RetrievalBlock()
     try:
         if minutes_search_needed(intent, message):
@@ -946,8 +961,11 @@ async def retrieve_for_message(
     # Layer 2b — doctrine retrieval (2026-10-23, P2a). Runs regardless of
     # whether a trust-scoped block matched: a doctrine question is about the
     # law and the reviewed corpus, not about this member's records.
+    # Audience-granted (2026-10-30): empty grant → universal corpus only.
     try:
-        block.doctrine = fetch_doctrine(message)
+        block.doctrine = fetch_doctrine(
+            message, allowed_audiences=list(allowed_audiences or [])
+        )
     except Exception as e:
         from logging import getLogger
         getLogger(__name__).warning(f"doctrine retrieval failed: {type(e).__name__}: {e}")
