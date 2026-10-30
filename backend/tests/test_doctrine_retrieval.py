@@ -214,7 +214,7 @@ class TestRankedSliceBeatsBlindTruncation:
     def test_ranked_slice_respects_the_char_budget(self):
         import chat_service as cs
 
-        kb = cs.get_knowledge_base()
+        kb = {**cs.get_knowledge_base().get('universal', {}), **cs.get_knowledge_base().get('wingpoint', {})}
         for message in (
             "What are my duties as trustee?",
             "How often should I do trustee accounting?",
@@ -285,7 +285,7 @@ class TestNoStaleTemplateCount:
     def test_knowledge_slice_never_contains_the_stale_count(self):
         import chat_service as cs
 
-        kb = cs.get_knowledge_base()
+        kb = {**cs.get_knowledge_base().get('universal', {}), **cs.get_knowledge_base().get('wingpoint', {})}
         for message in (
             "What minutes templates do you support?",
             "How do I create minutes?",
@@ -358,7 +358,8 @@ class TestBudgetGuard:
             "How often should I do trustee accounting?",
             "Can my successor trustee also be a beneficiary?",
         ):
-            kb = cs.get_knowledge_base()
+            _part = cs.get_knowledge_base()
+            kb = {**_part.get('universal', {}), **_part.get('wingpoint', {})}
             slice_text = cs._ranked_knowledge_slice(
                 message, "ask_knowledge", kb, []
             )
