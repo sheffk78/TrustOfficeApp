@@ -82,6 +82,11 @@ def _wingpoint_doctrine_prompt() -> str:
 with open(os.path.join(PROMPTS_DIR, "chat_system.md"), "r") as f:
     CHAT_SYSTEM_PROMPT = f.read()
 
+# WingPoint course cache for the course-progress brief lines (Phase B #6).
+# Filled lazily on the first WP turn; None means "not loaded yet", [] means
+# "loaded but unavailable". (lesson_number, title) pairs.
+_COURSE_LESSONS: Optional[list] = None
+
 # Action extractor prompt
 with open(os.path.join(PROMPTS_DIR, "action_extractor.md"), "r") as f:
     ACTION_EXTRACTOR_PROMPT = f.read()
@@ -1113,7 +1118,7 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
     try:
         _user_doc = await db.users.find_one(
             {"user_id": user_id},
-            {"_id": 0, "wp_ref": 1, "source": 1, "created_via": 1},
+            {"_id": 0, "wp_ref": 1, "source": 1, "created_via": 1, "email": 1},
         )
     except Exception as e:
         logger.warning(f"plan persona user lookup failed for {user_id}: {e}")
@@ -1132,6 +1137,53 @@ async def build_trust_context(user_id: str, trust_id: str, intent: str = "") -> 
         # connect answers back to the course doctrine), not capability.
         "execution_frame": "education" if is_wp_member else "execution",
     }
+
+    # 1a-2. Course-progress awareness (Phase B #6, council 2026-10-30): WP
+    # personas' Trust Brief carries a 2-line Trustee-101 progress summary.
+    # READ-ONLY, email-keyed into the course_leads collection the courses
+    # router already maintains; queried ONLY for WP members so non-WP turns
+    # keep their pre-Phase-B query cost. Progress data drives the "next
+    # lesson" line — never a nag, never a deadline.
+    context["course_progress"] = None
+    _user_email = ((_user_doc or {}).get("email") or "")
+    if is_wp_member and _user_email:
+        try:
+            _lead = await db.course_leads.find_one(
+                {"email": _user_email.strip().lower()},
+                {"_id": 0, "lessons_watched": 1, "lesson_1_watched": 1,
+                 "course_purchased": 1},
+            )
+            if _lead:
+                _watched = int(_lead.get("lessons_watched") or 0)
+                # Curriculum is static — cache the (lesson, title) pairs once
+                # instead of importing the router on every WP turn.
+                global _COURSE_LESSONS
+                if _COURSE_LESSONS is None:
+                    try:
+                        from routers.courses import CURRICULUM as _CURRICULUM
+                        _COURSE_LESSONS = [
+                            (m["lesson"], m["title"]) for m in _CURRICULUM
+                        ]
+                    except Exception as e:
+                        logger.warning(f"curriculum load failed: {e}")
+                        _COURSE_LESSONS = []
+                _total = len(_COURSE_LESSONS)
+                _next_pair = next(
+                    ((n, t) for n, t in _COURSE_LESSONS if n > _watched), None
+                )
+                _next = (
+                    {"lesson": _next_pair[0], "title": _next_pair[1]}
+                    if _next_pair else None
+                )
+                context["course_progress"] = {
+                    "lessons_watched": _watched,
+                    "total_lessons": _total,
+                    "course_purchased": bool(_lead.get("course_purchased")),
+                    "next_lesson": _next if _watched > 0 else None,
+                }
+        except Exception as e:  # never let a progress lookup break the turn
+            logger.warning(f"course progress lookup failed for {user_id}: {e}")
+            context["course_progress"] = None
 
     # 1b. State compliance facts (one indexed find on the state's profile).
     # The jurisdiction guard in the practice core needs utc_adopted /

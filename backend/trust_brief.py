@@ -206,6 +206,35 @@ def _render_plan_persona(persona: dict) -> list[str]:
     ]
 
 
+def _render_course_progress(progress: dict) -> list[str]:
+    """Render the optional course-progress lines (Phase B #6, 2026-10-30).
+
+    Two lines maximum, WP personas only (caller gates on persona). A mid-course
+    member gets a next-lesson pointer; a finished member gets a completion
+    line. Never a nag, never a deadline — and absent entirely when there is
+    no progress record.
+    """
+    if not isinstance(progress, dict):
+        return []
+    total = progress.get("total_lessons") or 0
+    watched = progress.get("lessons_watched") or 0
+    if total <= 0:
+        return []
+    lines = [f"Trustee-101 course: {watched}/{total} lessons watched."]
+    next_lesson = progress.get("next_lesson")
+    if isinstance(next_lesson, dict) and next_lesson.get("title"):
+        lines.append(
+            f"Next lesson: {next_lesson.get('lesson')} — {next_lesson['title']} "
+            "(mention it only when it genuinely connects to the current question)."
+        )
+    else:
+        lines.append(
+            "All course lessons watched — reference the member's course "
+            "foundation naturally when relevant."
+        )
+    return lines
+
+
 def _render_identity(trust: dict, td: dict) -> list[str]:
     lines = [
         f"Trust: {trust.get('name', 'Unknown')}",
@@ -379,6 +408,12 @@ def build_trust_brief(ctx: dict) -> dict:
     persona = _render_plan_persona(ctx.get("plan_persona", {}) or {})
     if persona:
         core_parts.append(("Plan", persona, 5))
+        # Course-progress lines ride ONLY with the WP persona (Phase B #6):
+        # the brief never shows course material to execution-frame members.
+        if (ctx.get("plan_persona") or {}).get("is_wingpoint"):
+            course_lines = _render_course_progress(ctx.get("course_progress") or {})
+            if course_lines:
+                core_parts.append(("Course Progress", course_lines, 6))
 
     bens = _render_beneficiaries(ctx.get("beneficiaries", []) or [],
                                  ctx.get("class_beneficiaries", []) or [])

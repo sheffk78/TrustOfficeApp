@@ -49,14 +49,18 @@ def test_core_constitution_has_persona_mirror():
 # (1) build_trust_context — persona derivation
 # --------------------------------------------------------------------------- #
 
-def _make_chat_service_with_fake_db(wp_user: bool, wp_trust: bool):
+def _make_chat_service_with_fake_db(wp_user: bool, wp_trust: bool,
+                                    course_lead: dict | None = None):
     """Import chat_service with db patched to a stub returning canned docs."""
     import importlib
     import chat_service as cs
     importlib.reload(cs)
 
+    _course_lead_doc = course_lead
     user_doc = (
-        {"wp_ref": "WP-REF-123", "source": "wingpoint", "created_via": "wingpoint_provision"}
+        {"wp_ref": "WP-REF-123", "source": "wingpoint",
+         "created_via": "wingpoint_provision",
+         "email": "member@wingpointtest.com"}
         if wp_user else {}
     )
     trust_doc = (
@@ -95,6 +99,8 @@ def _make_chat_service_with_fake_db(wp_user: bool, wp_trust: bool):
             find_one=AsyncMock(return_value=None)),
         distribution_records_ytd=types.SimpleNamespace(
             find=AsyncMock(return_value=_EmptyCursor())),
+        course_leads=types.SimpleNamespace(
+            find_one=AsyncMock(return_value=_course_lead_doc)),
     )
     return cs, fake_db
 
@@ -164,6 +170,80 @@ def test_persona_user_lookup_failure_fails_safe():
         ctx = _run(cs.build_trust_context("u1", "t1", intent="ask_knowledge"))
     p = ctx.get("plan_persona") or {}
     assert p.get("is_wingpoint") is False and p.get("execution_frame") == "execution"
+
+
+# --------------------------------------------------------------------------- #
+# (1b) course-progress awareness (Phase B #6)
+# --------------------------------------------------------------------------- #
+
+_COURSE_LEAD_MID = {
+    "lessons_watched": 4, "lesson_1_watched": True, "course_purchased": True,
+}
+
+
+def test_course_progress_fetched_for_wp_member():
+    cs, fake_db = _make_chat_service_with_fake_db(
+        wp_user=True, wp_trust=True, course_lead=dict(_COURSE_LEAD_MID))
+    with patch.object(cs, "db", fake_db):
+        ctx = _run(cs.build_trust_context("u1", "t1", intent="ask_knowledge"))
+    cp = ctx.get("course_progress") or {}
+    assert cp.get("lessons_watched") == 4
+    assert cp.get("total_lessons") == 9, "CURRICULUM length is 9 lessons"
+    nl = cp.get("next_lesson") or {}
+    assert nl.get("lesson") == 5 and "Commingling" in nl.get("title", ""), (
+        "next unwatched lesson must be lesson 5 for a 4-watched member"
+    )
+
+
+def test_course_progress_absent_for_trustee_member():
+    # Non-WP turns must incur ZERO course_leads queries (pre-Phase-B cost).
+    cs, fake_db = _make_chat_service_with_fake_db(wp_user=False, wp_trust=False)
+    calls = {"n": 0}
+
+    async def _spy(spec, projection=None, **kw):
+        calls["n"] += 1
+        return None
+
+    fake_db.course_leads = types.SimpleNamespace(find_one=_spy)
+    with patch.object(cs, "db", fake_db):
+        ctx = _run(cs.build_trust_context("u1", "t1", intent="ask_knowledge"))
+    assert ctx.get("course_progress") is None
+    assert calls["n"] == 0, "non-WP members must not trigger course_lookups"
+
+
+def test_course_progress_lookup_failure_fails_safe():
+    cs, fake_db = _make_chat_service_with_fake_db(
+        wp_user=True, wp_trust=True, course_lead=dict(_COURSE_LEAD_MID))
+    fake_db.course_leads = types.SimpleNamespace(
+        find_one=AsyncMock(side_effect=RuntimeError("db down")))
+    with patch.object(cs, "db", fake_db):
+        ctx = _run(cs.build_trust_context("u1", "t1", intent="ask_knowledge"))
+    assert ctx.get("course_progress") is None, "lookup failure must never break the turn"
+
+
+def test_brief_renders_course_progress_wp_only():
+    from trust_brief import build_trust_brief
+    base = {
+        "trust": {"name": "T", "type": "revocable"},
+        "plan_persona": {"is_wingpoint": True, "execution_frame": "education"},
+        "course_progress": {"lessons_watched": 4, "total_lessons": 9,
+                            "course_purchased": True,
+                            "next_lesson": {"lesson": 5, "title": "The Commingling Trap"}},
+    }
+    text = build_trust_brief(base)["text"]
+    assert "Course Progress" in text
+    assert "4/9 lessons watched" in text
+    assert "The Commingling Trap" in text
+
+    # Execution frame: NO course section, even with progress present.
+    trustee = dict(base)
+    trustee["plan_persona"] = {"is_wingpoint": False, "execution_frame": "execution"}
+    text2 = build_trust_brief(trustee)["text"]
+    assert "Course Progress" not in text2
+
+    # WP persona, no progress record → no section (never a nag).
+    no_progress = {"trust": base["trust"], "plan_persona": base["plan_persona"]}
+    assert "Course Progress" not in build_trust_brief(no_progress)["text"]
 
 
 # --------------------------------------------------------------------------- #
