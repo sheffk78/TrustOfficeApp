@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 
 from dependencies import get_current_user
+from database import db
 
 router = APIRouter(prefix="/state-compliance", tags=["state_deep_knowledge"])
 
@@ -102,6 +103,29 @@ def _list_knowledge_files() -> tuple:
     return tuple(sorted(KNOWLEDGE_DIR.glob("18-state-compliance-*.md")))
 
 
+async def _caller_audience_grants(user_id: str) -> set:
+    """Resolve the knowledge audiences the caller's own account grants.
+
+    Positive allowlist, fail closed (WingPoint isolation 2026-10-30): a
+    WingPoint audience grant exists ONLY when the caller's own account holds
+    a WP-provisioned trust. Anything else — including lookup failure —
+    returns an empty set, which means universal-tier documents only.
+    """
+    try:
+        wp_trust = await db.trusts.find_one(
+            {
+                "user_id": user_id,
+                "$or": [{"source": "wingpoint"}, {"wingpoint_ref": {"$exists": True, "$ne": None}}],
+            },
+            {"_id": 0, "trust_id": 1},
+        )
+        if wp_trust:
+            return {"wingpoint"}
+    except Exception:
+        pass  # fail closed on lookup failure
+    return set()
+
+
 def _parse_guide(path: Path) -> dict:
     """Extract title (first H1) and a plain-ish summary from a guide file."""
     text = path.read_text(encoding="utf-8")
@@ -121,14 +145,53 @@ def _parse_guide(path: Path) -> dict:
     }
 
 
+def _guide_audience(path: Path) -> set:
+    """The audiences a guide file grants to readers with those audiences.
+
+    A guide with front-matter `audiences` is tiered: only callers whose own
+    trust context grants an intersecting audience may read it. Files without
+    front-matter are universal. This reads the file's own declaration — the
+    same declaration validate_knowledge.py enforces.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {"universal"}
+    if not text.startswith("---"):
+        return {"universal"}
+    m = re.search(r"^---\s*$", text[3:], re.MULTILINE)
+    if not m:
+        return {"universal"}
+    header = text[3:m.start()]
+    auds: list = []
+    for line in header.splitlines():
+        line = line.strip()
+        if line.lower().startswith("audience"):
+            _, _, value = line.partition(":")
+            value = value.strip().strip("[]'\" ")
+            auds = [a.strip().lower().strip("'\"") for a in value.split(",") if a.strip()]
+            break
+    if not auds:
+        return {"universal"}
+    return {a for a in auds if a in ("universal", "wingpoint")} or {"universal"}
+
+
 @router.get("/deep-knowledge")
 async def list_deep_knowledge(user: dict = Depends(get_current_user)):
     """List the available per-state deep-knowledge guides, sorted by state_name."""
+    grants = await _caller_audience_grants(user.get("user_id", ""))
     items = []
     for path in _list_knowledge_files():
         slug = path.stem.replace("18-state-compliance-", "", 1)
         meta = STATE_META.get(slug)
         if not meta:
+            continue
+        # AUDIENCE GATE (WingPoint isolation, 2026-10-30): positive
+        # allowlist — the guide is listed only when its declared audiences
+        # are all granted by the caller's own account. Universal guides
+        # (audience == {'universal'}) always pass.
+        guide_auds = _guide_audience(path)
+        if guide_auds != {"universal"} and not guide_auds <= grants:
             continue
         state_code, state_name = meta
         parsed = _parse_guide(path)
@@ -153,6 +216,15 @@ async def get_deep_knowledge(state_code: str, user: dict = Depends(get_current_u
     path = KNOWLEDGE_DIR / f"18-state-compliance-{slug}.md"
     if not path.exists():
         raise HTTPException(status_code=404, detail="State not covered")
+
+    # AUDIENCE GATE (WingPoint isolation, 2026-10-30): same positive
+    # allowlist as the list route — a tiered guide without a matching grant
+    # from the caller's own account 404s. Fail closed.
+    guide_auds = _guide_audience(path)
+    if guide_auds != {"universal"}:
+        grants = await _caller_audience_grants(user.get("user_id", ""))
+        if not guide_auds <= grants:
+            raise HTTPException(status_code=404, detail="State not covered")
 
     _code, state_name = STATE_META[slug]
     parsed = _parse_guide(path)

@@ -14,6 +14,15 @@ const QUICK_CHIPS = [
   { label: 'Money Summary', message: 'Give me a summary of all money activity for my trust' },
 ];
 
+// WingPoint-provisioned trusts get a doctrine-shaped empty state (2026-10-30):
+// the subline names the WingPoint grounding and the chips fill provenance-safe
+// opener questions. Standard trusts never see this block.
+const WINGPOINT_CHIPS = [
+  { label: 'WingPoint Training', message: "What does my WingPoint training say about this?" },
+  { label: '508 Tax Status', message: "Explain my trust's 508 tax status" },
+  { label: '508 Money Flow', message: 'How does a 508 trust receive money?' },
+];
+
 const ChatPanel = ({
   messages = [],
   loading,
@@ -31,6 +40,7 @@ const ChatPanel = ({
   loadingConversation,
   trustId,
   onFileUploaded,
+  activeTrust = null,
 }) => {
   const [input, setInput] = useState('');
   const [showUploadCard, setShowUploadCard] = useState(false);
@@ -173,6 +183,15 @@ const ChatPanel = ({
   const hasUserMessages = messages.some(m => m.role === 'user');
   const showEmptyState = !hasUserMessages && !loading && !loadingConversation;
 
+  // WingPoint tailoring (2026-10-30): a WP-provisioned ACTIVE trust gets the
+  // doctrine empty state (grounded subline + WP chips). Standard trusts see
+  // nothing different. Provenance comes from the trust doc itself (useAuth
+  // selectedTrust), never from user input.
+  const isWingPointTrust = Boolean(
+    activeTrust
+    && (activeTrust.source === 'wingpoint' || activeTrust.wingpoint_ref)
+  );
+
   // Determine the loading indicator text
   const loadingText = streamPhase === 'thinking' ? 'Thinking...' : 'Generating...';
 
@@ -214,10 +233,12 @@ const ChatPanel = ({
                 Trust Assistant
               </h2>
               <p className="font-mono text-xs text-muted-foreground text-center max-w-md mb-8 leading-relaxed">
-                Ask about deadlines, minutes, distributions, investments, or your trust's health.
+                {isWingPointTrust
+                  ? 'This trust came from WingPoint. You can ask questions grounded in your WingPoint training materials.'
+                  : 'Ask about deadlines, minutes, distributions, investments, or your trust\'s health.'}
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {QUICK_CHIPS.map((chip) => (
+                {(isWingPointTrust ? WINGPOINT_CHIPS : QUICK_CHIPS).map((chip) => (
                   <button
                     key={chip.label}
                     onClick={() => handleChipClick(chip.message)}

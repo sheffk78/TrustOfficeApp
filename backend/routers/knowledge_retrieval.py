@@ -17,6 +17,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 
 from dependencies import get_current_user
+from database import db
 
 from services import trust_knowledge
 
@@ -62,14 +63,45 @@ async def search_knowledge(
     Search the GLOBAL knowledge base for published articles matching `q`.
 
     Compatibility wrapper: preserves the original endpoint signature and response
-    shape, but answers from the consolidated SQLite FTS5 index. Only live, public
-    records are surfaced to this public endpoint (private partner offers such as
-    WingPoint Annual are never returned).
+    shape, but answers from the consolidated SQLite FTS5 index.
+
+    AUDIENCE ALLOWLIST (WingPoint isolation, 2026-10-30): this is a POSITIVE
+    gate now. The authenticated caller's trust grants knowledge audiences;
+    grants come only from a WP-provisioned trust in the caller's own account.
+    No grant → universal-audience documents only (fail closed). The legacy
+    negative filter (visibility!='public') plus the internal:true bypass are
+    gone — a WP-tier document can only surface when the caller's own trust
+    context grants the wingpoint audience.
     """
     db_path = _ensure_index()
+
+    # Resolve the audience grant from the caller's OWN account: their
+    # WingPoint-provisioned trust(s) grant the wingpoint audience. This is a
+    # single indexed query on user_id — never request-derived, never
+    # client-controlled.
+    allowed_audiences: list = []
+    try:
+        wp_trust = await db.trusts.find_one(
+            {
+                "user_id": user["user_id"],
+                "$or": [{"source": "wingpoint"}, {"wingpoint_ref": {"$exists": True, "$ne": None}}],
+            },
+            {"_id": 0, "trust_id": 1},
+        )
+        if wp_trust:
+            allowed_audiences = ["wingpoint"]
+    except Exception:
+        allowed_audiences = []  # fail closed on lookup failure
+
     retrieved = trust_knowledge.retrieve(
         q,
-        {"db_path": db_path, "limit": limit, "status": "live", "visibility": "public"},
+        {
+            "db_path": db_path,
+            "limit": limit,
+            "status": "live",
+            "visibility": "public",
+            "allowed_audiences": allowed_audiences,
+        },
     )
 
     results = []

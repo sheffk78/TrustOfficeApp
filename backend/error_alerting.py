@@ -161,6 +161,82 @@ def _is_local_dev_traceback(stack_trace: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Knowledge-context redaction (WingPoint isolation, 2026-10-30)
+# ---------------------------------------------------------------------------
+# Error paths (error_logs documents, Discord embeds, Hermes webhook payloads)
+# must never become an exfiltration surface for audience-tiered knowledge.
+# The chat system prompt embeds an injected knowledge slice; a chat handler
+# crash would otherwise carry the whole slice (potentially WingPoint-only
+# doctrine) into a broadly readable surface gated by nobody's audience grant.
+# Redact those sections wherever full prompts/contexts are stored or forwarded.
+
+_KNOWLEDGE_SECTION_HEADER = "## Knowledge Base"
+
+
+def _redact_knowledge_sections(text: Optional[str]) -> Optional[str]:
+    """Replace injected knowledge-context sections with a length marker.
+
+    Finds `## Knowledge Base ... (up to the next '## ' heading or end)` and any
+    `### <topic>`/`### FTS: <title>` blocks, and replaces them with
+    '[KNOWLEDGE-CONTEXT REDACTED nchars]'. Idempotent and safe on None/empty.
+    """
+    if not text:
+        return text
+    out = text
+    total_redacted = 0
+
+    # 1. The full knowledge-base section in an assembled system prompt.
+    matches = list(_re.finditer(
+        _re.escape(_KNOWLEDGE_SECTION_HEADER) + r"\n(.*?)(?=\n## |\Z)",
+        out, _re.DOTALL,
+    ))
+    if matches:
+        for m in reversed(matches):
+            body = m.group(1)
+            out = out[:m.start()] + (
+                f"{_KNOWLEDGE_SECTION_HEADER}\n"
+                f"[KNOWLEDGE-CONTEXT REDACTED {len(body)} chars]"
+            ) + out[m.end():]
+            total_redacted += len(body)
+
+    # 2. Raw injected slices without the section header (user-content passthrough).
+    def _slice_sub(m):
+        nonlocal total_redacted
+        body = m.group(0)
+        total_redacted += len(body)
+        return "[KNOWLEDGE-CONTEXT REDACTED %d chars]" % len(body)
+
+    if _re.search(r"### (FTS: |\w[\w./-]*\n)", out):
+        out = _re.sub(
+            r"### (?:(FTS): )?[\w./-]+[^\n]*\n(?:.+\n?)+",
+            _slice_sub,
+            out,
+        )
+    if total_redacted:
+        return out
+    return text
+
+
+def _redact_knowledge_in_context(extra_context: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Redact knowledge-context blobs riding inside extra_context values."""
+    if not extra_context:
+        return extra_context
+    patched: Dict[str, Any] = {}
+    changed = False
+    for k, v in extra_context.items():
+        if isinstance(v, str) and (
+            _KNOWLEDGE_SECTION_HEADER in v or "RETRIEVED CONTEXT" in v or v.startswith("### ")
+        ):
+            nv = _redact_knowledge_sections(v)
+            if nv != v:
+                changed = True
+            patched[k] = nv
+        else:
+            patched[k] = v
+    return patched if changed else extra_context
+
+
+# ---------------------------------------------------------------------------
 # Hermes webhook trigger (autonomous agent)
 # ---------------------------------------------------------------------------
 
@@ -303,6 +379,16 @@ async def report_error(
         ``alerted`` is False when the error was deduped or Discord isn't
         configured; ``duplicate`` is True when deduped.
     """
+    # --- REDACT audience-tiered knowledge first (WingPoint isolation) ---
+    # Every outbound path below — the Mongo error_logs store, the Discord
+    # embeds, and the Hermes payload — gets the redacted values, so injected
+    # knowledge context (potentially WingPoint-only doctrine) can never ride
+    # an error out of this surface. The raw values are gone from here on.
+    error_message = _redact_knowledge_sections(error_message) or ""
+    if traceback_str:
+        traceback_str = _redact_knowledge_sections(traceback_str)
+    extra_context = _redact_knowledge_in_context(extra_context)
+
     # --- Build the fingerprint for dedupe ---
     # Suppress Discord paging for known browser-extension / crawler noise that
     # ships up from the frontend (unhandled promise rejections from content
