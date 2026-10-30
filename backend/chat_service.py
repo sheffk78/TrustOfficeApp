@@ -587,9 +587,20 @@ def _ranked_knowledge_slice(
             continue
         # ...and at most 2 passages per template family (state files, comm
         # template copies), so 50 near-identical boilerplates can't crowd
-        # out the single file that actually answers the question.
+        # out the single file that actually answers the question. The 50
+        # state files are ONE template: the family key is the template
+        # prefix ("18-state-compliance"), NOT rsplit("-", 1) — that split
+        # turned "north-carolina" into family "…-north" and let California,
+        # North Carolina, Rhode Island and South Carolina pass as four
+        # distinct families on exactly the generic questions this cap
+        # exists to stop. A member naming their state still gets the file
+        # via the waiver.
         if not _family_cap_waived and _FAMILY_RE.match(topic):
-            family = topic.rsplit("-", 1)[0] if topic.startswith("18-state-compliance-") else "31-comm-templates"
+            family = (
+                "18-state-compliance"
+                if topic.startswith("18-state-compliance-")
+                else "31-comm-templates"
+            )
             if per_family.get(family, 0) >= 1:
                 continue
             per_family[family] = per_family.get(family, 0) + 1
