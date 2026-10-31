@@ -426,12 +426,64 @@ def _term_idf(term: str) -> float:
     return _TERM_IDF_CACHE.get(term, 0.0)
 
 
+def _passage_index(kb: Dict[str, str]) -> Dict[str, list]:
+    """Flat-topic passage index: topic -> [(heading, text, token_set)].
+
+    Building the ranked slice used to re-split every KB file and re-tokenize
+    every passage on EVERY turn (profiler 2026-10-30: 3,161 tokenizations +
+    978 passage scores per knowledge question, ~90ms, all repeated although
+    the corpus is static). The index computes those once per corpus state.
+
+    `kb` here is the FLAT {topic: content} dict `_ranked_knowledge_slice`
+    already operates on (the merged, audience-filtered view). The cache key
+    is the corpus identity: topic count + per-topic content hash, so a
+    corpus swap (deploy, re-ingest, invalidation) — including an
+    audience-grant change that adds or removes tiered topics — rebuilds
+    once, and stale text can never shadow new corpus content.
+    """
+    global _PASSAGE_INDEX_CACHE
+    fingerprint = (len(kb), tuple(sorted((t, hash(c)) for t, c in kb.items() if c)))
+
+    cached = _PASSAGE_INDEX_CACHE
+    if cached and cached.get("fingerprint") == fingerprint:
+        return cached["index"]
+
+    index: Dict[str, list] = {}
+    for topic, content in kb.items():
+        if not content or topic in index:
+            continue
+        entry = []
+        for heading, text in _split_kb_passages(content):
+            entry.append((heading, text, frozenset(_content_tokens(text))))
+        index[topic] = entry
+
+    _PASSAGE_INDEX_CACHE = {"fingerprint": fingerprint, "index": index}
+    return index
+
+
+def _index_body_tokens(index: Dict[str, list], topic: str, content: str) -> set:
+    """Whole-body token set for a topic, from (or folded into) the index."""
+    entry = index.get(topic)
+    if entry is not None:
+        body = set()
+        for _h, _t, ptoks in entry:
+            body |= ptoks
+        return body
+    # Topic absent from the index (e.g. injected after index build): fall
+    # back to computing it, without caching, so behavior matches legacy.
+    return set(_content_tokens(content))
+
+
+_PASSAGE_INDEX_CACHE: Optional[dict] = None
+
+
 def _score_passage(
     message_tokens: set,
     intent_tokens: set,
     topic: str,
     heading: str,
     text: str,
+    passage_tokens: Optional[frozenset] = None,
     pinned: bool = False,
 ) -> float:
     """Score a passage's relevance to the member's message and intent.
@@ -444,13 +496,17 @@ def _score_passage(
       - how many appear in the file name (the file name is how the corpus is
         organized, so it is a strong prior)
     """
-    passage_tokens = set(_content_tokens(text))
+    # PASSAGE INDEX (2026-10-30 efficiency): callers with a prebuilt index
+    # pass `passage_tokens`; recompute only when absent (legacy callers).
+    ptoks = passage_tokens if passage_tokens is not None else frozenset(
+        _content_tokens(text)
+    )
     heading_tokens = set(_content_tokens(f"{topic} {heading}"))
     topic_tokens = set(_content_tokens(topic))
 
-    msg_hits = message_tokens & passage_tokens
+    msg_hits = message_tokens & ptoks
     msg_heading_hits = message_tokens & heading_tokens
-    intent_hits = intent_tokens & (passage_tokens | heading_tokens)
+    intent_hits = intent_tokens & (ptoks | heading_tokens)
     topic_hits = message_tokens & topic_tokens
 
     # IDF WEIGHTING: the word that carries the question ("accounting",
@@ -463,13 +519,13 @@ def _score_passage(
     # how many times a common word happens to appear.
     weighted_msg = 0.0
     weighted_heading = 0.0
-    for term in message_tokens & passage_tokens:
+    for term in message_tokens & set(ptoks):
         weighted_msg += _term_idf(term)
     for term in message_tokens & heading_tokens:
         weighted_heading += _term_idf(term)
     weighted_topic = sum(_term_idf(t) for t in topic_hits)
     weighted_intent = sum(
-        _term_idf(t) for t in intent_tokens & (passage_tokens | heading_tokens)
+        _term_idf(t) for t in intent_tokens & (set(ptoks) | heading_tokens)
     )
 
     if not msg_hits and not intent_hits and not topic_hits:
@@ -521,25 +577,35 @@ def _ranked_knowledge_slice(
     # Candidate files: the keyword-selected topics, plus every file whose
     # name matches the message, so a topical file that the hand-coded
     # keyword map missed can still win on relevance.
+    # PASSAGE INDEX (2026-10-30 efficiency pass): splitting every KB file
+    # and tokenizing every passage per turn cost the profiler ~90ms and
+    # 3,161 tokenizations on ONE knowledge question, all repeated for every
+    # turn although the corpus is static between turns. The index caches
+    # (topic -> [(heading, text, passage_token_set)]) per corpus state; the
+    # fingerprint rides the KB object so a corpus swap rebuilds once.
+    index = _passage_index(kb)
     topics = list(dict.fromkeys(list(selected) + sorted(kb.keys())))
     for topic in topics:
         content = kb.get(topic)
         if not content:
             continue
         topic_tokens = set(_content_tokens(topic))
+        _entry = index.get(topic)
         if topic_tokens and not (message_tokens & topic_tokens) and topic not in selected:
             # Not keyword-selected and its name says nothing about the
             # question. Still worth scanning when the BODY matches the
             # question: a file named "06-state-compliance" is the right
             # answer to "how often must I account?" even though its name
-            # does not contain the word.
-            body_tokens = set(_content_tokens(content))
+            # does not contain the word. The index carries each file's
+            # whole-body token set so this check costs one set intersection.
+            body_tokens = _index_body_tokens(index, topic, content)
             if not (message_tokens & body_tokens) and not (intent_tokens & body_tokens):
                 continue
         pinned = topic in selected
-        for heading, text in _split_kb_passages(content):
+        for heading, text, _ptokens in (_entry or []):
             score = _score_passage(
-                message_tokens, intent_tokens, topic, heading, text, pinned=pinned
+                message_tokens, intent_tokens, topic, heading, text,
+                passage_tokens=_ptokens, pinned=pinned,
             )
             if score < _RELEVANCE_FLOOR:
                 continue
