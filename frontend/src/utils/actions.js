@@ -18,11 +18,29 @@
  * schema (GET /api/actions) — handy for building dynamic forms later.
  */
 
-import { getAuthHeaders } from './api';
+import { getAuthHeaders, attemptSessionRefresh, handleRefreshFailure } from './api';
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL
   ? `${process.env.REACT_APP_BACKEND_URL}/api`
   : 'https://api.trustoffice.app/api';
+
+/**
+ * One authed POST to the action layer, shared by callAction's
+ * original-attempt and post-refresh retry (council A2).
+ * credentials:'include' so the httpOnly session/refresh cookies ride along
+ * cross-origin (2026-11-01 session-kickout fix).
+ */
+const doActionPost = (name, params, { trustId, conversationId } = {}) =>
+  fetch(`${API_BASE}/actions/${encodeURIComponent(name)}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: getAuthHeaders(), // freshly built at call time (token may have rotated)
+    body: JSON.stringify({
+      params,
+      ...(trustId ? { trust_id: trustId } : {}),
+      ...(conversationId ? { conversation_id: conversationId } : {}),
+    }),
+  });
 
 /**
  * Call a registered action.
@@ -35,15 +53,26 @@ const API_BASE = process.env.REACT_APP_BACKEND_URL
  */
 export async function callAction(name, params = {}, { trustId, conversationId } = {}) {
   try {
-    const response = await fetch(`${API_BASE}/actions/${encodeURIComponent(name)}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        params,
-        ...(trustId ? { trust_id: trustId } : {}),
-        ...(conversationId ? { conversation_id: conversationId } : {}),
-      }),
-    });
+    let response = await doActionPost(name, params, { trustId, conversationId });
+
+    // 401-recovery (2026-11-01 session-kickout fix, council A2): access-token
+    // expiry mid-form previously 401'd straight into a broken flow. Join the
+    // ONE single-flight refresh, retry the action ONCE with fresh headers;
+    // only then give up — dispatching session-expired (via the shared helper)
+    // and returning the {ok:false} envelope. Never throws for auth states.
+    if (response.status === 401) {
+      try {
+        await attemptSessionRefresh();
+        response = await doActionPost(name, params, { trustId, conversationId });
+      } catch (_refreshErr) {
+        handleRefreshFailure();
+        return { ok: false, action: name, duration_ms: 0, error: { code: 'session_expired', detail: 'Your session has expired. Please log in again.' } };
+      }
+      if (response.status === 401) {
+        handleRefreshFailure();
+        return { ok: false, action: name, duration_ms: 0, error: { code: 'session_expired', detail: 'Your session has expired. Please log in again.' } };
+      }
+    }
 
     // The layer returns ok=false in a 200 envelope for handled failures;
     // HTTP errors (404 unknown action, 401 auth) are surfaced uniformly.
@@ -70,9 +99,28 @@ export async function callAction(name, params = {}, { trustId, conversationId } 
  * write/trust_scoped flags, field schemas). Cached per page load.
  * @returns {Promise<Array<{name, description, write, trust_scoped, fields, surfaces}>>}
  */
-export async function listActions() {
+export async function listActions({ trustId, conversationId } = {}) {
   try {
-    const response = await fetch(`${API_BASE}/actions`, { headers: getAuthHeaders() });
+    let response = await fetch(`${API_BASE}/actions`, {
+      credentials: 'include',
+      headers: getAuthHeaders(),
+    });
+
+    // Same single-flight 401 recovery as callAction (council A2).
+    if (response.status === 401) {
+      try {
+        await attemptSessionRefresh();
+        response = await fetch(`${API_BASE}/actions`, { credentials: 'include', headers: getAuthHeaders() });
+      } catch (_refreshErr) {
+        handleRefreshFailure();
+        return [];
+      }
+      if (response.status === 401) {
+        handleRefreshFailure();
+        return [];
+      }
+    }
+
     if (!response.ok) return [];
     const data = await response.json().catch(() => ({}));
     return Array.isArray(data.actions) ? data.actions : [];
