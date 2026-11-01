@@ -79,6 +79,28 @@ const _attemptRefresh = async () => {
   return _refreshInFlight;
 };
 
+// Exported single-flight refresh (2026-11-01 session-kickout fix): ONE shared
+// promise for every 401-recovery caller in the app — AuthContext checkAuth /
+// loadTrustsInternal, utils/actions.js, components/onboarding/xhrRequest.js.
+// Two parallel 401s must produce exactly ONE POST /auth/refresh (council F4:
+// single-flight is per-tab; the backend's 60s rotation grace absorbs cross-tab
+// races — don't add a second dedupe layer anywhere else).
+// Exported via a function wrapper so this module's internals cannot be
+// re-assigned through the export binding.
+export const attemptSessionRefresh = () => _attemptRefresh();
+
+// Shared failure envelope for non-fetchWithAuth callers (actions.js,
+// xhrRequest.js): on refresh failure or retry-401, clear the token ONCE and
+// dispatch session-expired so AuthContext redirects to login with ?redirect=.
+// Idempotent-ish by design: single-flight means one caller owns the flow; the
+// dedupe of the session-expired LISTENER lives in AuthContext.
+export const handleRefreshFailure = () => {
+  if (localStorage.getItem('auth_token')) {
+    localStorage.removeItem('auth_token');
+  }
+  window.dispatchEvent(new CustomEvent('session-expired'));
+};
+
 // Generic fetch with auth
 export const fetchWithAuth = async (endpoint, options = {}) => {
   const defaultOptions = {

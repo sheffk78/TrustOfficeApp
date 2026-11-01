@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { reportErrorToBackend } from '@/utils/errors';
+// Single-flight 401 recovery (2026-11-01 session-kickout fix): checkAuth and
+// loadTrustsInternal share the ONE refresh promise from api.js — two parallel
+// 401s must produce exactly ONE POST /auth/refresh. Retry headers must be
+// FRESHLY BUILT after the refresh (council F9): the pre-refresh token is
+// expired — a cached/stale closure of getAuthHeaders() would retry with the
+// same dead token.
+import { attemptSessionRefresh } from '@/utils/api';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.trustoffice.app';
 const API = `${BACKEND_URL}/api`;
@@ -428,11 +435,29 @@ const useSubscriptionState = ({ setSubscription, setSubscriptionExpired, setIsRe
 const useTrustsLoader = ({ setTrusts, setTrustsLoading, setSelectedTrust, selectedTrust }) => {
   const loadTrustsInternal = useCallback(async (forceSelectNew = false) => {
     setTrustsLoading(true);
+
+    // Shared 401-recovery (2026-11-01 session-kickout fix, council F1): the
+    // raw fetch below previously swallowed any 401 as a console.error, leaving
+    // the app rendering an EMPTY trusts list after an access-token expiry —
+    // the silent blank-app failure mode. Now: on 401, join the ONE single-flight
+    // refresh, then retry ONCE with freshly built headers (F9), before giving up.
+    const doLoad = () => fetch(`${API}/trusts`, {
+      credentials: 'include',
+      headers: getAuthHeaders()
+    });
+
     try {
-      const response = await fetch(`${API}/trusts`, {
-        credentials: 'include',
-        headers: getAuthHeaders()
-      });
+      let response = await doLoad();
+
+      if (response.status === 401) {
+        try {
+          await attemptSessionRefresh();
+          response = await doLoad(); // fresh getAuthHeaders() — new token after refresh
+        } catch (_refreshErr) {
+          // refresh failed → fall through to the console.error path below,
+          // mirroring the pre-fix swallow-failure behavior on REFRESH FAILURE.
+        }
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -577,6 +602,27 @@ const useAuthCheck = ({
         // On 5xx or other errors, keep the token and let the user stay logged in
         // (transient backend failures should NOT wipe the session).
         if (response.status === 401) {
+          // 401-recovery (2026-11-01 session-kickout fix): attempt ONE refresh
+          // via the shared single-flight promise, then retry /auth/me exactly
+          // once with FRESHLY built headers (council F9 — the pre-refresh
+          // token is expired; a cached header object would retry it verbatim).
+          // Only a failed refresh or a second 401 reaches the original kick.
+          try {
+            await attemptSessionRefresh();
+            const retry = await fetch(`${API}/auth/me`, {
+              credentials: 'include',
+              headers: getAuthHeaders() // fresh build AFTER the refresh
+            });
+            if (retry.ok) {
+              const userData = await retry.json();
+              setUser(userData);
+              await trustsPromise;
+              loadSubscriptionState(userData.email);
+              return;
+            }
+          } catch (_refreshErr) {
+            // refresh failed → fall through to the session-clear below
+          }
           throw new Error('Not authenticated');
         }
         // Server error (5xx) — don't wipe the session, just log and stop loading
@@ -692,9 +738,13 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setTrusts([]);
       setSelectedTrust(null);
-      // Redirect to login (only if not already there)
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login?reason=session-expired';
+      setLoading(false);
+      // Redirect to login (only if not already there), combining the expiry
+      // reason with the current path so post-login returns to the form
+      // (dedupe of the two former listeners — council F2).
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/signup') {
+        window.location.href = `/login?reason=session-expired&redirect=${encodeURIComponent(currentPath)}`;
       }
     };
 
@@ -703,7 +753,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       window.removeEventListener('session-expired', handleSessionExpired);
     };
-  }, [setUser, setTrusts, setSelectedTrust]);
+  }, [setUser, setTrusts, setSelectedTrust, setLoading]);
 
   // Listen for subscription expired events from API calls
   useEffect(() => {
@@ -723,25 +773,9 @@ export const AuthProvider = ({ children }) => {
     window.addEventListener('subscription-expired', handleSubscriptionExpired);
     window.addEventListener('subscription-readonly', handleSubscriptionReadOnly);
 
-    // Handle session-expired (401 on authenticated API call — JWT expired/invalid)
-    const handleSessionExpired = () => {
-      console.warn('[AuthContext] Session expired (401 on API call) — redirecting to login');
-      setUser(null);
-      setTrusts([]);
-      setSelectedTrust(null);
-      setLoading(false);
-      // Redirect to login page (preserve current path for post-login redirect)
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/signup') {
-        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
-      }
-    };
-    window.addEventListener('session-expired', handleSessionExpired);
-
     return () => {
       window.removeEventListener('subscription-expired', handleSubscriptionExpired);
       window.removeEventListener('subscription-readonly', handleSubscriptionReadOnly);
-      window.removeEventListener('session-expired', handleSessionExpired);
     };
   }, [loadSubscriptionState, user?.email]);
 
