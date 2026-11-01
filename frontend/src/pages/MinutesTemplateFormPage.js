@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -57,6 +57,7 @@ import {
 } from './minutesTemplateForm/FormSections2';
 import { buildTemplateData } from './minutesTemplateForm/templateDataBuilders';
 import { useTrustEntityData } from './minutesTemplateForm/useTrustEntityData';
+import { loadDraft, clearDraft, createDraftSaver, draftKeyFor } from './minutesTemplateForm/draftStorage';
 
 export default function MinutesTemplateFormPage() {
   const navigate = useNavigate();
@@ -115,6 +116,19 @@ export default function MinutesTemplateFormPage() {
     add_to_schedule_a: true,
     schedule_a_category: 'real_property'
   });
+
+  // ----- Draft persistence (2026-11-01 session-kickout data-loss fix, F7/F8) -----
+  // The multi-row accept-property form is long; a mid-session kickout (expired
+  // access JWT) previously lost every row. Debounced (500ms) localStorage per
+  // trust+template; cleared ONLY when generation returns minutes_id (not at
+  // final save); race-guarded via draftGenerationRef so a flush scheduled
+  // before the clear cannot resurrect the draft after generation success.
+  const draftGenerationRef = useRef(0);
+  const draftSaverRef = useRef(null);
+  if (!draftSaverRef.current) {
+    draftSaverRef.current = createDraftSaver(500);
+    draftSaverRef.current.setGenerationGetter(() => draftGenerationRef.current);
+  }
 
   // Asset disposition fields
   const [dispositionData, setDispositionData] = useState({
@@ -461,6 +475,41 @@ export default function MinutesTemplateFormPage() {
     preFillTrusteeNames(trustees);
   }, [formData.trustees_present]);
 
+  // ----- Draft restore on mount (F7) -----
+  // If this trust + template type has a saved draft (saved mid-form, e.g.
+  // before a session-kickout navigation-away), merge its items into
+  // propertyData and toast a one-line restore notice. Runs once per mount
+  // (selectedTrust.trust_id / templateType key the storage).
+  useEffect(() => {
+    if (!selectedTrust?.trust_id || templateType !== 'acceptance_of_property') return;
+    const draft = loadDraft(selectedTrust.trust_id, templateType);
+    if (draft && Array.isArray(draft.items) && draft.items.length > 0) {
+      setPropertyData((prev) => {
+        // Legacy single-item shape has no items array — the multi-row form
+        // reads data.items || [data]; restoring always produces the items form.
+        const rest = { ...prev };
+        delete rest.items;
+        return { ...rest, items: draft.items };
+      });
+      toast.info('Draft restored');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrust?.trust_id, templateType]);
+
+  // ----- Draft save on propertyData change (debounced 500ms, F7) -----
+  useEffect(() => {
+    if (!selectedTrust?.trust_id || templateType !== 'acceptance_of_property') return;
+    const items = propertyData.items || [propertyData];
+    draftSaverRef.current.schedule(selectedTrust.trust_id, () => ({
+      items,
+      generation: draftGenerationRef.current,
+    }), templateType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyData, selectedTrust?.trust_id, templateType]);
+
+  // Cancel any pending flush on unmount (no stray writes after navigation)
+  useEffect(() => () => { draftSaverRef.current?.cancel(); }, []);
+
   const handleAddTrustee = () => {
     setFormData(prev => ({
       ...prev,
@@ -643,6 +692,16 @@ export default function MinutesTemplateFormPage() {
       }
 
       if (responseOk && result) {
+        // Generation success (F7): clear the accept-property draft AT
+        // minutes_id, not at final save. Bump the draft generation FIRST so
+        // any debounced flush scheduled before this moment becomes a no-op
+        // (race guard F8 — a stale timer must not resurrect the cleared draft),
+        // then cancel any pending flush, then remove the key.
+        draftGenerationRef.current += 1;
+        draftSaverRef.current?.cancel();
+        if (selectedTrust?.trust_id && templateType === 'acceptance_of_property') {
+          clearDraft(selectedTrust.trust_id, templateType);
+        }
         setGeneratedDoc(result.generated_document);
         setMinutesId(result.minutes_id);
         setPreviewMode(true);
