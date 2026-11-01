@@ -90,10 +90,15 @@ def rate_limit(max_requests: int, window_seconds: int = 60):
     Default OFF — prod behavior unchanged; the flag exists so local
     live-server test suites that log in once per test class aren't throttled.
     """
-    disabled = os.environ.get("RATE_LIMIT_DISABLED", "") == "1"
-
+    # 2026-11-01 (session-kickout chunk): disabled-flag is read PER REQUEST,
+    # not at decoration time. Several test modules set RATE_LIMIT_DISABLED=1
+    # during their own arrange phase; if the decorator baked the flag in at
+    # import/decoration time, any test that later needs the limiter ACTIVE
+    # (e.g. test_session_jti_fallback T5/T5b) inherits disabled=True baked by
+    # earlier-collected files. Reading inside the closure honors both intents:
+    # limiter off when the env var is set, on when it isn't.
     async def _check_rate_limit(request: Request):
-        if disabled:
+        if os.environ.get("RATE_LIMIT_DISABLED", "") == "1":
             return
         client_ip = request.client.host if request.client else "unknown"
         # Honour X-Forwarded-For for proxied requests

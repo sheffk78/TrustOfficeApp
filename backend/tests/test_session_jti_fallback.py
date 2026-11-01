@@ -47,7 +47,9 @@ from routers.auth import router as auth_router  # noqa: E402
 
 # Import the FakeDB infrastructure from the sibling hardening suite (extend,
 # don't reinvent) — it matches the collection shapes this fallback uses.
-from tests.test_session_hardening import FakeDB, FakeCursor  # noqa: E402
+# NOTE: tests/ has no __init__.py and pytest.ini sets rootdir-level collection,
+# so import by bare module name (pytest inserts the tests dir on sys.path).
+from test_session_hardening import FakeDB, FakeCursor  # noqa: E402
 
 # Some routers chain find().sort(...).to_list(...) (the hardening suite's tests
 # never hit those branches, the /auth/refresh path can) — add a no-op sort().
