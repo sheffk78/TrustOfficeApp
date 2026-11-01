@@ -393,7 +393,7 @@ describe('T10 session-expired handling (F2)', () => {
     const hrefWrites = [];
     Object.defineProperty(window.location, 'href', {
       get: () => hrefWrites[hrefWrites.length - 1] || '',
-      set: (v) => hrefWrites.push(v),
+      set: (v) => { hrefWrites.push(v); },
       configurable: true,
     });
 
