@@ -1046,7 +1046,157 @@ async def get_current_user(request: Request) -> dict:
     if user:
         return user
 
+    # LAST-RESORT jti fallback (2026-11-01, session-kickout data-loss fix):
+    # password-login sessions are written jti-keyed by record_session_for_token()
+    # (no `session_token` field), so the DB lookup above never resolves for them
+    # once the 30-min access JWT expires. The browser still presents the expired
+    # JWT + a live refresh cookie, so the user is mid-session — the UI refresh
+    # flow simply hasn't run yet. Fall back ONLY through the user_sessions jti
+    # record, gated by the 2026-09-15 hardening guarantees (council F5):
+    # revoked → rejected, jwt_revocations (jti or user 'all'-marker issued
+    # before the marker) → rejected, and no live unrotated refresh chain →
+    # rejected (dead chain = dead session). Never extends the sliding idle TTL —
+    # touch happens on normal authenticated requests exactly as today.
+    try:
+        expired_payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            options={"verify_exp": False},
+        )
+    except jwt.InvalidTokenError:
+        expired_payload = None
+    if expired_payload and expired_payload.get("type") == "access":
+        fallback_user = await _resolve_session_by_jti(expired_payload)
+        if fallback_user:
+            return fallback_user
+
     raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def _resolve_session_by_jti(payload: dict) -> Optional[dict]:
+    """Fallback auth via the jti-keyed user_sessions record of an EXPIRED access token.
+
+    Security gates (council F5 — ALL must pass, else no fallback auth):
+      (a) session record exists for that jti, revoked:false, sliding
+          expires_at still in the future;
+      (b) jwt_revocations has NO entry for the token's jti AND no
+          user_id+'all'-marker revocation row created after the token was
+          issued (`iat`);
+      (c) the user has at least one live unrotated refresh-token record
+          (revoked:false, expires_at in the future, rotated_at absent or
+          within the rotation grace window).
+
+    Returns the user doc (same shape as get_current_user) or None. NEVER
+    extends the session idle TTL — touch_session on normal authenticated
+    requests remains the only sliding-expiry writer.
+    """
+    user_id = payload.get("user_id")
+    jti = payload.get("jti")
+    if not user_id or not jti:
+        return None
+
+    try:
+        session = await db.user_sessions.find_one(
+            {"user_id": user_id, "jti": jti}, {"_id": 0}
+        )
+        if not session:
+            return None
+
+        # Gate (a): revoked-or-idle-expired session → no fallback.
+        if session.get("revoked"):
+            return None
+        session_expires_at = session.get("expires_at")
+        if isinstance(session_expires_at, str):
+            try:
+                session_expires_at = datetime.fromisoformat(session_expires_at)
+            except ValueError:
+                session_expires_at = None
+        if isinstance(session_expires_at, datetime) and session_expires_at.tzinfo is None:
+            session_expires_at = session_expires_at.replace(tzinfo=timezone.utc)
+        if session_expires_at and session_expires_at < datetime.now(timezone.utc):
+            return None
+
+        # Gate (b): token-level or user-wide revocation → no fallback.
+        if await db.jwt_revocations.find_one({"jti": jti}):
+            return None
+        user_revocation = await db.jwt_revocations.find_one({"user_id": user_id, "jti": "all"})
+        if user_revocation:
+            # Mirror _check_jwt_revocation: only tokens issued BEFORE a
+            # user-wide revocation marker are dead; tokens minted after it
+            # belong to the new session era and stay valid.
+            token_issued = None
+            token_iat = payload.get("iat")
+            if isinstance(token_iat, (int, float)):
+                token_issued = datetime.fromtimestamp(token_iat, tz=timezone.utc)
+            elif isinstance(token_iat, str):
+                try:
+                    token_issued = datetime.fromisoformat(token_iat.replace("Z", "+00:00"))
+                except ValueError:
+                    token_issued = None
+            elif isinstance(token_iat, datetime):
+                token_issued = token_iat
+            if token_issued is not None and isinstance(token_issued, datetime):
+                if token_issued.tzinfo is None:
+                    token_issued = token_issued.replace(tzinfo=timezone.utc)
+                revocation_time = user_revocation.get("created_at")
+                if isinstance(revocation_time, str):
+                    try:
+                        revocation_time = datetime.fromisoformat(revocation_time.replace("Z", "+00:00"))
+                    except ValueError:
+                        revocation_time = None
+                if hasattr(revocation_time, "tzinfo") and revocation_time.tzinfo is None:
+                    revocation_time = revocation_time.replace(tzinfo=timezone.utc)
+                if revocation_time and token_issued < revocation_time:
+                    return None
+
+        # Gate (c): a live unrotated refresh chain must exist — a dead chain
+        # means every session for the user is dead (password change,
+        # logout-all, reuse detection) and the fallback must NOT authenticate.
+        # Query uses plain-equality fields only (FakeDB-compatible); expiry and
+        # rotation-age filtering happens below in Python.
+        now = datetime.now(timezone.utc)
+        cursor = db.refresh_tokens.find(
+            {"user_id": user_id, "revoked": False},
+            {"_id": 0, "rotated_at": 1, "expires_at": 1},
+        )
+        docs = await cursor.to_list(length=None)
+        now_iso = now.isoformat()
+        has_live_chain = False
+        for record in docs:
+            # Unexpired check (string ISO compare is fine — all writers emit
+            # timezone-aware ISO strings via datetime.now(timezone.utc).isoformat()).
+            expires_at = record.get("expires_at")
+            if not isinstance(expires_at, str) or expires_at <= now_iso:
+                continue
+            rotated_at = record.get("rotated_at")
+            if not rotated_at:
+                has_live_chain = True
+                break
+            # Rotated within the tab-race grace window still counts as live
+            # (mirrors _consume_refresh_token's grace serving). Use the same
+            # REFRESH_ROTATION_GRACE_SECONDS constant.
+            try:
+                ra = datetime.fromisoformat(str(rotated_at).replace("Z", "+00:00"))
+                if ra.tzinfo is None:
+                    ra = ra.replace(tzinfo=timezone.utc)
+                age_seconds = (now - ra).total_seconds()
+                if age_seconds >= 0 and age_seconds <= REFRESH_ROTATION_GRACE_SECONDS:
+                    has_live_chain = True
+                    break
+            except (ValueError, TypeError):
+                continue
+
+        if not has_live_chain:
+            return None
+
+        user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        return user or None
+    except HTTPException:
+        raise
+    except Exception as exc:  # defensive — fallback must never break auth
+        logger.warning(f"_resolve_session_by_jti failed (non-fatal, no fallback): {exc}")
+        return None
 
 
 def _is_subscription_active(sub: dict) -> bool:

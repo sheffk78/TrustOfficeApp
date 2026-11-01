@@ -438,11 +438,18 @@ async def _consume_refresh_token(raw_token: str, user_id: str) -> dict:
 
 
 @router.post("/auth/refresh")
-async def refresh_token(request: Request, response: Response):
+async def refresh_token(request: Request, response: Response, _rl: None = Depends(rate_limit(30, 60))):
     """Rotate the refresh token: old invalidated, new issued + new access token returned.
 
     Reads the refresh_token cookie. On a reused (revoked/rotated/expired) token,
     revokes all of the user's refresh tokens and records a security event.
+
+    Rate limit 30/60s (2026-11-01, session-kickout fix): the browser fires one
+    refresh per 401-recovery, but multi-tab bursts legitimately fire several at
+    once (shared refresh cookie + single-flight is per-tab), and a 429 here
+    would kick the user out — the exact bug this fix removes. Budget sized
+    generously above per-tab single-flight (1 refresh/tab/burst) while still
+    bounding brute-force probing of the endpoint.
     """
     raw = request.cookies.get("refresh_token")
     if not raw:
