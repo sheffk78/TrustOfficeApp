@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Target, RefreshCw } from 'lucide-react';
@@ -17,6 +17,7 @@ import { LeadDetailDialog, BulkLeadStageDialog } from './admin/AdminDialogs';
  */
 export default function LeadsAccessPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
   const isLeadsUser = user?.is_leads_user || user?.is_admin;
@@ -111,6 +112,18 @@ export default function LeadsAccessPage() {
     }
     setLeadDetailLoading(false);
   };
+
+  // âââ Deep link: ?lead=<lead_id> opens that lead's detail dialog ââ
+  useEffect(() => {
+    const leadId = searchParams.get('lead');
+    if (!leadId) return;
+    fetchLeadDetail(leadId);
+    // strip the param so a refresh does not re-open the dialog
+    const next = new URLSearchParams(searchParams);
+    next.delete('lead');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams]);
 
   const addLeadNote = async () => {
     if (!leadNoteText.trim() || !selectedLead) return;

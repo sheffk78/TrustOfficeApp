@@ -100,6 +100,7 @@ from routers.admin import router as admin_router
 from routers.trust_admin_service import router as trust_admin_service_router
 from routers.contact import router as contact_router
 from routers.admin_api import router as admin_api_router
+from routers.leads_service import router as leads_service_router
 from routers.internal_agent import router as internal_agent_router
 from routers.stats import router as stats_router
 from routers.transactions import router as transactions_router
@@ -563,6 +564,7 @@ app.include_router(preferences_router, prefix="/api")
 app.include_router(email_router, prefix="/api")
 app.include_router(background_jobs_router, prefix="/api")
 app.include_router(categories_router, prefix="/api")
+app.include_router(leads_service_router, prefix="/api")
 app.include_router(beneficiaries_router, prefix="/api")
 app.include_router(demo_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
