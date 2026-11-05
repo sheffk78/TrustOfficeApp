@@ -780,3 +780,438 @@ class TestPeopleAuth:
     def test_people_counts_missing_key_401(self, people_client):
         r = people_client.get("/api/service/people/counts")
         assert r.status_code == 401
+
+
+# ==================== P3: GET /{id}/detail ====================
+
+
+class TestPersonDetail:
+    @pytest.mark.asyncio
+    async def test_detail_purchaser_bundle_shape(self, people_client):
+        await _seed_converted_lead(
+            user_id="user_d1", email="buyer_d1@example.com", lead_id="lead_d1"
+        )
+        await _seed_user_sub(email="buyer_d1@example.com", user_id="user_d1")
+        r = people_client.get(
+            "/api/service/people/purchaser:buyer_d1@example.com/detail", headers=AUTH
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        # docstring contract: person, status, emails, activities, notes, next_action, as_of
+        for key in (
+            "person",
+            "status",
+            "emails",
+            "activities",
+            "notes",
+            "next_action",
+            "as_of",
+        ):
+            assert key in body
+        assert body["person"]["kind"] == "purchaser"
+        assert body["person"]["id"] == "purchaser:buyer_d1@example.com"
+        assert body["person"]["email"] == "buyer_d1@example.com"
+        for k in ("stage", "source", "converted_at", "user_id"):
+            assert k in body["status"]
+        # emails populated from the converted lead's outbound 'email' activity
+        assert isinstance(body["emails"], list) and len(body["emails"]) >= 1
+        assert datetime.fromisoformat(body["as_of"])
+        # activities newest-first, capped + iso stamped
+        acts = body["activities"]
+        assert len(acts) >= 1
+        ats = [datetime.fromisoformat(a["created_at"]) for a in acts]
+        assert ats == sorted(ats, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_detail_lead_bundle_shape(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_d2",
+                "name": "Lead D2",
+                "email": "lead_d2@example.com",
+                "stage": "warm",
+                "source": "web",
+                "created_at": (now - timedelta(days=3)).isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        await db.lead_activities.insert_many(
+            [
+                {
+                    "activity_id": "a1",
+                    "lead_id": "lead_d2",
+                    "action_type": "email",
+                    "content": "Sent via MailerCloud: welcome - inside",
+                    "created_at": now - timedelta(hours=3),
+                },
+                {
+                    "activity_id": "a2",
+                    "lead_id": "lead_d2",
+                    "action_type": "note_added",
+                    "content": "called, wants pricing",
+                    "created_at": now - timedelta(hours=1),
+                },
+            ]
+        )
+        r = people_client.get("/api/service/people/lead:lead_d2/detail", headers=AUTH)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["person"]["kind"] == "lead"
+        assert body["person"]["id"] == "lead:lead_d2"
+        assert body["status"]["stage"] == "warm"
+        assert any(e["type"] == "email" for e in body["emails"])
+
+    @pytest.mark.asyncio
+    async def test_detail_notes_present(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_d3",
+                "name": "Lead D3",
+                "email": "lead_d3@example.com",
+                "stage": "warm",
+                "source": "web",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        await db.lead_activities.insert_many(
+            [
+                {
+                    "activity_id": "n1",
+                    "lead_id": "lead_d3",
+                    "action_type": "note_added",
+                    "content": "PATCH-note: interested in trustee plan",
+                    "created_at": now - timedelta(minutes=10),
+                },
+                {
+                    "activity_id": "n2",
+                    "lead_id": "lead_d3",
+                    "action_type": "manual",
+                    "content": "manual note: left voicemail",
+                    "created_at": now - timedelta(minutes=5),
+                },
+                {
+                    "activity_id": "x1",
+                    "lead_id": "lead_d3",
+                    "action_type": "email",
+                    "content": "Sent via MailerCloud: receipt",
+                    "created_at": now - timedelta(minutes=1),
+                },
+            ]
+        )
+        r = people_client.get("/api/service/people/lead:lead_d3/detail", headers=AUTH)
+        assert r.status_code == 200, r.text
+        notes = r.json()["notes"]
+        assert len(notes) == 2  # note_added + manual, never the email row
+        for n in notes:
+            assert set(n.keys()) == {"action_type", "content", "created_at"}
+            assert n["action_type"] in ("note_added", "manual")
+        nts = [datetime.fromisoformat(n["created_at"]) for n in notes]
+        assert nts == sorted(nts, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_detail_downloads_in_activities(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_d4",
+                "name": "Lead D4",
+                "email": "lead_d4@example.com",
+                "stage": "engaged",
+                "source": "web",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        await db.lead_activities.insert_many(
+            [
+                {
+                    "activity_id": "dl1",
+                    "lead_id": "lead_d4",
+                    "action_type": "download",
+                    "content": "Downloaded trust-funding checklist PDF",
+                    "created_at": now - timedelta(minutes=30),
+                },
+                {
+                    "activity_id": "vw1",
+                    "lead_id": "lead_d4",
+                    "action_type": "video_watch",
+                    "content": "Watched 'What is a trust' (80%)",
+                    "created_at": now - timedelta(minutes=20),
+                },
+                {
+                    "activity_id": "em1",
+                    "lead_id": "lead_d4",
+                    "action_type": "email",
+                    "content": "Sent via MailerCloud: your download",
+                    "created_at": now - timedelta(minutes=10),
+                },
+            ]
+        )
+        r = people_client.get("/api/service/people/lead:lead_d4/detail", headers=AUTH)
+        assert r.status_code == 200, r.text
+        acts = r.json()["activities"]
+        types = [a["action_type"] for a in acts]
+        # downloads + video opens/watches are surfaced within the contact history
+        assert "download" in types
+        assert "video_watch" in types
+
+    @pytest.mark.asyncio
+    async def test_detail_emails_merged_from_collections(
+        self, people_client, monkeypatch
+    ):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_d5",
+                "name": "Lead D5",
+                "email": "lead_d5@example.com",
+                "stage": "warm",
+                "source": "web",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        # outbound send in lead_activities
+        await db.lead_activities.insert_one(
+            {
+                "activity_id": "out1",
+                "lead_id": "lead_d5",
+                "action_type": "email",
+                "content": "Sent via MailerCloud: weekly digest - body here",
+                "created_at": now - timedelta(hours=1),
+            }
+        )
+        # inbound reply in the live inbound collection (runtime discovery)
+        inbound = db["emails"]
+        await inbound.insert_one(
+            {
+                "to": "lead_d5@example.com",
+                "from": "friend@other.com",
+                "subject": "Question about trusts",
+                "snippet": "Can I move my house into the trust?",
+                "type": "inbound",
+                "created_at": now,
+            }
+        )
+
+        async def fake_discovery():
+            return "emails"
+
+        monkeypatch.setattr(people_service, "_inbound_collection_name", fake_discovery)
+        r = people_client.get("/api/service/people/lead:lead_d5/detail", headers=AUTH)
+        assert r.status_code == 200, r.text
+        emails = r.json()["emails"]
+        directions = [e["direction"] for e in emails]
+        assert "in" in directions   # from inbound collection
+        assert "out" in directions  # from lead_activities
+        # newest (inbound, now) sorts first
+        assert emails[0]["direction"] == "in"
+        assert emails[0]["subject"] == "Question about trusts"
+
+    @pytest.mark.asyncio
+    async def test_detail_activities_newest_first(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_d6",
+                "name": "Lead D6",
+                "email": "lead_d6@example.com",
+                "stage": "new",
+                "source": "web",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        await db.lead_activities.insert_many(
+            [
+                {
+                    "activity_id": "o1",
+                    "lead_id": "lead_d6",
+                    "action_type": "email",
+                    "content": "old",
+                    "created_at": now - timedelta(days=3),
+                },
+                {
+                    "activity_id": "o2",
+                    "lead_id": "lead_d6",
+                    "action_type": "email",
+                    "content": "mid",
+                    "created_at": now - timedelta(days=1),
+                },
+                {
+                    "activity_id": "o3",
+                    "lead_id": "lead_d6",
+                    "action_type": "email",
+                    "content": "new",
+                    "created_at": now - timedelta(hours=1),
+                },
+            ]
+        )
+        r = people_client.get("/api/service/people/lead:lead_d6/detail", headers=AUTH)
+        assert r.status_code == 200, r.text
+        acts = r.json()["activities"]
+        ats = [datetime.fromisoformat(a["created_at"]) for a in acts]
+        assert ats == sorted(ats, reverse=True)
+        assert acts[0]["content"] == "new"
+
+    @pytest.mark.asyncio
+    async def test_detail_next_action_present(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_d7",
+                "name": "Lead D7",
+                "email": "lead_d7@example.com",
+                "stage": "warm",
+                "source": "web",
+                "next_action": "Send pricing PDF by Friday",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        r = people_client.get("/api/service/people/lead:lead_d7/detail", headers=AUTH)
+        assert r.status_code == 200, r.text
+        assert r.json()["next_action"] == "Send pricing PDF by Friday"
+
+    @pytest.mark.asyncio
+    async def test_detail_subscription_only_purchaser_empty_history(self, people_client):
+        # buyer exists only as a subscription/user doc, no lead -> honest empty history
+        await _seed_user_sub(email="subonly_d@example.com", user_id="user_subd")
+        r = people_client.get(
+            "/api/service/people/purchaser:subonly_d@example.com/detail", headers=AUTH
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["person"]["kind"] == "purchaser"
+        assert body["person"]["email"] == "subonly_d@example.com"
+        assert body["person"]["name"]  # resolved from user doc
+        assert body["activities"] == []
+        assert body["notes"] == []
+        assert body["emails"] == []
+
+    def test_detail_missing_key_401(self, people_client):
+        r = people_client.get("/api/service/people/lead:x/detail")
+        assert r.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_detail_unknown_id_200_empty_bundle(self, people_client):
+        # Docstring contract: unknown id => 200 + empty bundle, never 404
+        # (matches /emails; the OS frontend relies on the 200-empty shape).
+        r = people_client.get(
+            "/api/service/people/lead:ghostperson/detail", headers=AUTH
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["emails"] == []
+        assert body["activities"] == []
+        assert body["notes"] == []
+        assert body["person"]["id"] == "lead:ghostperson"
+        assert body["person"]["kind"] == "lead"
+        assert "as_of" in body
+
+
+class TestRosterDetailRoundTrip:
+    """Regression: the id the roster hands out MUST resolve in /{id}/detail.
+
+    Live bug found 2026-11-05: `_person_id_for_entry` read entry["lead_id"],
+    but roster entries carry `lead_ids` (a list). Every lead therefore shipped
+    `lead:<email>` while /detail looked up db.leads by lead_id -> every real
+    lead's detail bundle was silently empty (0 activities, 0 emails) even
+    though the roster showed last_activity_at. Purchasers were unaffected,
+    which is why the P3 unit tests (which pass ids by hand) stayed green.
+    """
+
+    @pytest.mark.asyncio
+    async def test_roster_lead_id_resolves_in_detail(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_rt01",
+                "name": "Round Trip",
+                "email": "roundtrip@example.com",
+                "stage": "new",
+                "source": "facebook-lead-ad",
+                "phone": "+15550001111",
+                "next_action": "Call the lead",
+                "created_at": (now - timedelta(days=1)).isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        await db.lead_activities.insert_one(
+            {
+                "activity_id": "act_rt1",
+                "lead_id": "lead_rt01",
+                "action_type": "email",
+                "content": "Sent welcome email - hello there",
+                "created_at": now,
+            }
+        )
+        roster = people_client.get("/api/service/people", headers=AUTH).json()
+        assert len(roster["people"]) == 1
+        person = roster["people"][0]
+        # the id must be the lead_id form, not the email
+        assert person["id"] == "lead:lead_rt01"
+        assert person["email"] == "roundtrip@example.com"
+
+        detail = people_client.get(
+            f"/api/service/people/{person['id']}/detail", headers=AUTH
+        )
+        assert detail.status_code == 200, detail.text
+        body = detail.json()
+        assert body["person"]["name"] == "Round Trip"
+        assert body["person"]["email"] == "roundtrip@example.com"
+        assert body["person"]["phone"] == "+15550001111"
+        assert body["status"]["stage"] == "new"
+        assert body["next_action"] == "Call the lead"
+        # the whole point: real history, not an empty shell
+        assert len(body["activities"]) == 1
+        assert len(body["emails"]) == 1
+
+        emails = people_client.get(
+            f"/api/service/people/{person['id']}/emails", headers=AUTH
+        ).json()
+        assert len(emails["emails"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_legacy_email_keyed_lead_id_still_resolves(self, people_client):
+        # Ids minted before the fix carried the email inside the lead: slot.
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            {
+                "lead_id": "lead_legacy",
+                "name": "Legacy Link",
+                "email": "legacy@example.com",
+                "stage": "warm",
+                "source": "web",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "notes": "",
+            }
+        )
+        await db.lead_activities.insert_one(
+            {
+                "activity_id": "act_legacy",
+                "lead_id": "lead_legacy",
+                "action_type": "manual",
+                "content": "called, left voicemail",
+                "created_at": now,
+            }
+        )
+        r = people_client.get(
+            "/api/service/people/lead:legacy@example.com/detail", headers=AUTH
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["person"]["name"] == "Legacy Link"
+        assert body["status"]["stage"] == "warm"
+        assert len(body["activities"]) == 1

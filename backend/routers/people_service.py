@@ -328,7 +328,13 @@ def _row_sort_key(row: dict):
 def _person_id_for_entry(entry: dict) -> str:
     if entry["kind"] == "purchaser":
         return f"purchaser:{entry['email_key']}"
-    return f"lead:{entry.get('lead_id') or entry['email_key']}"
+    # Contract: lead ids are "lead:<lead_id>" so they round-trip into
+    # /{id}/emails and /{id}/detail. Fall back to the email key only for the
+    # rare lead doc that never got a lead_id stamp.
+    lead_ids = entry.get("lead_ids") or []
+    if lead_ids and lead_ids[0]:
+        return f"lead:{lead_ids[0]}"
+    return f"lead:{entry['email_key']}"
 
 
 async def _person_email_rows(person: dict, activity_query: dict) -> List[dict]:
@@ -433,6 +439,21 @@ async def _resolve_person(
                 {"lead_id": activity_lid},
                 DETAIL_LEAD_PROJECTION,
             )
+            if lead is None and "@" in activity_lid:
+                # Ids minted before the lead_id round-trip fix carried the
+                # email key in the lead:<...> slot. Resolve by email so old
+                # links still land on the right person (no invented data).
+                lead = await db.leads.find_one(
+                    {
+                        "email": {
+                            "$regex": f"^{re.escape(activity_lid)}$",
+                            "$options": "i",
+                        }
+                    },
+                    DETAIL_LEAD_PROJECTION,
+                )
+                if lead and lead.get("lead_id"):
+                    activity_lid = lead["lead_id"]
             if lead:
                 person = {
                     "id": person_id,
