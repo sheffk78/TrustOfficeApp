@@ -10,6 +10,11 @@ Endpoints:
   GET /api/service/people/{id}/emails  -> latest 10 email records, newest first
                                           (unknown id => 200 + empty list,
                                           never a 404)
+  GET /api/service/people/{id}/detail  -> P3 bounded per-person bundle:
+                                          identity + stage/status + <=10
+                                          emails + <=50 activities + <=10
+                                          notes + next_action (unknown id
+                                          => 200 + empty bundle, never 404)
 
 Read-only: touches ONLY existing collections — leads, users, subscriptions,
 lead_activities — plus an inbound-email collection when the live database
@@ -36,7 +41,12 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends
 
 from database import db
-from routers.leads_service import LEAD_PROJECTION, ACTIVITY_CONTENT_LIMIT, require_leads_service
+from routers.leads_service import (
+    ACTIVITY_CONTENT_LIMIT,
+    LEAD_PROJECTION,
+    _activity_view,
+    require_leads_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +65,48 @@ ROSTER_LEAD_PROJECTION = {
     "user_id": 1,
     "converted_at": 1,
 }
+
+# ---- P3 (per-person detail bundle) ----
+PEOPLE_DETAIL_EMAIL_LIMIT = 10   # newest email records in the bundle
+PEOPLE_DETAIL_ACT_LIMIT = 50     # activity rows: contact history incl. video/downloads
+PEOPLE_DETAIL_NOTE_LIMIT = 10    # latest notes (note_added rows)
+# Lead doc fields for the bundle identity/status block (P1 shape + P3 extras).
+DETAIL_LEAD_PROJECTION = {
+    **LEAD_PROJECTION,
+    "user_id": 1,
+    "converted_at": 1,
+    "next_action": 1,
+    "booked_call": 1,
+    "call_outcome": 1,
+}
+# note rows: note_added activities carry the note text in `content`.
+DETAIL_NOTE_PROJECTION = {
+    "_id": 0,
+    "action_type": 1,
+    "content": 1,
+    "created_at": 1,
+}
+# Identity fields for a user-backed person (users docs carry no phone/company).
+DETAIL_USER_PROJECTION = {
+    "_id": 0,
+    "user_id": 1,
+    "full_name": 1,
+    "name": 1,
+    "first_name": 1,
+    "last_name": 1,
+    "email": 1,
+}
+
+# Contact-history activities use the same projection `_activity_view` expects
+# (action_type / content / created_at) so they render in the OS activity shape.
+DETAIL_ACTIVITY_PROJECTION = {
+    "_id": 0,
+    "action_type": 1,
+    "content": 1,
+    "created_at": 1,
+}
+# Note-style activity rows surfaced as "notes" in the detail bundle.
+NOTE_ACTION_TYPES = ("note_added", "manual")
 
 # Runtime-discovery candidates for a live inbound-email collection.
 _INBOUND_CANDIDATES = ("emails", "inbound_emails", "mail_logs", "received_emails")
@@ -267,10 +319,153 @@ def _email_snippet(content: str) -> str:
     return body.strip()[:ACTIVITY_CONTENT_LIMIT]
 
 
+def _row_sort_key(row: dict):
+    """Sort key over possibly-mixed datetime/ISO-string stamps -> epoch float."""
+    dt = _as_dt(row.get("at"))
+    return dt.timestamp() if dt else 0.0
+
+
 def _person_id_for_entry(entry: dict) -> str:
     if entry["kind"] == "purchaser":
         return f"purchaser:{entry['email_key']}"
     return f"lead:{entry.get('lead_id') or entry['email_key']}"
+
+
+async def _person_email_rows(person: dict, activity_query: dict) -> List[dict]:
+    """Bounded newest-first email rows for one resolved person (P2/P3 shared).
+
+    Sources: the discovered live inbound-email collection (direction 'in')
+    plus lead_activities-derived rows; merged, deduped, newest first, capped
+    at PEOPLE_EMAIL_LIMIT. Stamps render as ISO strings on the way out.
+    """
+    email_rows: List[dict] = []
+
+    # ---- discovered inbound collection (live DB only) -> direction 'in' ----
+    inbound_coll = await _inbound_collection_name()
+    if inbound_coll and person["email"]:
+        addr_icase = {
+            "$regex": f"^{re.escape(person['email'])}$",
+            "$options": "i",
+        }
+        inbound_cursor = (
+            db[inbound_coll]
+            .find({"$or": [{"to": addr_icase}, {"from": addr_icase}]})
+            .sort("created_at", -1)
+            .limit(PEOPLE_EMAIL_LIMIT)
+        )
+        async for doc in inbound_cursor:
+            email_rows.append(
+                {
+                    "at": doc.get("created_at") or doc.get("date"),
+                    "direction": "in",
+                    "subject": (doc.get("subject") or "")[:200],
+                    "snippet": (doc.get("snippet") or doc.get("text") or "")[:ACTIVITY_CONTENT_LIMIT],
+                    "type": doc.get("type") or "inbound",
+                }
+            )
+
+    # ---- lead_activities rows (always the base source) ----
+    if activity_query:
+        cursor = (
+            db.lead_activities.find(activity_query)
+            .sort("created_at", -1)
+            .limit(PEOPLE_EMAIL_LIMIT * 2)
+        )
+        async for act in cursor:
+            email_rows.append(
+                {
+                    "at": act.get("created_at"),
+                    "direction": _email_direction(act.get("action_type"), act.get("content") or ""),
+                    "subject": _email_subject(act.get("content") or ""),
+                    "snippet": _email_snippet(act.get("content") or ""),
+                    "type": act.get("action_type") or "activity",
+                }
+            )
+
+    # ---- merge, dedupe, newest-first, cap ----
+    deduped: List[dict] = []
+    seen_rows = set()
+    for row in email_rows:
+        key = ((row.get("direction") or ""), (row.get("subject") or "").lower()[:80])
+        if inbound_coll and key in seen_rows and row.get("direction") == "out":
+            # an inbound copy already covers this thread; skip the mirror row
+            continue
+        if key in seen_rows and row.get("direction") != "out":
+            continue
+        seen_rows.add(key)
+        deduped.append(row)
+
+    deduped.sort(key=_row_sort_key, reverse=True)
+
+    return [
+        {
+            "at": row["at"].isoformat() if isinstance(row["at"], datetime) else row["at"],
+            "direction": row["direction"],
+            "subject": row["subject"],
+            "snippet": row["snippet"],
+            "type": row["type"],
+        }
+        for row in deduped[:PEOPLE_EMAIL_LIMIT]
+    ]
+
+
+async def _resolve_person(
+    person_id: str, email: str = "", name: str = ""
+) -> Tuple[dict, Optional[dict], Optional[dict], dict]:
+    """Turn an opaque person id into (person, lead, user, activity_query).
+
+    Exact P2 emails-endpoint semantics, extracted so /detail reuses the same
+    resolution: lead:<lead_id> matches db.leads.lead_id (activities queried
+    even when the lead doc itself is gone — degrade honestly); purchaser:<email>
+    matches a lead by case-insensitive email, falling back to a user doc for
+    identity only when no lead exists. Unknown shapes/persons resolve to the
+    echoed person with empty query — a 200 empty bundle, never a 404.
+    """
+    person = {"id": person_id, "name": name or "", "email": email or ""}
+    lead: Optional[dict] = None
+    user: Optional[dict] = None
+    activity_query: dict = {}
+
+    if person_id.startswith("lead:"):
+        activity_lid = person_id[len("lead:"):]
+        if activity_lid and activity_lid not in ("", "null"):
+            lead = await db.leads.find_one(
+                {"lead_id": activity_lid},
+                DETAIL_LEAD_PROJECTION,
+            )
+            if lead:
+                person = {
+                    "id": person_id,
+                    "name": lead.get("name") or person["name"],
+                    "email": lead.get("email") or person["email"],
+                }
+            activity_query = {"lead_id": activity_lid}
+    elif person_id.startswith("purchaser:"):
+        p_email = (email or person_id[len("purchaser:"):]).strip().lower()
+        person = {"id": person_id, "name": name or "", "email": p_email}
+        email_icase = {"$regex": f"^{re.escape(p_email)}$", "$options": "i"} if p_email else None
+        if p_email:
+            lead = await db.leads.find_one({"email": email_icase}, DETAIL_LEAD_PROJECTION)
+        if lead:
+            person["name"] = lead.get("name") or person["name"]
+            person["email"] = lead.get("email") or p_email
+            activity_query = {"lead_id": lead.get("lead_id")}
+        else:
+            if p_email:
+                user = await db.users.find_one(
+                    {"email": email_icase},
+                    DETAIL_USER_PROJECTION,
+                )
+            if user:
+                person["name"] = (
+                    user.get("full_name")
+                    or " ".join(p for p in (user.get("first_name"), user.get("last_name")) if p)
+                    or user.get("name")
+                    or ""
+                ) or person["name"]
+                person["email"] = (user.get("email") or p_email)
+
+    return person, lead, user, activity_query
 
 
 def _entry_recency(entry: dict) -> Optional[datetime]:
@@ -564,140 +759,98 @@ async def get_person_emails(person_id: str, email: str = "", name: str = ""):
     whatever name/email arrived as query params.
     """
     as_of_dt = datetime.now(timezone.utc)
-    person = {"id": person_id, "name": name or "", "email": email or ""}
-    email_rows: List[dict] = []
-    activity_query: dict = {}
-    activity_lid = None
-
-    if person_id.startswith("lead:"):
-        activity_lid = person_id[len("lead:"):]
-        if activity_lid and activity_lid not in ("", "null"):
-            lead = await db.leads.find_one(
-                {"lead_id": activity_lid},
-                {"_id": 0, "lead_id": 1, "name": 1, "email": 1},
-            )
-            if lead:
-                person = {
-                    "id": person_id,
-                    "name": lead.get("name") or person["name"],
-                    "email": lead.get("email") or person["email"],
-                }
-            activity_query = {"lead_id": activity_lid}
-    elif person_id.startswith("purchaser:"):
-        p_email = (email or person_id[len("purchaser:"):]).strip().lower()
-        person = {"id": person_id, "name": name or "", "email": p_email}
-        email_icase = {"$regex": f"^{re.escape(p_email)}$", "$options": "i"} if p_email else None
-        lead = None
-        if p_email:
-            lead = await db.leads.find_one(
-                {"email": email_icase},
-                {"_id": 0, "lead_id": 1, "name": 1, "email": 1},
-            )
-        if lead:
-            person["name"] = lead.get("name") or person["name"]
-            person["email"] = lead.get("email") or p_email
-            activity_lid = lead.get("lead_id")
-            activity_query = {"lead_id": activity_lid}
-        else:
-            user = None
-            if p_email:
-                user = await db.users.find_one(
-                    {"email": email_icase},
-                    {"_id": 0, "full_name": 1, "name": 1, "first_name": 1, "last_name": 1, "email": 1},
-                )
-            if user:
-                person["name"] = (
-                    user.get("full_name")
-                    or " ".join(p for p in (user.get("first_name"), user.get("last_name")) if p)
-                    or user.get("name")
-                    or ""
-                ) or person["name"]
-                person["email"] = (user.get("email") or p_email)
-
-    # ---- discovered inbound collection (live DB only) -> direction 'in' ----
-    inbound_coll = await _inbound_collection_name()
-    if inbound_coll and person["email"]:
-        addr_icase = {
-            "$regex": f"^{re.escape(person['email'])}$",
-            "$options": "i",
-        }
-        inbound_cursor = (
-            db[inbound_coll]
-            .find({"$or": [{"to": addr_icase}, {"from": addr_icase}]})
-            .sort("created_at", -1)
-            .limit(PEOPLE_EMAIL_LIMIT)
-        )
-        async for doc in inbound_cursor:
-            email_rows.append(
-                {
-                    "at": doc.get("created_at") or doc.get("date"),
-                    "direction": "in",
-                    "subject": (doc.get("subject") or "")[:200],
-                    "snippet": (doc.get("snippet") or doc.get("text") or "")[:ACTIVITY_CONTENT_LIMIT],
-                    "type": doc.get("type") or "inbound",
-                }
-            )
-
-    # ---- lead_activities rows (always the base source) ----
-    if activity_query:
-        cursor = (
-            db.lead_activities.find(activity_query)
-            .sort("created_at", -1)
-            .limit(PEOPLE_EMAIL_LIMIT * 2)
-        )
-        async for act in cursor:
-            email_rows.append(
-                {
-                    "at": act.get("created_at"),
-                    "direction": _email_direction(act.get("action_type"), act.get("content") or ""),
-                    "subject": _email_subject(act.get("content") or ""),
-                    "snippet": _email_snippet(act.get("content") or ""),
-                    "type": act.get("action_type") or "activity",
-                }
-            )
-
-    # ---- merge, dedupe, newest-first, cap ----
-    deduped: List[dict] = []
-    seen_rows = set()
-    for row in email_rows:
-        key = ((row.get("direction") or ""), (row.get("subject") or "").lower()[:80])
-        if inbound_coll and key in seen_rows and row.get("direction") == "out":
-            # an inbound copy already covers this thread; skip the mirror row
-            continue
-        if key in seen_rows and row.get("direction") != "out":
-            continue
-        seen_rows.add(key)
-        deduped.append(row)
-
-    def _row_key(row: dict):
-        at = row.get("at")
-        dt = at if isinstance(at, datetime) else None
-        if dt is None and isinstance(at, str):
-            try:
-                dt = datetime.fromisoformat(at)
-            except ValueError:
-                dt = None
-        if isinstance(dt, datetime) and dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.timestamp() if dt else 0.0
-
-    deduped.sort(key=_row_key, reverse=True)
-
+    person, _lead, _user, activity_query = await _resolve_person(
+        person_id, email=email, name=name
+    )
+    emails = await _person_email_rows(person, activity_query)
     return {
         "person": {
             "id": person["id"],
             "name": person["name"] or "",
             "email": person["email"] or "",
         },
-        "emails": [
-            {
-                "at": row["at"].isoformat() if isinstance(row["at"], datetime) else row["at"],
-                "direction": row["direction"],
-                "subject": row["subject"],
-                "snippet": row["snippet"],
-                "type": row["type"],
-            }
-            for row in deduped[:PEOPLE_EMAIL_LIMIT]
-        ],
+        "emails": emails,
+        "as_of": as_of_dt.isoformat(),
+    }
+
+
+@router.get("/{person_id}/detail")
+async def get_person_detail(person_id: str, email: str = "", name: str = ""):
+    """P3 bounded per-person bundle for the OS People page detail view.
+
+    Identity (name/email/phone/company) + stage/status + latest emails +
+    contact-history activities (the /admin/leads activity log shape, incl.
+    video opens/watches, downloads, booked_call) + latest notes + next_action.
+
+    Unknown/missing ids are NOT 404s: same contract as /emails — a 200 with
+    an empty bundle, person echoed from the path + query params, all lists
+    empty, identity keys present but blank. Bounded: <=10 emails, <=50
+    activities, <=10 notes, newest first everywhere, content capped at
+    ACTIVITY_CONTENT_LIMIT; degrades honestly (phone/company blank when the
+    source docs never carried them) and never invents data.
+
+    "Notes" are the two canonical note writes: admin PATCH-notes rows
+    (action_type "note_added") and note-style rows (action_type "manual").
+    """
+    as_of_dt = datetime.now(timezone.utc)
+    person, lead, user, activity_query = await _resolve_person(
+        person_id, email=email, name=name
+    )
+
+    emails = await _person_email_rows(person, activity_query)
+
+    # ---- contact history: admin activity-log rows, newest first, capped ----
+    activities: List[dict] = []
+    if activity_query:
+        act_cursor = (
+            db.lead_activities.find(activity_query, DETAIL_ACTIVITY_PROJECTION)
+            .sort("created_at", -1)
+            .limit(PEOPLE_DETAIL_ACT_LIMIT)
+        )
+        async for act in act_cursor:
+            activities.append(_activity_view(act))
+
+    # ---- latest notes: bounded note-action rows, newest first ----
+    notes: List[dict] = []
+    if activity_query:
+        note_cursor = (
+            db.lead_activities.find(
+                {**activity_query, "action_type": {"$in": list(NOTE_ACTION_TYPES)}},
+                DETAIL_NOTE_PROJECTION,
+            )
+            .sort("created_at", -1)
+            .limit(PEOPLE_DETAIL_NOTE_LIMIT)
+        )
+        async for note in note_cursor:
+            notes.append(_activity_view(note))
+
+    # ---- identity + stage/status (empty/None when nothing is known) ----
+    identity = {
+        "id": person["id"],
+        "kind": "purchaser" if person_id.startswith("purchaser:") else "lead",
+        "name": person["name"] or "",
+        "email": person["email"] or "",
+        "phone": (lead.get("phone") if lead else None) or "",
+        "company": (lead.get("company") if lead else None) or "",
+    }
+    status = {
+        "stage": (lead.get("stage") if lead else None),
+        "source": (lead.get("source") if lead else None),
+        "created_at": lead.get("created_at") if lead else None,
+        "updated_at": lead.get("updated_at") if lead else None,
+        "converted_at": lead.get("converted_at") if lead else None,
+        "user_id": (lead.get("user_id") if lead else None)
+        or (user.get("user_id") if user else None),
+        "booked_call": (lead.get("booked_call") if lead else None),
+        "call_outcome": (lead.get("call_outcome") if lead else None),
+    }
+
+    return {
+        "person": identity,
+        "status": status,
+        "emails": emails[:PEOPLE_DETAIL_EMAIL_LIMIT],
+        "activities": activities,
+        "notes": notes,
+        "next_action": lead.get("next_action") if lead else None,
         "as_of": as_of_dt.isoformat(),
     }
