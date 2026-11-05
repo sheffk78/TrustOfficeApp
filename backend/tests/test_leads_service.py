@@ -41,7 +41,15 @@ db = database.db
 @pytest_asyncio.fixture(autouse=True)
 async def clean_db():
     """Fresh collections around every test."""
-    colls = ("leads", "lead_activities", "users", "subscriptions")
+    colls = (
+        "leads",
+        "lead_activities",
+        "users",
+        "subscriptions",
+        "payment_transactions",
+        "course_leads",
+        "fiduciary_assessments",
+    )
     for coll in colls:
         await db[coll].delete_many({})
     yield
@@ -262,8 +270,18 @@ async def _seed_user_sub(
     created_at=None,
     with_user=True,
     stripe_sub=None,
+    billing_period=None,
+    current_period_end=None,
+    stripe_customer_id=None,
+    wp_ref=None,
+    created_via=None,
 ):
-    """One subscription (+ optional user doc) in the fake db."""
+    """One subscription (+ optional user doc) in the fake db.
+
+    billing_period / current_period_end / stripe_customer_id drive the
+    enrichment economics; wp_ref / created_via on the USER doc drive
+    is_wingpoint_user() (the WingPoint single source of truth).
+    """
     now = created_at or datetime.now(timezone.utc)
     sub = {
         "subscription_id": "sub_test_" + user_id,
@@ -271,22 +289,65 @@ async def _seed_user_sub(
         "plan_type": plan,
         "status": status,
         "stripe_subscription_id": stripe_sub or f"stripe_sub_{user_id}",
+        "stripe_customer_id": stripe_customer_id,
+        "billing_period": billing_period,
+        "current_period_end": current_period_end,
         "created_at": now.isoformat(),
         "updated_at": now.isoformat(),
     }
     await db.subscriptions.insert_one(sub)
     if with_user:
-        await db.users.insert_one(
-            {
-                "user_id": user_id,
-                "email": email,
-                "full_name": "Buyer " + user_id,
-                "first_name": "Buyer",
-                "last_name": user_id,
-                "created_at": now.isoformat(),
-            }
-        )
+        user_doc = {
+            "user_id": user_id,
+            "email": email,
+            "full_name": "Buyer " + user_id,
+            "first_name": "Buyer",
+            "last_name": user_id,
+            "created_at": now.isoformat(),
+        }
+        if wp_ref is not None:
+            user_doc["wp_ref"] = wp_ref
+        if created_via is not None:
+            user_doc["created_via"] = created_via
+        await db.users.insert_one(user_doc)
     return sub
+
+
+async def _seed_payment(user_id, amount_dollars, created_at, status="paid"):
+    """A stored invoice.paid trail row (payment_transactions, dollars)."""
+    await db.payment_transactions.insert_one(
+        {
+            "transaction_id": f"txn_{user_id}_{int(created_at.timestamp())}",
+            "user_id": user_id,
+            "amount": float(amount_dollars),
+            "currency": "usd",
+            "payment_status": status,
+            "created_at": created_at.isoformat(),
+        }
+    )
+
+
+async def _seed_signups(email, course_source="trustee-101-landing", asessment_score=80):
+    """A newsletter (course_leads) + assessment (fiduciary_assessments) row for email."""
+    now = datetime.now(timezone.utc)
+    await db.course_leads.insert_one(
+        {
+            "email": email,
+            "name": "Signup " + email,
+            "source": course_source,
+            "lesson_1_watched": True,
+            "course_purchased": False,
+            "created_at": now.isoformat(),
+        }
+    )
+    await db.fiduciary_assessments.insert_one(
+        {
+            "assessment_id": "fa_" + email,
+            "email": email,
+            "score": asessment_score,
+            "created_at": now.isoformat(),
+        }
+    )
 
 
 async def _seed_converted_lead(
@@ -1215,3 +1276,150 @@ class TestRosterDetailRoundTrip:
         assert body["person"]["name"] == "Legacy Link"
         assert body["status"]["stage"] == "warm"
         assert len(body["activities"]) == 1
+
+
+class TestRosterEnrichment:
+    """P2 deepen: every roster person carries real behavior + economics + WingPoint truth.
+
+    Additive keys only; every value derives from stored data. Where the TO product
+    keeps no server-side record (page views, resource downloads) the list is empty.
+    """
+
+    @pytest.mark.asyncio
+    async def test_purchaser_economics_full(self, people_client):
+        now = datetime.now(timezone.utc)
+        await _seed_user_sub(
+            email="eco@example.com", user_id="u_eco",
+            plan="trustee", status="active",
+            billing_period="monthly",
+            current_period_end="2027-02-01T00:00:00+00:00",
+            stripe_customer_id="cus_eco",
+        )
+        # newest first; stored invoice.paid trail (dollars in payment_transactions)
+        await _seed_payment("u_eco", 99.00, now - timedelta(days=50))
+        await _seed_payment("u_eco", 99.00, now - timedelta(days=20))
+        await _seed_signups("eco@example.com")
+        r = people_client.get("/api/service/people", headers=AUTH)
+        assert r.status_code == 200, r.text
+        person = [p for p in r.json()["people"] if p["email"] == "eco@example.com"][0]
+
+        # ---- purchaser economics (all from stored data) ----
+        assert person["kind"] == "purchaser"
+        assert person["product"] == "Trustee"
+        assert person["amount_cents"] == 9900
+        assert person["billing_period"] == "monthly"
+        assert person["last_amount_cents"] == 9900
+        assert person["last_paid_at"] is not None
+        assert person["next_due_at"] == "2027-02-01T00:00:00+00:00"
+
+        # ---- WingPoint truth via is_wingpoint_user (single source) ----
+        assert person["wp_origin"] is False
+        assert person["wp_product"] is False
+
+        # ---- behavior: page_events/resources not stored server-side -> empty ----
+        assert person["behavior"]["page_events"] == []
+        assert person["behavior"]["resources"] == []
+        # signups matched by email from course_leads + fiduciary_assessments
+        kinds = {s["kind"] for s in person["behavior"]["signups"]}
+        assert "newsletter" in kinds and "assessment" in kinds
+
+    @pytest.mark.asyncio
+    async def test_wingpoint_origin_and_product(self, people_client):
+        await _seed_user_sub(
+            email="wp@example.com", user_id="u_wp",
+            plan="wingpoint_trustee", status="active",
+            billing_period="annual",
+            current_period_end="2027-03-01T00:00:00+00:00",
+            wp_ref="WP-ABC12345-DE67",
+        )
+        await _seed_payment("u_wp", 758.00, datetime.now(timezone.utc) - timedelta(days=10))
+        r = people_client.get("/api/service/people", headers=AUTH)
+        assert r.status_code == 200, r.text
+        person = [p for p in r.json()["people"] if p["email"] == "wp@example.com"][0]
+        # is_wingpoint_user() is the single source of truth
+        assert person["wp_origin"] is True
+        assert person["wp_product"] is True
+        assert person["product"] == "WingPoint Trustee"
+        assert person["amount_cents"] == 75800
+        assert person["billing_period"] == "annual"
+        assert person["next_due_at"] == "2027-03-01T00:00:00+00:00"
+
+    @pytest.mark.asyncio
+    async def test_lead_without_wp_and_signups(self, people_client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one({
+            "lead_id": "lead_enr1", "name": "Enr Lead",
+            "email": "enr@example.com", "stage": "warm",
+            "source": "web", "created_at": now.isoformat(),
+            "updated_at": now.isoformat(), "notes": "",
+        })
+        await _seed_signups("enr@example.com")
+        r = people_client.get("/api/service/people", headers=AUTH)
+        assert r.status_code == 200, r.text
+        person = [p for p in r.json()["people"] if p["email"] == "enr@example.com"][0]
+        assert person["kind"] == "lead"
+        # purchaser economics are null for leads
+        assert person["product"] is None
+        assert person["amount_cents"] is None
+        assert person["next_due_at"] is None
+        assert person["wp_origin"] is False
+        assert person["wp_product"] is False
+        # behavior.signups populated from stored rows; page/resources empty
+        kinds = {s["kind"] for s in person["behavior"]["signups"]}
+        assert kinds == {"newsletter", "assessment"}
+        assert person["behavior"]["page_events"] == []
+        assert person["behavior"]["resources"] == []
+
+    @pytest.mark.asyncio
+    async def test_no_payment_trail_last_paid_null(self, people_client):
+        # Subscription exists but no payment_transactions and no Stripe key in test
+        # env -> last payment stays null (never invented). Current price still derives.
+        await _seed_user_sub(
+            email="nope@example.com", user_id="u_nope", plan="estate",
+            billing_period="monthly",
+            current_period_end="2027-01-01T00:00:00+00:00",
+            stripe_customer_id="cus_nope",
+        )
+        r = people_client.get("/api/service/people", headers=AUTH)
+        assert r.status_code == 200, r.text
+        person = [p for p in r.json()["people"] if p["email"] == "nope@example.com"][0]
+        assert person["amount_cents"] == 18900
+        assert person["billing_period"] == "monthly"
+        assert person["next_due_at"] == "2027-01-01T00:00:00+00:00"
+        assert person["last_paid_at"] is None
+        assert person["last_amount_cents"] is None
+
+    @pytest.mark.asyncio
+    async def test_stripe_fallback_when_trail_empty(self, people_client, monkeypatch):
+        # Purchaser with empty stored trail; Stripe Invoice retrieve fills last payment.
+        import stripe as _stripe
+
+        await _seed_user_sub(
+            email="fb@example.com", user_id="u_fb", plan="trustee",
+            billing_period="monthly",
+            current_period_end="2027-04-01T00:00:00+00:00",
+            stripe_customer_id="cus_fb",
+        )
+
+        class _Inv:
+            def __init__(self, paid_at_ts, cents):
+                self.status_transitions = type("st", (), {"paid_at": paid_at_ts})()
+                self.amount_paid = cents
+
+        class _List:
+            def __init__(self, inv):
+                self.data = [inv]
+
+        paid_ts = int(datetime(2026, 12, 1, tzinfo=timezone.utc).timestamp())
+        monkeypatch.setattr(
+            _stripe, "Invoice",
+            type("Invoice", (), {"list": staticmethod(lambda **kw: _List(_Inv(paid_ts, 9900)))}),
+        )
+        monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_fb")
+        r = people_client.get("/api/service/people", headers=AUTH)
+        assert r.status_code == 200, r.text
+        person = [p for p in r.json()["people"] if p["email"] == "fb@example.com"][0]
+        assert person["last_paid_at"] is not None
+        assert person["last_amount_cents"] == 9900
+        assert person["next_due_at"] == "2027-04-01T00:00:00+00:00"
+

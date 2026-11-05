@@ -47,8 +47,136 @@ from routers.leads_service import (
     _activity_view,
     require_leads_service,
 )
+# WingPoint membership single source of truth â never re-derive inline.
+from services.wingpoint_identity import is_wingpoint_user
 
 logger = logging.getLogger(__name__)
+
+# ==================== ROSTER ENRICHMENT HELPERS (P2 deepen) ====================
+#
+# Behavior/truth fields added ADDITIVELY to every roster person. Every value is
+# derived from real stored data (subscriptions + payment_transactions + users +
+# course_leads + fiduciary_assessments). Nothing is synthesized or default-filled:
+# when the data does not exist server-side the field is null / the list empty.
+#
+# NOTE on behavior.page_events / behavior.resources:
+#   The TO product does NOT store per-page visits or resource downloads
+#   server-side. Page views are client-side GA4/Meta Pixel only; resource access
+#   is tracked only as course-lesson flags. So those two lists are emitted empty
+#   by design and never fabricated. (See the lane-A report for the probe result.)
+
+# plan_type -> human product label (display only; falls back to raw plan_type).
+PRODUCT_LABELS = {
+    "trustee": "Trustee",
+    "estate": "Estate",
+    "advisor": "Advisor",
+    "wingpoint": "WingPoint",
+    "wingpoint_trustee": "WingPoint Trustee",
+}
+# WingPoint pricing plan_types (wp_product truth per contract).
+WP_PLAN_TYPES = ("wingpoint", "wingpoint_trustee")
+# payment_transactions statuses that count as a real payment.
+PAID_STATUSES = ("paid", "succeeded")
+
+_PLAN_AMOUNTS_CACHE = None
+
+
+def _plan_amounts():
+    """Lazily import the canonical price map from routers.subscriptions.
+
+    Avoids a hard top-level import of the (heavy) subscriptions router; falls
+    back to an empty map if it cannot be loaded so the roster never 500s.
+    """
+    global _PLAN_AMOUNTS_CACHE
+    if _PLAN_AMOUNTS_CACHE is None:
+        try:
+            from routers.subscriptions import PLAN_AMOUNTS as _pa
+            _PLAN_AMOUNTS_CACHE = _pa or {}
+        except Exception:
+            _PLAN_AMOUNTS_CACHE = {}
+    return _PLAN_AMOUNTS_CACHE
+
+
+def _product_label(plan_type):
+    if not plan_type:
+        return None
+    return PRODUCT_LABELS.get(plan_type, plan_type)
+
+
+def _amount_cents_for(plan_type, billing_period):
+    """Current-cycle price in cents from the canonical (plan_type, billing_period)
+    map. Returns None when the stored plan/period isn't a known price (never invents)."""
+    if not plan_type:
+        return None
+    amt = _plan_amounts().get((plan_type, billing_period))
+    if amt is None:
+        return None
+    return int(round(float(amt) * 100))
+
+
+def _to_cents(amount_dollars):
+    """payment_transactions stores dollars; convert to cents. None-safe."""
+    if amount_dollars is None:
+        return None
+    try:
+        return int(round(float(amount_dollars) * 100))
+    except (TypeError, ValueError):
+        return None
+
+
+def _iso(raw):
+    """BSON Date | ISO string | None -> ISO string | None (tz-aware out)."""
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return raw.isoformat()
+    if isinstance(raw, str):
+        dt = _as_dt(raw)
+        return dt.isoformat() if dt else raw
+    return None
+
+
+def _last_paid_from_stripe(stripe_customer_id):
+    """Fail-soft Stripe Invoice retrieve fallback.
+
+    Invoked ONLY when the stored payment_transactions trail is empty and a Stripe
+    customer id is present AND STRIPE_SECRET_KEY is in env. Returns (iso_at, cents)
+    or (None, None). Any Stripe error is swallowed so the roster never breaks.
+    """
+    if not stripe_customer_id:
+        return None, None
+    api_key = os.environ.get("STRIPE_SECRET_KEY")
+    if not api_key:
+        return None, None
+    try:
+        import stripe
+
+        stripe.api_key = api_key
+        invoices = stripe.Invoice.list(
+            customer=stripe_customer_id, status="paid", limit=1
+        )
+        data = list(getattr(invoices, "data", []) or [])
+        if not data:
+            return None, None
+        inv = data[0]
+        if isinstance(inv, dict):
+            paid_at = (inv.get("status_transitions") or {}).get("paid_at")
+            amount_cents = inv.get("amount_paid")
+        else:
+            paid_at = getattr(
+                getattr(inv, "status_transitions", None), "paid_at", None
+            )
+            amount_cents = getattr(inv, "amount_paid", None)
+        iso_at = (
+            datetime.fromtimestamp(paid_at, tz=timezone.utc).isoformat()
+            if paid_at
+            else None
+        )
+        return iso_at, (int(amount_cents) if amount_cents is not None else None)
+    except Exception as e:  # pragma: no cover - network path
+        logger.warning(f"people_service Stripe invoice fallback failed: {e}")
+        return None, None
+
 
 router = APIRouter(
     prefix="/service/people",
@@ -64,6 +192,9 @@ ROSTER_LEAD_PROJECTION = {
     **LEAD_PROJECTION,
     "user_id": 1,
     "converted_at": 1,
+    # WingPoint membership fields so is_wingpoint_user() can run on lead docs too.
+    "wp_ref": 1,
+    "created_via": 1,
 }
 
 # ---- P3 (per-person detail bundle) ----
@@ -538,6 +669,9 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
             "lead_ids": [lead.get("lead_id")] if lead.get("lead_id") else [],
             "user_id": lead.get("user_id"),
             "converted_at": lead.get("converted_at"),
+            # WingPoint identity fields (projection widened to carry them)
+            "wp_ref": lead.get("wp_ref"),
+            "created_via": lead.get("created_via"),
         }
         existing = entries_by_email.get(key)
         if existing is None:
@@ -595,6 +729,9 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
             "status": 1,
             "trial_end_date": 1,
             "stripe_subscription_id": 1,
+            "stripe_customer_id": 1,
+            "billing_period": 1,
+            "current_period_end": 1,
             "created_at": 1,
         },
     ).to_list(2000)
@@ -618,6 +755,10 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
                 "name": 1,
                 "first_name": 1,
                 "last_name": 1,
+                # WingPoint identity fields so is_wingpoint_user() can run on the user doc
+                "wp_ref": 1,
+                "source": 1,
+                "created_via": 1,
             },
         ).limit(2000)
         async for user in users_cursor:
@@ -664,6 +805,7 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
             # stamp first, then by identical email.
             sub = None
             uid = entry.get("user_id")
+            linked_uid = None
             if uid and uid in paid_subs:
                 sub = paid_subs[uid]
             else:
@@ -672,6 +814,8 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
                     sub = paid_subs[linked_uid]
             if sub:
                 entry["plan"] = sub.get("plan_type")
+                entry["_sub"] = sub
+                entry["_uid"] = uid or linked_uid
         entry["email_count"] = email_count
         entry["id"] = _person_id_for_entry(entry)
         out_entries.append(entry)
@@ -712,8 +856,116 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
                 "user_id": uid,
                 "email_count": 0,
                 "id": f"purchaser:{key}",
+                # enrichment hooks (same shape as step-4 purchasers)
+                "_sub": sub,
+                "_uid": uid,
             }
         )
+
+    # ---- 5b. enrichment: economics + behavior + WingPoint truth (ADDITIVE) ----
+    # Every value derived from real stored data. Nothing is synthesized. Where the
+    # TO product keeps no server-side record (page visits, resource downloads) the
+    # list is emitted empty â never fabricated. See module docstring + lane-A report.
+    purchaser_uids = [
+        e.get("_uid") for e in out_entries
+        if e.get("kind") == "purchaser" and e.get("_uid")
+    ]
+    stored_paid: dict = {}
+    if purchaser_uids:
+        txn_cursor = (
+            db.payment_transactions.find(
+                {
+                    "user_id": {"$in": purchaser_uids},
+                    "payment_status": {"$in": list(PAID_STATUSES)},
+                },
+                {"_id": 0, "user_id": 1, "amount": 1, "created_at": 1},
+            )
+            .sort("created_at", -1)
+            .limit(2000)
+        )
+        async for txn in txn_cursor:
+            uid = txn.get("user_id")
+            if uid is not None and uid not in stored_paid:
+                stored_paid[uid] = txn  # newest first per user
+
+    # Signup rows (newsletter/course + fiduciary assessment) matched by email.
+    all_emails = [e["email"] for e in out_entries if e.get("email")]
+    signups_by_email: dict = {}
+    if all_emails:
+        async for cl in db.course_leads.find(
+            {"email": {"$in": all_emails}},
+            {"_id": 0, "email": 1, "source": 1, "created_at": 1,
+             "course_purchased": 1, "lesson_1_watched": 1},
+        ):
+            e = (cl.get("email") or "").lower()
+            signups_by_email.setdefault(e, []).append({
+                "kind": "newsletter",
+                "source": cl.get("source"),
+                "created_at": _iso(cl.get("created_at")),
+                "detail": {
+                    "course_purchased": cl.get("course_purchased"),
+                    "lesson_1_watched": cl.get("lesson_1_watched"),
+                },
+            })
+        async for fa in db.fiduciary_assessments.find(
+            {"email": {"$in": all_emails}},
+            {"_id": 0, "email": 1, "assessment_id": 1, "score": 1, "created_at": 1},
+        ):
+            e = (fa.get("email") or "").lower()
+            signups_by_email.setdefault(e, []).append({
+                "kind": "assessment",
+                "source": "fiduciary-assessment",
+                "created_at": _iso(fa.get("created_at")),
+                "detail": {
+                    "assessment_id": fa.get("assessment_id"),
+                    "score": fa.get("score"),
+                },
+            })
+
+    # Per-purchaser economics: current price + last payment + next due.
+    economics_by_id: dict = {}
+    for entry in out_entries:
+        if entry["kind"] != "purchaser":
+            continue
+        uid = entry.get("_uid")
+        sub = entry.get("_sub") or {}
+        plan_type = entry.get("plan")
+        billing_period = sub.get("billing_period")
+        txn = stored_paid.get(uid) if uid else None
+        last_paid_at = _iso(txn.get("created_at")) if txn else None
+        last_amount_cents = _to_cents(txn.get("amount")) if txn else None
+        # Stripe Invoice fallback ONLY when the stored trail is empty.
+        if last_paid_at is None and sub.get("stripe_customer_id"):
+            fb_at, fb_cents = _last_paid_from_stripe(sub["stripe_customer_id"])
+            last_paid_at = last_paid_at or fb_at
+            last_amount_cents = last_amount_cents if last_amount_cents is not None else fb_cents
+        economics_by_id[entry["id"]] = {
+            "product": _product_label(plan_type),
+            "amount_cents": _amount_cents_for(plan_type, billing_period),
+            "billing_period": billing_period,
+            "last_paid_at": last_paid_at,
+            "last_amount_cents": last_amount_cents,
+            # subscription current_period_end; null when lifetime/one-off or when
+            # the Stripe-managed period end is only computed live (not persisted).
+            "next_due_at": _iso(sub.get("current_period_end")),
+        }
+
+    # WingPoint truth + signups for EVERY entry (behavior available or not).
+    for entry in out_entries:
+        email_key = entry.get("email_key") or (entry.get("email") or "").lower()
+        if entry["kind"] == "purchaser":
+            identity_doc = user_by_id.get(entry.get("_uid")) or {}
+            wp_product = entry.get("plan") in WP_PLAN_TYPES
+        else:
+            identity_doc = {
+                "source": entry.get("source"),
+                "wp_ref": entry.get("wp_ref"),
+                "created_via": entry.get("_created_via"),
+            }
+            wp_product = False
+        entry["_wp_origin"] = bool(is_wingpoint_user(identity_doc))
+        entry["_wp_product"] = wp_product
+        entry["_signups"] = signups_by_email.get(email_key, [])
 
     # ---- 6. sort (purchasers first by recency, leads by last_activity desc) ----
     def _sort_key(entry: dict):
@@ -748,6 +1000,24 @@ async def _load_roster() -> Tuple[List[dict], dict, datetime]:
             "last_activity_at": entry["last_activity_at"],
             "source": entry["source"],
             "email_count": entry.get("email_count", 0),
+            # ---- additive enrichment (P2 deepen; all derived from stored data) ----
+            # purchaser economics (null for leads)
+            "product": economics_by_id.get(entry["id"], {}).get("product"),
+            "amount_cents": economics_by_id.get(entry["id"], {}).get("amount_cents"),
+            "billing_period": economics_by_id.get(entry["id"], {}).get("billing_period"),
+            "last_paid_at": economics_by_id.get(entry["id"], {}).get("last_paid_at"),
+            "last_amount_cents": economics_by_id.get(entry["id"], {}).get("last_amount_cents"),
+            "next_due_at": economics_by_id.get(entry["id"], {}).get("next_due_at"),
+            # WingPoint truth (single source: is_wingpoint_user)
+            "wp_origin": entry.get("_wp_origin", False),
+            "wp_product": entry.get("_wp_product", False),
+            # behavior: page_events/resources not stored server-side -> empty;
+            # signups matched by email from course_leads + fiduciary_assessments.
+            "behavior": {
+                "page_events": [],
+                "resources": [],
+                "signups": entry.get("_signups", []),
+            },
         }
         for entry in out_entries
     ]
