@@ -36,13 +36,14 @@ OAUTH_CONFIG = {
         "scope": "https://www.googleapis.com/auth/drive.file",
         "client_id_env": "GOOGLE_CLIENT_ID",
         "client_secret_env": "GOOGLE_CLIENT_SECRET",
-        # Dedicated var: 2026-11-06 redirect decoupling. GOOGLE_LOGIN_REDIRECT_URI
-        # now points at /api/auth/google/callback (sign-in flow, routers/auth.py);
-        # backup connect must NOT share it — the backup callback validates a JWT
-        # state while the login callback validates Mongo oauth_states, so sharing
-        # one redirect URI broke the consent round-trip (defect from 2026-11-06
-        # member-level test: consent redirected to the login callback).
-        "redirect_key": "GOOGLE_BACKUP_REDIRECT_URI",
+        # 2026-11-06 (2nd fix): Google's OAuth console registers ONLY the sign-in
+        # callback (/api/auth/google/callback) — verified live: every backup-callback
+        # variant returned redirect_uri_mismatch. So google_drive authorizes against
+        # the shared login redirect and the login callback MULTIPLEXES by state flow
+        # tag (flow=cloud_backup) back into this router (see complete_google_backup_connect).
+        # GOOGLE_BACKUP_REDIRECT_URI stays reserved for a future dedicated console entry;
+        # the JWT /backup/oauth/callback path below remains for dropbox/onedrive.
+        "redirect_key": "GOOGLE_REDIRECT_URI",
     },
     "dropbox": {
         "auth_url": "https://www.dropbox.com/oauth2/authorize",
@@ -111,8 +112,128 @@ async def initiate_oauth(provider: str, user: dict = Depends(get_current_user)):
         "prompt": "consent",  # Force consent to get refresh_token
     }
 
+    # google_drive multiplexes through the (console-registered) login callback.
+    # Tag the state in oauth_states so routers/auth.google_callback can hand the
+    # round-trip back to complete_google_backup_connect (which verifies the JWT
+    # state before proceeding — the tag only ROUTES, it never authorizes).
+    if provider == "google_drive":
+        from datetime import timedelta
+        await db.oauth_states.update_one(
+            {"state": state},
+            {"$set": {
+                "state": state,
+                "flow": "cloud_backup",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+            }},
+            upsert=True,
+        )
+
     auth_url = f"{config['auth_url']}?{urlencode(params)}"
     return {"auth_url": auth_url}
+
+
+async def complete_google_backup_connect(request: Request):
+    """Finish a cloud_backup-tagged Google consent round-trip that landed on the
+    shared login callback (routers/auth.py). Verifies the JWT state (the flow tag
+    in oauth_states only routes — it never authorizes), then runs the normal
+    backup connection save path with the authorize-time redirect_uri."""
+    from routers.auth import GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI
+
+    _fe = (os.environ.get("FRONTEND_URL", "") or "").rstrip("/")
+    if not _fe:
+        logger.error("FRONTEND_URL not set — cannot return member to app after backup OAuth")
+        return RedirectResponse(url="https://app.trustoffice.app/vault?backup_error=server_config")
+
+    code = request.query_params.get("code")
+    state = request.query_params.get("state")
+    oauth_error = request.query_params.get("error")
+
+    if oauth_error:
+        return RedirectResponse(url=_fe + "/vault?backup_error=" + oauth_error)
+    if not code or not state:
+        return RedirectResponse(url=_fe + "/vault?backup_error=missing_params")
+
+    try:
+        state_data = _verify_oauth_state(state)  # JWT verify: user_id + provider
+    except HTTPException as e:
+        return RedirectResponse(url=_fe + "/vault?backup_error=state_" + str(e.status_code))
+
+    # Single-use hygiene: consume the routing tag row (JWT state itself is
+    # nonce-unique per attempt; this row is only the login-callback router key).
+    await db.oauth_states.delete_one({"state": state, "flow": "cloud_backup"})
+
+    user_id = state_data["user_id"]
+    provider_name = state_data["provider"]
+    if provider_name not in OAUTH_CONFIG:
+        return RedirectResponse(url=_fe + "/vault?backup_error=invalid_provider")
+
+    config = OAUTH_CONFIG[provider_name]
+    client_id = os.environ.get(config["client_id_env"])
+    client_secret = os.environ.get(config["client_secret_env"])
+    redirect_uri = os.environ.get(config["redirect_key"])
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        token_resp = await client.post(config["token_url"], data={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+        })
+
+    if token_resp.status_code != 200:
+        logger.error(f"Backup token exchange failed: {token_resp.text}")
+        return RedirectResponse(url=_fe + "/vault?backup_error=token_exchange_failed")
+
+    tokens = token_resp.json()
+    access_token = tokens.get("access_token")
+    refresh_token = tokens.get("refresh_token")
+    expires_in = tokens.get("expires_in", 3600)
+
+    if not access_token:
+        return RedirectResponse(url=_fe + "/vault?backup_error=no_access_token")
+
+    if not refresh_token:
+        existing = await db.cloud_backup_connections.find_one({"user_id": user_id, "provider": provider_name})
+        if existing and existing.get("refresh_token"):
+            await db.cloud_backup_connections.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {
+                    "access_token": access_token,
+                    "token_expires_at": (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat(),
+                    "is_active": True,
+                }}
+            )
+            return RedirectResponse(url=_fe + "/vault?backup_connected=true")
+        return RedirectResponse(url=_fe + "/vault?backup_error=no_refresh_token")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+    await db.cloud_backup_connections.update_one(
+        {"user_id": user_id, "provider": provider_name},
+        {
+            "$set": {
+                "user_id": user_id,
+                "provider": provider_name,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_expires_at": expires_at,
+                "connected_at": now_iso,
+                "backup_frequency": "weekly",
+                "last_backup_at": None,
+                "last_backup_status": "connected",
+                "last_backup_error": None,
+                "last_backup_doc_count": 0,
+                "backup_folder_id": None,
+                "is_active": True,
+            }
+        },
+        upsert=True,
+    )
+
+    logger.info(f"Cloud backup connected via multiplexed login callback: user={user_id}, provider={provider_name}")
+    return RedirectResponse(url=_fe + "/vault?backup_connected=true")
 
 
 @router.get("/backup/oauth/callback")

@@ -1130,6 +1130,15 @@ async def google_callback(request: Request, response: Response, code: str = None
     
     # Verify state token
     state_record = await db.oauth_states.find_one({"state": state}, {"_id": 0})
+
+    # 2026-11-06: cloud-backup multiplexing. Google's OAuth console registers ONLY
+    # this callback (verified live: every /api/backup/oauth/callback variant returns
+    # redirect_uri_mismatch), so the Drive backup connect tags its state (flow=
+    # cloud_backup) and routes here. Route BEFORE login-state validation; the backup
+    # completer re-verifies its own JWT state (the tag only routes — never authorizes).
+    if state_record and state_record.get("flow") == "cloud_backup":
+        from routers.cloud_backup import complete_google_backup_connect
+        return await complete_google_backup_connect(request)
     if not state_record:
         logger.warning(f"Invalid OAuth state: {state}")
         return RedirectResponse(url=f"{frontend_url}/login?error=invalid_state")
