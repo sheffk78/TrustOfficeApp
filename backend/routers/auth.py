@@ -130,7 +130,7 @@ GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 # GOOGLE_LOGIN_REDIRECT_URI: sign-in OAuth redirect — decoupled from the backup
 # connect redirect per the 2026-11-06 fix (the backup callback lives at
 # /api/backup/oauth/callback and validates JWT state; see routers/cloud_backup.py).
-GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_LOGIN_REDIRECT_URI')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_LOGIN_REDIRECT_URI') or os.environ.get('GOOGLE_REDIRECT_URI')
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
