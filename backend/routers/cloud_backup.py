@@ -36,7 +36,13 @@ OAUTH_CONFIG = {
         "scope": "https://www.googleapis.com/auth/drive.file",
         "client_id_env": "GOOGLE_CLIENT_ID",
         "client_secret_env": "GOOGLE_CLIENT_SECRET",
-        "redirect_key": "GOOGLE_REDIRECT_URI",
+        # Dedicated var: 2026-11-06 redirect decoupling. GOOGLE_LOGIN_REDIRECT_URI
+        # now points at /api/auth/google/callback (sign-in flow, routers/auth.py);
+        # backup connect must NOT share it — the backup callback validates a JWT
+        # state while the login callback validates Mongo oauth_states, so sharing
+        # one redirect URI broke the consent round-trip (defect from 2026-11-06
+        # member-level test: consent redirected to the login callback).
+        "redirect_key": "GOOGLE_BACKUP_REDIRECT_URI",
     },
     "dropbox": {
         "auth_url": "https://www.dropbox.com/oauth2/authorize",
