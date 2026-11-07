@@ -87,6 +87,9 @@ export const AUDIT_ACTION_LABELS = {
   vault_upload: 'Document Uploaded',
   vault_download: 'Document Downloaded',
   vault_delete: 'Document Deleted',
+  alert_resolved: 'Alert Resolved',
+  insight_resolved: 'Insight Resolved',
+  insight_dismissed: 'Insight Dismissed',
 };
 
 export const PAGE_SIZE = 25;

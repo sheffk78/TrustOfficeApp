@@ -34,7 +34,9 @@ from approval_handler import (
     get_latest_pending_action,
     handle_text_approval,
     handle_text_rejection,
+    build_failure_message,
 )
+from capability_guard import apply_capability_guard
 
 router = APIRouter(prefix="/ai", tags=["ai", "chat"])
 logger = logging.getLogger(__name__)
@@ -398,9 +400,15 @@ async def chat(
     )
 
     # 9. Save assistant message
+    # Day-0 audit: no-fabricated-capability guard. Plain-text replies that
+    # claim a vault/document/alert action with no execution_result in the
+    # turn are rewritten to the honest form (see capability_guard.py).
+    assistant_text, _capability_flagged = apply_capability_guard(
+        ai_response.get("message", "I'm not sure how to respond. Could you rephrase that?")
+    )
     assistant_msg_doc = ChatMessage(
         role="assistant",
-        content=ai_response.get("message", "I'm not sure how to respond. Could you rephrase that?"),
+        content=assistant_text,
         action_card=action_card,
         citation_note=ai_response.get("citation_note"),
         unknown_note=ai_response.get("unknown_note"),
@@ -1857,7 +1865,10 @@ async def _exec_document_upload(mapped_data: dict, trust_id: str, user_id: str) 
             "record_id": result["doc_id"],
             "endpoint": "vault/documents",
             "action": "created",
-            "note": "Document record created. Upload the file in the Vault page to complete.",
+            # Day-0 audit: honest STUB -- the vault_documents RECORD is
+            # created, but no file exists yet. The receipt says so plainly.
+            "pending_upload": True,
+            "note": "Upload the file in the Vault page to finish.",
         }
     except HTTPException as e:
         return {"success": False, "error": e.detail}
@@ -2448,68 +2459,118 @@ async def _execute_approved_action(
     # primary key. A handler that reports success but wrote nothing flips
     # to success=false ("record not found after write") and fires a Discord
     # alert. See exec_hardening.verify_exec_write.
-    from exec_hardening import verify_exec_write
+    from exec_hardening import verify_exec_write, READBACK_MISS_ERROR
 
-    async def _verified(result: dict) -> dict:
+    async def _verified(result: dict, retry=None) -> dict:
         if not result:
             return result
-        return await verify_exec_write(
-            db,
-            endpoint_type=endpoint_type,
-            result=result,
-            user_id=user_id,
-            trust_id=trust_id,
-            action_type=card_type or endpoint_type,
-        )
+        if result.get("success") is False:
+            return result
+        # NOTE: no record_id early-return here. Some handlers (alert_dismiss)
+        # report a criterion instead of a record_id; verify_exec_write resolves
+        # those targets from READBACK_MAP and marks a truly unverifiable
+        # envelope honestly (verified=false + verification_skipped).
+        try:
+            verified = await verify_exec_write(
+                db,
+                endpoint_type=result.get("endpoint") or endpoint_type,
+                result=result,
+                user_id=user_id,
+                trust_id=trust_id,
+                action_type=card_type or endpoint_type,
+            )
+        except Exception as e:
+            logger.warning(f"Read-back verification error: {e}")
+            return result
+        # 2026-11-06 (Day-0 audit): on a read-back miss, retry the write ONCE
+        # and re-verify. A miss means the member was about to be told
+        # "created" with nothing behind it; the retry is the last chance for
+        # a transient lag. Still missing -> success:false + plain failure.
+        if (
+            retry is not None
+            and not verified.get("success")
+            and verified.get("error") == READBACK_MISS_ERROR
+        ):
+            logger.warning(
+                "EXEC_READBACK_RETRY | action=%s endpoint=%s user=%s trust=%s",
+                card_type, result.get("endpoint"), user_id, trust_id,
+            )
+            retry_result = await retry()
+            if retry_result.get("success") is False:
+                return retry_result
+            try:
+                verified = await verify_exec_write(
+                    db,
+                    endpoint_type=retry_result.get("endpoint") or result.get("endpoint") or endpoint_type,
+                    result=retry_result,
+                    user_id=user_id,
+                    trust_id=trust_id,
+                    action_type=card_type or endpoint_type,
+                )
+            except Exception as e:
+                logger.warning(f"Read-back verification error on retry: {e}")
+                return retry_result
+            verified["readback_retry_attempted"] = True
+        return verified
 
     if endpoint_type == "distribution_minutes":
         # Distribution minutes (2026-10-29): document an existing distribution
         # in the minutes book. Duplicate guard FIRST: one distribution gets
         # one minutes entry, or the double-approve path creates two records.
-        distribution_id = mapped_data.get("distribution_id", "")
-        if not distribution_id:
-            return {"success": False, "error": "No distribution selected — pick the distribution this minutes entry documents."}
-        dup = await db.minutes_records.find_one(
-            {"trust_id": trust_id, "user_id": user_id, "distribution_id": distribution_id},
-            {"_id": 0, "minutes_id": 1, "status": 1},
-        )
-        if dup:
-            return {
-                "success": True,
-                "duplicate_guard": True,
-                "record_id": dup.get("minutes_id", ""),
-                "endpoint": "minutes",
-                "status": dup.get("status", ""),
-                "review_link": f"/minutes/{dup.get('minutes_id', '')}",
-                "message": "This distribution already has minutes on file — nothing was created twice.",
-            }
-        mapped_data.setdefault("minutes_type", "distribution")
-        result = await _exec_minutes(mapped_data, trust_id, user_id)
-        if result.get("success") and result.get("record_id"):
-            link_res = await db.minutes_records.update_one(
-                {"minutes_id": result["record_id"], "user_id": user_id},
-                {"$set": {"distribution_id": distribution_id}},
+        # Day-0 audit: this branch used to skip verify_exec_write entirely;
+        # it now goes through the same read-back + one-retry contract as
+        # every other write path.
+        async def _run_distribution_minutes() -> dict:
+            distribution_id = mapped_data.get("distribution_id", "")
+            if not distribution_id:
+                return {"success": False, "error": "No distribution selected — pick the distribution this minutes entry documents."}
+            dup = await db.minutes_records.find_one(
+                {"trust_id": trust_id, "user_id": user_id, "distribution_id": distribution_id},
+                {"_id": 0, "minutes_id": 1, "status": 1},
             )
-            if link_res.modified_count != 1:
-                logger.error(
-                    "DISTRIBUTION_MINUTES_LINK_FAILED | minutes=%s distribution=%s | minutes created but distribution link missing",
-                    result["record_id"], distribution_id,
+            if dup:
+                return {
+                    "success": True,
+                    "duplicate_guard": True,
+                    "record_id": dup.get("minutes_id", ""),
+                    "endpoint": "minutes",
+                    "status": dup.get("status", ""),
+                    "review_link": f"/minutes/{dup.get('minutes_id', '')}",
+                    "message": "This distribution already has minutes on file — nothing was created twice.",
+                }
+            mapped_data.setdefault("minutes_type", "distribution")
+            result = await _exec_minutes(mapped_data, trust_id, user_id)
+            if result.get("success") and result.get("record_id"):
+                link_res = await db.minutes_records.update_one(
+                    {"minutes_id": result["record_id"], "user_id": user_id},
+                    {"$set": {"distribution_id": distribution_id}},
                 )
-                result["distribution_link_failed"] = True
-        result.pop("prefilled", None)
-        return result
+                if link_res.modified_count != 1:
+                    logger.error(
+                        "DISTRIBUTION_MINUTES_LINK_FAILED | minutes=%s distribution=%s | minutes created but distribution link missing",
+                        result["record_id"], distribution_id,
+                    )
+                    result["distribution_link_failed"] = True
+            result.pop("prefilled", None)
+            return result
+
+        result = await _run_distribution_minutes()
+        return await _verified(result, retry=_run_distribution_minutes)
 
     if endpoint_type == "minutes":
         # Chat minutes cards carry participants_text / decisions_text and
         # status=draft — a different shape from the seed generate-minutes
         # action — so this intent keeps its dedicated handler (which itself
         # routes through the real minutes router).
+        async def _run_minutes() -> dict:
+            return await _exec_minutes(mapped_data, trust_id, user_id)
+
         try:
-            result = await _exec_minutes(mapped_data, trust_id, user_id)
+            result = await _run_minutes()
         except Exception as e:
             logger.error(f"Action execution error: {type(e).__name__}: {e}")
             return {"success": False, "error": str(e)}
-        return await _verified(result)
+        return await _verified(result, retry=_run_minutes)
 
     from actions_seed import get_chat_intent_action
     from action_layer import call_action
@@ -2534,30 +2595,34 @@ async def _execute_approved_action(
             coerced[k] = v
         mapped_data = coerced
 
-    outcome = await call_action(
-        action_name,
-        mapped_data,
-        user_id=user_id,
-        trust_id=trust_id,
-        user=None,  # intent handlers backfill the user doc when needed
-        surface="chat",
-    )
-    # Adapt the layer envelope {ok, action, result|error} back to the legacy
-    # {success, record_id, endpoint, ...} envelope stored on action cards
-    # (frontend ActionCard.js + approval_handler.py read these fields).
-    if outcome.get("ok"):
-        result = outcome.get("result") or {}
-        result.setdefault("success", True)
-        return await _verified(result)
-    err = outcome.get("error")
-    if not err:
-        err = (outcome.get("result") or {}).get("error")
-    if isinstance(err, dict):
-        detail = err.get("detail") or err.get("code") or "Action failed"
-    else:
-        detail = err or "Action failed"
-    logger.error(f"Action execution error (action_layer): {action_name}: {detail}")
-    return {"success": False, "error": detail}
+    async def _run_action_layer() -> dict:
+        outcome = await call_action(
+            action_name,
+            mapped_data,
+            user_id=user_id,
+            trust_id=trust_id,
+            user=None,  # intent handlers backfill the user doc when needed
+            surface="chat",
+        )
+        # Adapt the layer envelope {ok, action, result|error} back to the
+        # legacy {success, record_id, endpoint, ...} envelope stored on
+        # action cards (frontend ActionCard.js + approval_handler.py read
+        # these fields).
+        if outcome.get("ok"):
+            result = outcome.get("result") or {}
+            result.setdefault("success", True)
+            return result
+        err = outcome.get("error")
+        if not err:
+            err = (outcome.get("result") or {}).get("error")
+        if isinstance(err, dict):
+            detail = err.get("detail") or err.get("code") or "Action failed"
+        else:
+            detail = err or "Action failed"
+        logger.error(f"Action execution error (action_layer): {action_name}: {detail}")
+        return {"success": False, "error": detail}
+
+    return await _verified(await _run_action_layer(), retry=_run_action_layer)
 
 
 @router.post("/chat/actions/{conversation_id}/{message_index}/confirm")
@@ -2641,6 +2706,17 @@ async def confirm_action(
                         f"messages.{message_index}.action_card.executed_at": datetime.now(timezone.utc).isoformat(),
                     }}
                 )
+                # Day-0 audit: a failed write must roll the card back to
+                # pending so the member can retry (mirrors the text-approval
+                # rollback in approval_handler.handle_text_approval) and must
+                # never report "Action approved".
+                if execution_result.get("success") is False:
+                    await db.chat_conversations.update_one(
+                        {"conversation_id": conversation_id, "user_id": user_id},
+                        {"$set": {
+                            f"messages.{message_index}.action_card.confirmation_status": "pending",
+                        }}
+                    )
 
     logger.info(
         f"ACTION | user={user_id} | conversation={conversation_id} | "
@@ -2668,6 +2744,11 @@ async def confirm_action(
                 )
             except Exception as e:  # noqa: BLE001 — never fail the approval
                 logger.warning("confirm_action: could not build success message: %s", e)
+        else:
+            # Day-0 audit: never claim approval for a failed write. Plain
+            # failure text; the card is rolled back to pending above.
+            response["message"] = build_failure_message(execution_result)
+            response["action_status"] = "pending"
 
     return response
 
@@ -2957,6 +3038,11 @@ async def _chat_stream_generator(
         if action_def and action_def.get("requires_write"):
             caveat = "This proposed action should be reviewed with your legal or tax professional before execution."
 
+        # Day-0 audit: no-fabricated-capability guard on the streamed reply.
+        # Applied BEFORE the done event so the UI can replace the text live;
+        # the same guarded text is what gets persisted below.
+        guarded_response_text, capability_flagged = apply_capability_guard(full_response_text)
+
         # 9. Send done event immediately — user sees response is complete
         yield await _sse_event("done", {
             "action_card": None,
@@ -2965,6 +3051,11 @@ async def _chat_stream_generator(
             "caveat": caveat,
             "intent": intent,
         })
+
+        # Honesty correction: the member must not be left looking at a claim
+        # the assistant cannot back. Replace the streamed text in place.
+        if capability_flagged:
+            yield await _sse_event("corrected", {"content": guarded_response_text})
 
         # 10. Generate action card lazily (after done event) and send as separate event
         action_card = None
@@ -2997,7 +3088,7 @@ async def _chat_stream_generator(
 
         assistant_msg_doc = ChatMessage(
             role="assistant",
-            content=full_response_text,
+            content=guarded_response_text,
             action_card=action_card_for_db,
             citation_note=citation_note,
             unknown_note=unknown_note,

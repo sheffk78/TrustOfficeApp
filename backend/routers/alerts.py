@@ -1,4 +1,5 @@
 # Separation Alerts router — commingling detection alert management
+import logging
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -10,6 +11,15 @@ from models import AlertResponse, AlertResolveRequest, AlertCountResponse
 from alert_detection import run_pattern_alerts
 
 router = APIRouter(tags=["alerts"])
+logger = logging.getLogger(__name__)
+
+# Member-facing labels for the resolution types the UI offers.
+RESOLUTION_TYPE_LABELS = {
+    "classified": "Reclassified the transaction",
+    "linked": "Linked to governance action",
+    "documented": "Uploaded supporting documentation",
+    "reviewed_no_issue": "Reviewed — No Issue",
+}
 
 
 @router.get("/alerts", response_model=List[AlertResponse])
@@ -118,6 +128,35 @@ async def resolve_alert(alert_id: str, req: AlertResolveRequest, user: dict = De
         "resolution_note": req.resolution_note,
         "timestamp": now
     })
+
+    # Day-0 audit: member-visible activity receipt. alert_audit_log is
+    # immutable but the member's activity/audit feed (Audit Trail page,
+    # /audit-logs) never saw it. Write the resolution to audit_logs so the
+    # member can see which alert was closed, how, by whom, and when.
+    action_taken = (
+        "no action — marked reviewed"
+        if req.resolution_type == "reviewed_no_issue"
+        else RESOLUTION_TYPE_LABELS.get(req.resolution_type, req.resolution_type)
+    )
+    try:
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user["user_id"],
+            action="alert_resolved",
+            entity_type="separation_alert",
+            entity_id=alert_id,
+            details={
+                "alert_type": alert.get("alert_type", ""),
+                "alert_title": alert.get("title", ""),
+                "resolution_type": req.resolution_type,
+                "action_taken": action_taken,
+                "resolved_by": user["user_id"],
+                "resolved_at": now,
+                "resolution_note": req.resolution_note,
+            },
+        )
+    except Exception as e:  # noqa: BLE001 — the alert is already resolved
+        logger.warning(f"alert resolve: activity receipt failed (non-fatal): {e}")
 
     updated = await db.separation_alerts.find_one({"alert_id": alert_id}, {"_id": 0})
     entity = await db.entities.find_one({"entity_id": updated.get("entity_id")}, {"_id": 0, "name": 1})

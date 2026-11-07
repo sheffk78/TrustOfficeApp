@@ -198,6 +198,15 @@ function createStreamEventHandler({
         handleDoneEvent({ data, assistantId, fullText, setMessages, onDoneCallbackRef, newConvId: getNewConvId() });
         break;
 
+      case 'corrected':
+        // Backend honesty guard rewrote the reply in place (a plain-text
+        // vault/document/alert claim with no execution path). Replace the
+        // streamed text so the member never sees the false claim.
+        setMessages(prev => prev.map(msg => (
+          msg.id === assistantId ? { ...msg, content: data.content } : msg
+        )));
+        break;
+
       case 'action_status': {
         // Backend executed a pending action card because the user approved or
         // rejected it by TEXT (e.g. typed "yes"). Update the original card so

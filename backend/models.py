@@ -1332,6 +1332,18 @@ class DismissedInsightCreate(BaseModel):
     trust_id: str
     criterion_name: str
 
+class InsightResolveRequest(BaseModel):
+    """Resolve a client-computed insight/risk finding (Day-0 audit).
+
+    Risk findings are computed on the fly, not stored as alert rows, so
+    resolving one needs a durable marker: we reuse dismissed_insights
+    (same key the UI already filters on) with resolution metadata.
+    """
+    trust_id: str
+    criterion_name: str
+    alert_title: Optional[str] = None
+    resolution_note: Optional[str] = None
+
 class DismissedInsightResponse(BaseModel):
     dismiss_id: str
     user_id: str

@@ -96,7 +96,7 @@ async def generate_minutes(params: dict, ctx: ActionContext) -> dict:
     return {
         "record_id": result.minutes_id,
         "status": "draft",
-        "review_link": f"/minutes/result.minutes_id",
+        "review_link": f"/minutes/{result.minutes_id}",
         "message": "Draft minutes created — review and finalize on the Minutes page.",
     }
 
@@ -755,7 +755,7 @@ async def _chat_contribute_asset(params: dict, ctx: ActionContext) -> dict:
         "minutes_id": minutes_result.minutes_id,
         "endpoint": "contribute_asset",
         "status": "draft",
-        "review_link": f"/minutes/minutes_result.minutes_id",
+        "review_link": f"/minutes/{minutes_result.minutes_id}",
     }
 
 
@@ -1095,7 +1095,11 @@ async def _chat_document_upload(params: dict, ctx: ActionContext) -> dict:
             "record_id": result["doc_id"],
             "endpoint": "vault/documents",
             "action": "created",
-            "note": "Document record created. Upload the file in the Vault page to complete.",
+            # Day-0 audit: this is an honest STUB. The vault_documents RECORD
+            # is created, but no file exists yet -- the receipt must say so
+            # and name the one action left (upload in the Vault page).
+            "pending_upload": True,
+            "note": "Upload the file in the Vault page to finish.",
         }
     except HTTPException as e:
         return {"success": False, "error": e.detail}

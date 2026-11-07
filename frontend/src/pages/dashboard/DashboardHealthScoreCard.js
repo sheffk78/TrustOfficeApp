@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Circle, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/utils/api';
 import { getScoreColor } from './constants';
 
 /**
@@ -76,13 +77,40 @@ export function DashboardHealthScoreCard({ dashboard, selectedTrust, healthScore
         )}
       </div>
 
-      <ScoreBanners healthScore={healthScore} isNewTrust={isNewTrust} />
+      <ScoreBanners healthScore={healthScore} isNewTrust={isNewTrust} selectedTrust={selectedTrust} />
     </div>
   );
 }
 
-function ScoreBanners({ healthScore, isNewTrust }) {
+function ScoreBanners({ healthScore, isNewTrust, selectedTrust }) {
   const score = healthScore?.total_score;
+
+  // Resolve a client-computed risk finding (Day-0 audit): persist a reviewed
+  // marker server-side and show the receipt. The finding is computed on the
+  // fly, so the old navigate-only Resolve flipped nothing durable.
+  const resolveRisk = async (risk) => {
+    if (!selectedTrust) return;
+    try {
+      const response = await fetchWithAuth('/insights/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          criterion_name: `risk:${risk.type}`,
+          alert_title: risk.title,
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(data.receipt || 'resolved — reviewed, no action taken');
+      } else {
+        toast.error(data.detail || 'Failed to resolve');
+      }
+    } catch (error) {
+      console.error('Failed to resolve risk finding:', error);
+      toast.error('Failed to resolve');
+    }
+  };
   // v4 thresholds (mirrors backend SCORE_GREEN/YELLOW_THRESHOLD): green >=85,
   // yellow 65-84, red <65. Amber banner only for the yellow band; red "Urgent"
   // only when the score is actually critical.
@@ -116,7 +144,7 @@ function ScoreBanners({ healthScore, isNewTrust }) {
               : 'Your governance score needs attention. Consider completing the suggested actions above.'}
           </p>
         </div>
-        {showRiskList && <RiskFindingList findings={visibleFindings} />}
+        {showRiskList && <RiskFindingList findings={visibleFindings} onResolve={resolveRisk} />}
         {extraCount > 0 && (
           <p className="text-xs text-muted-foreground mt-2">
             And {extraCount} more item{extraCount > 1 ? 's' : ''} — <Link to="/governance" className="underline">see the full list</Link>.
@@ -137,7 +165,7 @@ function ScoreBanners({ healthScore, isNewTrust }) {
               : 'Urgent: Your trust requires immediate attention. Complete pending tasks to improve your score.'}
           </p>
         </div>
-        {showRiskList && <RiskFindingList findings={visibleFindings} error />}
+        {showRiskList && <RiskFindingList findings={visibleFindings} error onResolve={resolveRisk} />}
         {extraCount > 0 && (
           <p className="text-xs text-muted-foreground mt-2">
             And {extraCount} more item{extraCount > 1 ? 's' : ''} — <Link to="/governance" className="underline">see the full list</Link>.
@@ -179,7 +207,7 @@ const SEVERITY_STYLES = {
  * finding title, its per-finding point penalty, and the fix — linked to the
  * page where the fix happens (deeplink from the risk-gathering service).
  */
-function RiskFindingList({ findings, error = false }) {
+function RiskFindingList({ findings, error = false, onResolve }) {
   const navigate = useNavigate();
 
   return (
@@ -210,7 +238,7 @@ function RiskFindingList({ findings, error = false }) {
           {r.deeplink && (
             <button
               type="button"
-              onClick={() => navigate(r.deeplink)}
+              onClick={() => (onResolve ? onResolve(r) : navigate(r.deeplink))}
               data-testid={`risk-finding-fix-${r.type}`}
               className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-widest px-2 py-1 border ${
                 error ? 'border-error/40 text-error hover:bg-error/10' : 'border-warning/40 text-warning hover:bg-warning/10'

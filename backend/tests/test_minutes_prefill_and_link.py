@@ -435,7 +435,7 @@ def test_success_message_includes_review_link():
         {"success": True, "review_link": "/minutes/minutes_abc123"},
     )
     assert "/minutes/minutes_abc123" in msg
-    assert "Open it:" in msg
+    assert "(saved)" in msg
 
 
 def test_success_message_includes_caveat():
@@ -460,7 +460,7 @@ def test_success_message_without_link_has_no_open_it():
 
     msg = build_success_message("beneficiary", {"success": True})
     assert "Open it:" not in msg
-    assert msg.startswith("Done — beneficiary has been created.")
+    assert msg.startswith("Done \u2014 beneficiary has been created")
 
 
 @pytest.mark.asyncio
@@ -506,6 +506,6 @@ async def test_approval_reply_text_carries_the_link(seeded, monkeypatch):
 
     assert out.get("success") is True, out
     msg = out.get("message") or ""
-    assert "Open it:" in msg, f"confirmation does not carry the link: {msg!r}"
     assert "/minutes/minutes_" in msg, f"confirmation link missing: {msg!r}"
+    assert "saved as" in msg, f"confirmation is not receipt-first: {msg!r}"
     assert out["execution_result"].get("review_link")

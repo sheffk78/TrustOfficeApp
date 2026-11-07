@@ -78,6 +78,10 @@ logger = logging.getLogger(__name__)
 # record (contribute_asset creates a Schedule A item AND acceptance minutes).
 READBACK_MAP: dict[str, Any] = {
     "minutes":                 ("minutes_records", "minutes_id", "", "user_id"),
+    # distribution_minutes creates the same minutes_records row as the
+    # minutes action (the distribution branch of _exec_minutes). It was the
+    # one card path that skipped verify_exec_write entirely (Day-0 audit).
+    "distribution_minutes":    ("minutes_records", "minutes_id", "", "user_id"),
     "contribute_asset":        [
         ("schedule_a_items", "item_id", "schedule_a_id", "user_id"),
         ("minutes_records", "minutes_id", "minutes_id", "user_id"),
@@ -101,7 +105,9 @@ READBACK_MAP: dict[str, Any] = {
     "class_beneficiary":       ("class_beneficiaries", "class_beneficiary_id", "", "user_id"),
     # settings_update writes to trusts (keyed by trust_id);
     # alert_dismiss upserts into dismissed_insights (keyed by criterion).
-    "settings_update":         ("trusts", "trust_id", "", ""),
+    # Both are trust-scoped: the read-back must constrain on trust_id, not
+    # the acting user_id, or it matches nothing (Day-0 audit: weak scoping).
+    "settings_update":         ("trusts", "trust_id", "", "trust_id"),
     "alert_dismiss":           ("dismissed_insights", "criterion_name", "criterion", "trust_id"),
 }
 
@@ -379,8 +385,14 @@ async def verify_exec_write(
 
     for collection, key_field, key_value, scope_field in targets:
         query: dict[str, Any] = {key_field: key_value}
-        if scope_field and user_id:
-            query[scope_field] = user_id
+        if scope_field:
+            # trust-scoped records must be constrained by trust_id; the
+            # acting user_id is not the record's trust. (Day-0 audit: the
+            # old code always used user_id, so trust-scoped entries could
+            # never match.)
+            scope_value = trust_id if scope_field == "trust_id" else user_id
+            if scope_value:
+                query[scope_field] = scope_value
         try:
             found = await db[collection].find_one(query, {"_id": 0})
         except Exception as e:  # noqa: BLE001 — a broken read must not mask the write
@@ -488,8 +500,12 @@ async def _deferred_miss_recheck(
         key_field = _t[1] if _t else key_value
         scope_field = _t[3] if _t else "user_id"
         query: dict[str, Any] = {key_field: key_value}
-        if scope_field and user_id:
-            query[scope_field] = user_id
+        if scope_field:
+            # Mirror verify_exec_write: trust-scoped records are constrained
+            # by trust_id, not the acting user_id (Day-0 audit fix).
+            scope_value = trust_id if scope_field == "trust_id" else user_id
+            if scope_value:
+                query[scope_field] = scope_value
         try:
             found = await db[collection].find_one(query, {"_id": 0})
         except Exception as e:  # noqa: BLE001 — a broken read must not block the alert

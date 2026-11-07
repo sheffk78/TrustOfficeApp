@@ -155,6 +155,7 @@ def _friendly_summary(card: dict) -> str:
 # /minutes/:minutesId only).
 REPLY_LINK_ROUTES: dict[str, str] = {
     "minutes":                 "/minutes/{id}",
+    "distribution_minutes":    "/minutes/{id}",
     "contribute_asset":        "/minutes/{id}",
     "distribution":            "/distributions",
     "distribution_cancel":     "/distributions",
@@ -248,6 +249,16 @@ def build_record_link(endpoint_type: str, result: dict) -> str:
     return ""
 
 
+def _saved_as_phrase(result: dict) -> str:
+    """Short 'saved as' descriptor for the Rule-5 receipt (contract Rule 5)."""
+    status = str(result.get("status") or "").strip().lower()
+    if status == "draft":
+        return "saved as a draft"
+    if status in ("final", "finalized", "approved"):
+        return "saved as finalized"
+    return "saved"
+
+
 def build_success_message(summary: str, result: dict, endpoint_type: str = "") -> str:
     """
     Build the assistant's post-approval confirmation text.
@@ -263,23 +274,66 @@ def build_success_message(summary: str, result: dict, endpoint_type: str = "") -
     member who creates a task, transaction, entity, investment or vault
     document is told where it went. Types with no member-facing route are
     named plainly — no fabricated URLs.
+
+    2026-11-06 (Day-0 audit, contract Rule 5): the FIRST sentence now carries
+    the whole receipt — record type · saved-as · working link — instead of
+    burying the link after guidance sentences.
+
+    2026-11-06 (Day-0 audit): document_upload is an honest STUB — it creates
+    the vault_documents record but no file. Its receipt says so plainly and
+    names the one action left (upload in the Vault page); it never says
+    "Done" in a way that implies the document is in place.
     """
-    text = f"Done — {summary} has been created."
+    link = build_record_link(endpoint_type, result)
+    saved_as = _saved_as_phrase(result)
+
+    if result.get("pending_upload") or endpoint_type == "document_upload":
+        target = link if link else "/vault"
+        remaining = (
+            (result.get("note") or "").strip()
+            or "Upload the file in the Vault page to finish."
+        )
+        text = (
+            f"Created the vault document entry ({saved_as}): {target}. "
+            f"The file is not uploaded yet — {remaining}"
+        )
+        caveat = (result.get("caveat") or "").strip()
+        if caveat:
+            text += f" Note: {caveat}"
+        return text
+
+    if link and link.startswith("/"):
+        text = f"Done — {summary} has been created ({saved_as}): {link}"
+    elif link:
+        # A plain-language record reference (no route exists for it).
+        text = f"Done — {summary} has been created ({saved_as}). It was saved as {link}."
+    else:
+        text = f"Done — {summary} has been created ({saved_as})."
+
     if summary.startswith("distribution"):
         text += " To finalize it, confirm solvency and recusal on the Distributions page."
     elif summary.startswith("minutes"):
-        text += " It's saved as a draft — review and finalize on the Minutes page."
-
-    link = build_record_link(endpoint_type, result)
-    if link:
-        if link.startswith("/"):
-            text += f" Open it: {link}"
-        else:
-            # A plain-language record reference (no route exists for it).
-            text += f" It was saved as {link}."
+        text += " Review and finalize it on the Minutes page."
     caveat = (result.get("caveat") or "").strip()
     if caveat:
         text += f" Note: {caveat}"
+    return text
+
+
+def build_failure_message(result: dict | None = None) -> str:
+    """
+    Plain failure text (contract Rule 3, Day-0 audit).
+
+    Never reports success and never blames the member. A technical
+    read-back detail is appended only when it is user-meaningful; the
+    internal "record not found after write" miss is omitted (the member
+    doesn't need the internals — they need to know nothing was saved).
+    """
+    result = result or {}
+    text = "I couldn't complete that — nothing was saved."
+    err = str(result.get("error") or "").strip()
+    if err and err != "record not found after write":
+        text += f" ({err})"
     return text
 
 
@@ -339,8 +393,9 @@ async def handle_text_approval(
         )
         return {"success": True, "message": text, "execution_result": result}
     else:
-        err = result.get("error", "the system reported an error")
-        # Roll the card back to pending so the user can retry or edit it.
+        # Plain failure text (contract Rule 3, Day-0 audit): never claim
+        # success, never blame the member. The card rolls back to pending
+        # so the member can retry or edit it.
         await _get_db().chat_conversations.update_one(
             {"conversation_id": conversation_id, "user_id": user_id},
             {"$set": {
@@ -349,7 +404,8 @@ async def handle_text_approval(
         )
         return {
             "success": False,
-            "message": f"I couldn't complete that action: {err}. The action card is still pending — you can edit it or try approving again.",
+            "message": build_failure_message(result)
+                + " The action card is still pending — you can edit it or try approving again.",
             "execution_result": result,
         }
 

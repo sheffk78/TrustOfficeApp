@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,19 @@ import DissolvedTrustBanner, { isTrustDissolved } from '@/components/trust/Disso
 import { deleteDocument, downloadDocument, register2faStepUpRunner } from '@/components/vault/vaultOperations';
 import use2faStepUp from '@/hooks/use2faStepUp';
 
+// Schedule A category labels (mirrors ScheduleAPage / schedule_a router).
+// Used ONLY for read-only display in the Vault's Schedule A section.
+const SCHEDULE_A_CATEGORY_LABELS = {
+  real_property: 'Real Property',
+  personal_property: 'Personal Property',
+  financial_accounts: 'Financial Accounts',
+  business_interests: 'Business Interests',
+  digital_assets: 'Digital Assets',
+  intellectual_property: 'Intellectual Property',
+  notes_receivable: 'Notes Receivable',
+  other_property: 'Other Property',
+};
+
 export default function VaultPage() {
   const { selectedTrust } = useAuth();
   const [searchParams] = useSearchParams();
@@ -44,6 +57,8 @@ export default function VaultPage() {
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [criticalDismissed, setCriticalDismissed] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [scheduleA, setScheduleA] = useState([]);
+  const [scheduleALoading, setScheduleALoading] = useState(false);
   const copyTimeoutRef = useRef(null);
 
   // 2FA step-up: vault downloads are a protected action. When the backend
@@ -98,6 +113,28 @@ export default function VaultPage() {
       loadData();
     }
   }, [selectedTrust, activeCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Schedule A (read-only surfacing, Day-0 audit): members look in the Vault
+  // for "where is my Schedule A?" — surface the trust's assets here and link
+  // to the ledger. This never moves or modifies any data.
+  useEffect(() => {
+    if (!selectedTrust) return;
+    let cancelled = false;
+    const loadScheduleA = async () => {
+      setScheduleALoading(true);
+      try {
+        const res = await fetchWithAuth(`/schedule-a?trust_id=${selectedTrust.trust_id}&status=active&limit=50`);
+        const data = res && res.ok ? await res.json() : null;
+        if (!cancelled) setScheduleA((data && (data.items || data)) || []);
+      } catch {
+        if (!cancelled) setScheduleA([]);
+      } finally {
+        if (!cancelled) setScheduleALoading(false);
+      }
+    };
+    loadScheduleA();
+    return () => { cancelled = true; };
+  }, [selectedTrust]);
 
   const upload = useVaultUpload(selectedTrust, loadData);
 
@@ -225,6 +262,52 @@ export default function VaultPage() {
             missingCritical={!criticalDismissed ? summary?.missing_critical : null}
             onDismiss={() => setCriticalDismissed(true)}
           />
+
+          {/* Schedule A — trust assets (read-only; the ledger lives on /schedule-a) */}
+          <div className="card-trust corner-mark p-5 mb-6" data-testid="vault-schedule-a">
+            <div className="flex items-center justify-between mb-3 gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <FolderOpen className="w-4 h-4 text-navy flex-shrink-0" />
+                <h2 className="text-base font-semibold text-navy truncate">Schedule A — Trust Assets</h2>
+              </div>
+              <Link
+                to="/schedule-a"
+                data-testid="vault-schedule-a-manage"
+                className="font-mono text-[10px] uppercase tracking-widest text-navy/70 hover:text-navy flex-shrink-0"
+              >
+                Manage on Schedule A
+              </Link>
+            </div>
+            {scheduleALoading ? (
+              <p className="text-sm text-muted-foreground">Loading assets…</p>
+            ) : scheduleA.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No Schedule A assets on file yet.{' '}
+                <Link to="/schedule-a" className="underline hover:text-navy">Add assets on the Schedule A page</Link>.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {scheduleA.map((item) => (
+                  <li key={item.item_id} className="py-2 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        to="/schedule-a"
+                        data-testid={`vault-schedule-a-item-${item.item_id}`}
+                        className="text-sm font-medium text-navy hover:underline truncate block"
+                      >
+                        {item.description || 'Untitled asset'}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">
+                        {SCHEDULE_A_CATEGORY_LABELS[item.category] || item.category}
+                        {item.approximate_value != null ? ` · $${Number(item.approximate_value).toLocaleString()}` : ''}
+                        {item.status ? ` · ${item.status}` : ''}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           {/* Cloud Backup */}
           <div

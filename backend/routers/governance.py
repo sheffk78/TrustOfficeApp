@@ -14,7 +14,7 @@ from models import (
     HealthScoreResponse, HealthScoreCriterion, HealthColor,
     OnboardingState, GovernanceInsight, DashboardStats,
     DashboardResponse, DashboardSubscriptionState,
-    DismissedInsightCreate, DismissedInsightResponse
+    DismissedInsightCreate, DismissedInsightResponse, InsightResolveRequest
 )
 from routers.tasks import CHECKLIST_TEMPLATES
 from services.risk_gathering import gather_risk_findings, compute_risk_penalty
@@ -1646,10 +1646,108 @@ async def dismiss_insight(
     if criterion_name.startswith("risk:"):
         await db.risk_findings_cache.delete_one({"trust_id": trust_id})
 
+    # Day-0 audit: member-visible activity receipt (Audit Trail page).
+    try:
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="insight_dismissed",
+            entity_type="governance_insight",
+            entity_id=criterion_name,
+            details={
+                "trust_id": trust_id,
+                "criterion_name": criterion_name,
+                "action_taken": "no action — dismissed",
+            },
+        )
+    except Exception:  # noqa: BLE001 — receipt is best-effort
+        pass
+
     return {
         "message": f"Insight '{criterion_name}' dismissed",
         "criterion_name": criterion_name,
         "dismissed": True
+    }
+
+
+@router.post("/insights/resolve")
+async def resolve_insight(
+    req: InsightResolveRequest,
+    user: dict = Depends(require_write_access)
+):
+    """Resolve a client-computed insight/risk finding durably (Day-0 audit).
+
+    Risk findings are computed on the fly and have no DB row, so the old
+    inline Resolve flipped UI state only. This persists a reviewed marker in
+    dismissed_insights (the same key the UI filters on) with resolution
+    metadata, writes a member-visible activity receipt, and returns the
+    receipt text the UI shows.
+    """
+    trust_id = req.trust_id
+    criterion_name = req.criterion_name
+    user_id = user["user_id"]
+
+    trust = await db.trusts.find_one(
+        {"trust_id": trust_id, "user_id": user_id}, {"_id": 0}
+    )
+    if not trust:
+        raise HTTPException(status_code=404, detail="Trust not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    action_taken = "no action — marked reviewed"
+    await db.dismissed_insights.update_one(
+        {"trust_id": trust_id, "criterion_name": criterion_name, "user_id": user_id},
+        {
+            "$set": {
+                "trust_id": trust_id,
+                "user_id": user_id,
+                "criterion_name": criterion_name,
+                "resolution_kind": "resolved_reviewed",
+                "action_taken": action_taken,
+                "resolved_by": user_id,
+                "resolved_at": now,
+                "alert_title": req.alert_title or criterion_name,
+                "resolution_note": req.resolution_note or "",
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "dismiss_id": f"resolve_{uuid.uuid4().hex[:12]}",
+                "dismissed_at": now,
+            },
+        },
+        upsert=True,
+    )
+
+    if criterion_name.startswith("risk:"):
+        await db.risk_findings_cache.delete_one({"trust_id": trust_id})
+
+    # Member-visible activity receipt.
+    try:
+        from utils.audit import log_audit_event
+        await log_audit_event(
+            user_id=user_id,
+            action="insight_resolved",
+            entity_type="governance_insight",
+            entity_id=criterion_name,
+            details={
+                "trust_id": trust_id,
+                "criterion_name": criterion_name,
+                "alert_title": req.alert_title or criterion_name,
+                "action_taken": action_taken,
+                "resolved_by": user_id,
+                "resolved_at": now,
+            },
+        )
+    except Exception:  # noqa: BLE001 — receipt is best-effort
+        pass
+
+    return {
+        "message": f"Insight '{criterion_name}' resolved",
+        "criterion_name": criterion_name,
+        "resolution_kind": "resolved_reviewed",
+        "action_taken": action_taken,
+        "receipt": "resolved — reviewed, no action taken",
+        "resolved": True,
     }
 
 

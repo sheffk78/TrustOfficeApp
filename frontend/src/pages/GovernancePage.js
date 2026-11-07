@@ -93,6 +93,35 @@ export default function GovernancePage() {
     }
   };
 
+  // Resolve a client-computed risk finding (Day-0 audit). These findings are
+  // computed on the fly with no DB row, so the old Resolve only flipped UI
+  // state. Now it persists a reviewed marker server-side, writes a
+  // member-visible activity receipt, and shows the receipt to the member.
+  const resolveRisk = async (risk) => {
+    if (!selectedTrust) return;
+    try {
+      const response = await fetchWithAuth('/insights/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trust_id: selectedTrust.trust_id,
+          criterion_name: `risk:${risk.type}`,
+          alert_title: risk.title,
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(data.receipt || 'resolved — reviewed, no action taken');
+        await loadGovernanceData();
+      } else {
+        showError(toast, new Error(data.detail || 'Failed to resolve'), { operation: 'resolve', page: 'Governance' });
+      }
+    } catch (error) {
+      console.error('Failed to resolve risk finding:', error);
+      showError(toast, error, { operation: 'resolve', page: 'Governance' });
+    }
+  };
+
   const getScoreColor = (score) => {
     if (score >= 85) return 'text-success';
     if (score >= 65) return 'text-warning';
@@ -532,12 +561,14 @@ export default function GovernancePage() {
                           <span className="font-mono text-xs text-error">
                             {risk.penalty || 0} pts
                           </span>
-                          <Link
-                            to={risk.deeplink}
+                          <button
+                            type="button"
+                            onClick={() => resolveRisk(risk)}
                             className="text-gold text-sm hover:underline font-mono uppercase tracking-wider"
+                            data-testid={`resolve-risk-${risk.type}`}
                           >
                             Resolve
-                          </Link>
+                          </button>
                           <button
                             type="button"
                             onClick={() => dismissRisk(risk.type)}
