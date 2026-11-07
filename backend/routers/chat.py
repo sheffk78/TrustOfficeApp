@@ -1574,7 +1574,7 @@ async def _exec_contribute_asset(mapped_data: dict, trust_id: str, user_id: str)
         "minutes_id": minutes_result.minutes_id,
         "endpoint": "contribute_asset",
         "status": "draft",
-        "review_link": f"/minutes/minutes_result.minutes_id",
+        "review_link": f"/minutes/{minutes_result.minutes_id}",
     }
 
     

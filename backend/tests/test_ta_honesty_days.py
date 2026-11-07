@@ -447,15 +447,84 @@ async def test_contribute_asset_review_link_uses_real_minutes_id(seeded, monkeyp
     assert "minutes_result.minutes_id" not in result["review_link"]
 
 
+@pytest.mark.asyncio
+async def test_chat_exec_contribute_asset_review_link_uses_real_id(seeded, monkeypatch):
+    """The card-path handler (routers/chat.py) had the same literal bug."""
+    import routers.chat as chat_router
+    import routers.schedule_a as schedule_a_router
+    import routers.minutes as minutes_router
+    import dependencies
+
+    async def _fake_create_asset(item, user):
+        return types.SimpleNamespace(item_id="sa_chat_1")
+
+    async def _fake_create_minutes(minutes, background_tasks, user):
+        return types.SimpleNamespace(minutes_id="min_chat_123")
+
+    async def _fake_update_asset(item_id, update, user):
+        return None
+
+    async def _fake_onboarding(user_id, trust_id):
+        return None
+
+    monkeypatch.setattr(schedule_a_router, "create_schedule_a_item", _fake_create_asset)
+    monkeypatch.setattr(schedule_a_router, "update_schedule_a_item", _fake_update_asset)
+    monkeypatch.setattr(minutes_router, "create_minutes", _fake_create_minutes)
+    monkeypatch.setattr(dependencies, "auto_update_onboarding", _fake_onboarding)
+
+    result = await chat_router._exec_contribute_asset(
+        {
+            "description": "Family home",
+            "category": "real_property",
+            "approximate_value": 500000,
+            "date_conveyed": "2026-01-01",
+        },
+        "trust_test_honesty",
+        "user_test_honesty",
+    )
+    assert result.get("success") is True, result
+    assert result["review_link"] == "/minutes/min_chat_123", result
+
+
 def test_generate_minutes_review_link_is_not_a_literal_placeholder():
-    """Source invariant: the old f\"/minutes/result.minutes_id\" bug is gone."""
+    """Source invariant: the old f"/minutes/result.minutes_id" bug is gone
+    from BOTH parallel execution systems (actions_seed + chat card path)."""
     from pathlib import Path
 
-    source = Path(os.path.join(os.path.dirname(__file__), "..", "actions_seed.py")).read_text()
-    assert 'f"/minutes/result.minutes_id"' not in source
-    assert 'f"/minutes/minutes_result.minutes_id"' not in source
-    assert 'f"/minutes/{minutes_result.minutes_id}"' in source
-    assert 'f"/minutes/{result.minutes_id}"' in source
+    base = Path(os.path.join(os.path.dirname(__file__), ".."))
+    for rel in ("actions_seed.py", "routers/chat.py"):
+        source = (base / rel).read_text()
+        assert 'f"/minutes/result.minutes_id"' not in source, rel
+        assert 'f"/minutes/minutes_result.minutes_id"' not in source, rel
+
+    actions = (base / "actions_seed.py").read_text()
+    assert 'f"/minutes/{minutes_result.minutes_id}"' in actions
+    assert 'f"/minutes/{result.minutes_id}"' in actions
+
+    chat_src = (base / "routers/chat.py").read_text()
+    assert 'f"/minutes/{minutes_result.minutes_id}"' in chat_src
+
+
+def test_no_literal_review_link_placeholders_remain():
+    """No member-facing review_link may be a literal-string placeholder.
+
+    The same class of bug existed in the AI/dashboard surfaces (ai.py,
+    governance.py); this locks all of them down.
+    """
+    from pathlib import Path
+
+    base = Path(os.path.join(os.path.dirname(__file__), ".."))
+    offenders = [
+        'f"/minutes/existing[\'minutes_id\']"',
+        'f"/minutes/minutes_id"',
+        'f"/minutes/pending_draft[\'minutes_id\']"',
+        'f"/minutes/result.minutes_id"',
+        'f"/minutes/minutes_result.minutes_id"',
+    ]
+    for rel in ("actions_seed.py", "routers/chat.py", "routers/ai.py", "routers/governance.py"):
+        source = (base / rel).read_text()
+        for bad in offenders:
+            assert bad not in source, f"{rel} still has a literal review_link: {bad}"
 
 
 # --------------------------------------------------------------------------- #
