@@ -27,6 +27,7 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "trustoffice_isolation_test")
 os.environ.setdefault("JWT_SECRET", "test-secret-tenant-isolation")
 os.environ.setdefault("CORS_ORIGINS", "https://app.trustoffice.app")
+os.environ.setdefault("TRUSTOFFICE_LEADS_SERVICE_KEY", "test-service-key")
 
 # ==================== Route map ====================
 # (router module, [(method, path-template, creatable-via-API)])
@@ -111,6 +112,21 @@ ROUTE_MAP = [
     ]),
     ("trust_parties", [
         ("GET", "/api/trust-parties/{x_trust_id}", False),
+    ]),
+    # Service lanes (P1 leads, P2 people) - gated by X-Service-Key via
+    # require_leads_service; unauthenticated calls return 401 (env key set
+    # above), satisfying the tenant-isolation probes. Cross-tenant probes
+    # hit the same gate (no service key) and are denied.
+    ("leads_service", [
+        ("GET", "/api/service/leads/latest", False),
+        ("POST", "/api/service/leads/{lead_id}/note", True),
+        ("PATCH", "/api/service/leads/{lead_id}/stage", False),
+    ]),
+    ("people_service", [
+        ("GET", "/api/service/people", False),
+        ("GET", "/api/service/people/counts", False),
+        ("GET", "/api/service/people/{person_id}/emails", False),
+        ("GET", "/api/service/people/{person_id}/detail", False),
     ]),
 ]
 
@@ -307,7 +323,8 @@ DATA_ROUTER_MODULES = ("routers.trusts", "routers.vault", "routers.minutes",
                        "routers.compensation", "routers.calendar",
                        "routers.client_notes", "routers.orgs",
                        "routers.org_search", "routers.org_queue",
-                       "routers.defense_summary", "routers.trust_parties")
+                       "routers.defense_summary", "routers.trust_parties",
+                       "routers.leads_service", "routers.people_service")
 
 
 @pytest.fixture
@@ -353,13 +370,14 @@ def app(iso_db):
     import routers.beneficiaries, routers.compensation, routers.calendar
     import routers.client_notes, routers.actions
     import routers.org_search, routers.org_queue, routers.defense_summary
+    import routers.leads_service, routers.people_service
 
     app = FastAPI()
     for r in (routers.trusts, routers.vault, routers.minutes, routers.banking,
               routers.beneficiaries, routers.compensation, routers.calendar,
               routers.client_notes, routers.actions, routers.orgs,
               routers.org_search, routers.org_queue, routers.defense_summary,
-              routers.trust_parties):
+              routers.trust_parties, routers.leads_service, routers.people_service):
         app.include_router(r.router, prefix="/api")
     return app
 
