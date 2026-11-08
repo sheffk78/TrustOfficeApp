@@ -463,7 +463,12 @@ describe('OrgConsolePage Phase 2 — firm calendar + automated badge', () => {
     expect(screen.getByText('Automated')).toBeInTheDocument();
     expect(screen.getByTestId('cal-open-a1')).toBeInTheDocument();
     // date render regression (2026-10-13): calendar cards show "due Nov 4", not raw ISO "2026-11-04"
-    expect(screen.getByText(/due Nov 4/)).toBeInTheDocument();
+    // "due Nov 4" renders twice: the overdue chip ("Overdue Nov 4") and the calendar line
+    // ("<Trust> Â· due Nov 4"). Pin the calendar line (the match that isn't the chip) to assert
+    // the relative-date rendering, and confirm no raw ISO date leaks through.
+    const dueNov4 = screen.getAllByText(/due Nov 4/);
+    expect(dueNov4).toHaveLength(2);
+    expect(dueNov4.some(el => el.textContent !== 'Overdue Nov 4')).toBe(true);
     expect(screen.queryByText(/due 2026-11-04/)).not.toBeInTheDocument();
   });
 });
