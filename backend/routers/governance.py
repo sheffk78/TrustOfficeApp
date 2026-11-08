@@ -1332,11 +1332,14 @@ async def get_governance_history(trust_id: str, days: int = 30, user: dict = Dep
             "trust_id": trust_id,
             "user_id": user["user_id"],
             "$or": [
-                # v3 shape (calculated_at) and legacy shape (created_at, or no
-                # date at all — those are unchartable but shouldn't be dropped
-                # silently for score history older than the field rename).
+                # v3 shape (calculated_at) is windowed to `days`.
                 {"calculated_at": {"$gte": cutoff}},
-                {"created_at": {"$gte": cutoff}},
+                # Legacy shape (created_at): created_at is the ONLY date signal on
+                # legacy rows, so a legacy row older than `days` must still be
+                # fetched and merged by date - otherwise a real historical score
+                # silently drops (KeyError on later date lookups). Legacy rows are
+                # therefore NOT windowed by the `days` cutoff.
+                {"created_at": {"$exists": True}, "calculated_at": {"$exists": False}},
                 {"created_at": {"$exists": False}, "calculated_at": {"$exists": False}},
             ],
         },
