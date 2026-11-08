@@ -130,7 +130,28 @@ GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 # GOOGLE_LOGIN_REDIRECT_URI: sign-in OAuth redirect — decoupled from the backup
 # connect redirect per the 2026-11-06 fix (the backup callback lives at
 # /api/backup/oauth/callback and validates JWT state; see routers/cloud_backup.py).
-GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_LOGIN_REDIRECT_URI') or os.environ.get('GOOGLE_REDIRECT_URI')
+GOOGLE_LOGIN_REDIRECT_URI_DEFAULT = "https://api.trustoffice.app/api/auth/google/callback"
+
+
+def _google_redirect_uri() -> str:
+    """Resolve the Google sign-in redirect URI lazily at call time.
+
+    Precedence: GOOGLE_LOGIN_REDIRECT_URI (decoupled sign-in redirect), then the
+    legacy GOOGLE_REDIRECT_URI env var, then the documented default. Resolving at
+    call time (not import time) means env vars set by a test suite after this
+    module was already imported are still honored, and the value is never None.
+    """
+    return (
+        os.environ.get("GOOGLE_LOGIN_REDIRECT_URI")
+        or os.environ.get("GOOGLE_REDIRECT_URI")
+        or GOOGLE_LOGIN_REDIRECT_URI_DEFAULT
+    )
+
+
+def __getattr__(name):  # PEP 562: lazy module-attribute access
+    if name == "GOOGLE_REDIRECT_URI":
+        return _google_redirect_uri()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
@@ -1064,7 +1085,7 @@ async def google_login(request: Request):
     Initiate Google OAuth flow.
     Redirects user to Google's consent screen with TrustOffice branding.
     """
-    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
+    if not GOOGLE_CLIENT_ID or not _google_redirect_uri():
         raise HTTPException(status_code=500, detail="Google OAuth is not configured. Please contact support@trustoffice.app.")
     
     # Get the redirect URL from query params (where to go after successful auth)
@@ -1099,7 +1120,7 @@ async def google_login(request: Request):
     # Build Google OAuth URL
     params = {
         "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "redirect_uri": _google_redirect_uri(),
         "response_type": "code",
         "scope": "openid email profile",
         "state": state,
@@ -1170,7 +1191,7 @@ async def google_callback(request: Request, response: Response, code: str = None
                     "client_secret": GOOGLE_CLIENT_SECRET,
                     "code": code,
                     "grant_type": "authorization_code",
-                    "redirect_uri": GOOGLE_REDIRECT_URI
+                    "redirect_uri": _google_redirect_uri()
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
