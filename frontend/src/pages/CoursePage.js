@@ -62,11 +62,13 @@ export default function CoursePage() {
   };
 
   // Fire-and-forget report of marketing activity (matches CRM lead by email).
+  // Must POST to the API origin — the SPA host's catch-all serves text/html for
+  // every path, so a relative /api/... fetch silently disappears (2026-11-09).
   const logActivity = (action_type, detail) => {
     const email = user?.email;
     if (!email) return;
     try {
-      fetch(`/api/admin/leads/activity`, {
+      fetch(`${API}/admin/leads/activity`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, action_type, detail }),
