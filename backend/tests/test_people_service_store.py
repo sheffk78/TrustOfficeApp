@@ -32,7 +32,7 @@ from fastapi.testclient import TestClient
 import database
 import routers.people_service as people_service
 
-SERVICE_KEY = "test-service-key-1234"
+SERVICE_KEY = os.environ["TRUSTOFFICE_LEADS_SERVICE_KEY"]
 AUTH = {"X-Service-Key": SERVICE_KEY}
 
 db = database.db
