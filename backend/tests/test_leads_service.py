@@ -966,13 +966,23 @@ class TestPersonDetail:
         )
         r = people_client.get("/api/service/people/lead:lead_d3/detail", headers=AUTH)
         assert r.status_code == 200, r.text
-        notes = r.json()["notes"]
-        assert len(notes) == 2  # note_added + manual, never the email row
-        for n in notes:
-            assert set(n.keys()) == {"action_type", "content", "created_at"}
-            assert n["action_type"] in ("note_added", "manual")
-        nts = [datetime.fromisoformat(n["created_at"]) for n in notes]
-        assert nts == sorted(nts, reverse=True)
+        body = r.json()
+        # P4 contract: `notes`/`tasks` come from the server-side store
+        # (people_notes / people_tasks) keyed by the EXACT person id.
+        assert body["notes"] == []
+        assert body["tasks"] == []
+        # Legacy admin/manual note rows remain visible in the activity history
+        # (never the email row) — same _activity_view shape as before.
+        note_acts = [a for a in body["activities"] if a["action_type"] in ("note_added", "manual")]
+        assert len(note_acts) == 2
+        for a in note_acts:
+            assert set(a.keys()) == {"action_type", "content", "created_at"}
+            assert a["action_type"] in ("note_added", "manual")
+        assert "PATCH-note: interested in trustee plan" in (
+            a["content"] for a in note_acts
+        )
+        email_acts = [a for a in body["activities"] if a["action_type"] == "email"]
+        assert len(email_acts) == 1
 
     @pytest.mark.asyncio
     async def test_detail_downloads_in_activities(self, people_client):

@@ -35,12 +35,15 @@ Conventions (mirrors the P1 module):
 import logging
 import os
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from database import db
+from routers.leads import _log_activity
 from routers.leads_service import (
     ACTIVITY_CONTENT_LIMIT,
     LEAD_PROJECTION,
@@ -200,7 +203,6 @@ ROSTER_LEAD_PROJECTION = {
 # ---- P3 (per-person detail bundle) ----
 PEOPLE_DETAIL_EMAIL_LIMIT = 10   # newest email records in the bundle
 PEOPLE_DETAIL_ACT_LIMIT = 50     # activity rows: contact history incl. video/downloads
-PEOPLE_DETAIL_NOTE_LIMIT = 10    # latest notes (note_added rows)
 # Lead doc fields for the bundle identity/status block (P1 shape + P3 extras).
 DETAIL_LEAD_PROJECTION = {
     **LEAD_PROJECTION,
@@ -238,6 +240,108 @@ DETAIL_ACTIVITY_PROJECTION = {
 }
 # Note-style activity rows surfaced as "notes" in the detail bundle.
 NOTE_ACTION_TYPES = ("note_added", "manual")
+
+# ---- P4 (server-side person notes/tasks store, OS people-card writes) ----
+# A REAL store owned by this repo: OS writes land HERE (Mongo, service-key
+# scoped) instead of living only in the OS host's Mac-local crm.db. person_id
+# is stored EXACTLY as sent — colon-prefixed forms included ("lead:<bare>",
+# "purchaser:<email>", bare "lead_<hex>") — because round-tripping the exact id
+# is the only thing the OS card needs to read its writes back.
+PEOPLE_STORE_NOTE_LIMIT = 20   # newest notes carried in one read
+PEOPLE_STORE_TASK_LIMIT = 20   # newest tasks carried in one read
+PEOPLE_NOTE_TEXT_LIMIT = 2000
+PEOPLE_TASK_TITLE_LIMIT = 300
+PEOPLE_TASK_STATUSES = ("open", "done")
+
+
+class PersonNoteRequest(BaseModel):
+    text: str
+
+
+class PersonTaskRequest(BaseModel):
+    title: str
+    status: str = "open"
+
+
+class PersonTaskStatusRequest(BaseModel):
+    task_id: str
+    status: str
+
+
+def _person_note_view(doc: dict) -> dict:
+    """Mongo people_notes doc -> OS wire shape {id, text, at}."""
+    return {
+        "id": doc.get("note_id") or "",
+        "text": doc.get("text") or "",
+        "at": _iso(doc.get("at")),
+    }
+
+
+def _person_task_view(doc: dict) -> dict:
+    """Mongo people_tasks doc -> OS wire shape {id, title, status, at}."""
+    return {
+        "id": doc.get("task_id") or "",
+        "title": doc.get("title") or "",
+        "status": doc.get("status") or "open",
+        "at": _iso(doc.get("at")),
+    }
+
+
+async def _store_person_notes(person_id: str, limit: int = PEOPLE_STORE_NOTE_LIMIT) -> List[dict]:
+    """Newest-first notes for the EXACT person id (empty list when none)."""
+    out: List[dict] = []
+    cursor = (
+        db.people_notes.find({"person_id": person_id})
+        .sort("at", -1)
+        .limit(limit)
+    )
+    async for doc in cursor:
+        out.append(_person_note_view(doc))
+    return out
+
+
+async def _store_person_tasks(person_id: str, limit: int = PEOPLE_STORE_TASK_LIMIT) -> List[dict]:
+    """Newest-first tasks for the EXACT person id (empty list when none)."""
+    out: List[dict] = []
+    cursor = (
+        db.people_tasks.find({"person_id": person_id})
+        .sort("at", -1)
+        .limit(limit)
+    )
+    async for doc in cursor:
+        out.append(_person_task_view(doc))
+    return out
+
+
+def _bare_lead_id(person_id: str) -> Optional[str]:
+    """"lead:lead_abc" -> "lead_abc"; anything else -> None.
+
+    The legacy lead-activity log is keyed by the BARE lead_id (routes do
+    db.leads.find_one({"lead_id": lead_id})), so the side-log only fires when
+    the colon is present and always logs the stripped form.
+    """
+    if person_id.startswith("lead:") and len(person_id) > len("lead:"):
+        return person_id.split(":", 1)[1].strip() or None
+    return None
+
+
+async def _side_log_lead_activity(bare_lead_id: str, text: str) -> bool:
+    """Best-effort append of a 'manual' activity to the legacy lead log.
+
+    Same _log_activity path routers.leads_service's add_service_note uses, but
+    NEVER raises: an unknown/missing lead must not fail a note that already
+    landed in people_notes. Returns True when a row was written.
+    """
+    try:
+        lead = await db.leads.find_one({"lead_id": bare_lead_id})
+        if not lead:
+            return False
+        await _log_activity(bare_lead_id, "manual", text)
+        return True
+    except Exception:
+        logger.exception("lead-activity side-log failed for lead %s", bare_lead_id)
+        return False
+
 
 # Runtime-discovery candidates for a live inbound-email collection.
 _INBOUND_CANDIDATES = ("emails", "inbound_emails", "mail_logs", "received_emails")
@@ -1071,17 +1175,21 @@ async def get_person_detail(person_id: str, email: str = "", name: str = ""):
 
     Identity (name/email/phone/company) + stage/status + latest emails +
     contact-history activities (the /admin/leads activity log shape, incl.
-    video opens/watches, downloads, booked_call) + latest notes + next_action.
+    video opens/watches, downloads, booked_call) + stored notes + stored
+    tasks + next_action.
 
     Unknown/missing ids are NOT 404s: same contract as /emails — a 200 with
     an empty bundle, person echoed from the path + query params, all lists
     empty, identity keys present but blank. Bounded: <=10 emails, <=50
-    activities, <=10 notes, newest first everywhere, content capped at
-    ACTIVITY_CONTENT_LIMIT; degrades honestly (phone/company blank when the
-    source docs never carried them) and never invents data.
+    activities, <=20 stored notes, <=20 stored tasks, newest first
+    everywhere, content capped at ACTIVITY_CONTENT_LIMIT; degrades honestly
+    (phone/company blank when the source docs never carried them) and never
+    invents data.
 
-    "Notes" are the two canonical note writes: admin PATCH-notes rows
-    (action_type "note_added") and note-style rows (action_type "manual").
+    "notes"/"tasks" are P4 server-side store rows (people_notes /
+    people_tasks, keyed by the EXACT person id) — the OS card's write path.
+    The legacy lead-activity note rows ("note_added"/"manual") remain visible
+    up in `activities`.
     """
     as_of_dt = datetime.now(timezone.utc)
     person, lead, user, activity_query = await _resolve_person(
@@ -1100,20 +1208,6 @@ async def get_person_detail(person_id: str, email: str = "", name: str = ""):
         )
         async for act in act_cursor:
             activities.append(_activity_view(act))
-
-    # ---- latest notes: bounded note-action rows, newest first ----
-    notes: List[dict] = []
-    if activity_query:
-        note_cursor = (
-            db.lead_activities.find(
-                {**activity_query, "action_type": {"$in": list(NOTE_ACTION_TYPES)}},
-                DETAIL_NOTE_PROJECTION,
-            )
-            .sort("created_at", -1)
-            .limit(PEOPLE_DETAIL_NOTE_LIMIT)
-        )
-        async for note in note_cursor:
-            notes.append(_activity_view(note))
 
     # ---- identity + stage/status (empty/None when nothing is known) ----
     identity = {
@@ -1136,12 +1230,156 @@ async def get_person_detail(person_id: str, email: str = "", name: str = ""):
         "call_outcome": (lead.get("call_outcome") if lead else None),
     }
 
+    notes = await _store_person_notes(person_id)
+    tasks = await _store_person_tasks(person_id)
     return {
         "person": identity,
         "status": status,
         "emails": emails[:PEOPLE_DETAIL_EMAIL_LIMIT],
         "activities": activities,
         "notes": notes,
+        "tasks": tasks,
         "next_action": lead.get("next_action") if lead else None,
         "as_of": as_of_dt.isoformat(),
     }
+
+
+# ==================== PERSON NOTES / TASKS STORE (P4 writes) ====================
+# Server-side store behind the OS people card (Jeff's flow: add a note or a
+# task on any person card — lead or purchaser — flip the task, refresh the
+# page, everything is still there). Rows live in people_notes / people_tasks,
+# keyed by the person id EXACTLY as the OS sent it; the legacy lead-activity
+# log gets a best-effort 'manual' side-log for lead: notes so the admin
+# timeline keeps its history. This is the primary store; the OS host's
+# Mac-local crm.db is a best-effort side-write at the OS layer, never a
+# dependency of these routes.
+
+
+@router.get("/{person_id}/notes")
+async def get_person_notes(person_id: str):
+    """Newest-first stored notes for the exact person id (empty when none).
+
+    Unknown ids are NOT 404s — same contract as /emails: a person with no
+    notes yet is just an empty list. The id is matched EXACTLY as stored,
+    colon-prefixed forms included.
+    """
+    as_of_dt = datetime.now(timezone.utc)
+    notes = await _store_person_notes(person_id)
+    return {"person_id": person_id, "notes": notes, "as_of": as_of_dt.isoformat()}
+
+
+@router.get("/{person_id}/tasks")
+async def get_person_tasks(person_id: str):
+    """Newest-first stored tasks for the exact person id (empty when none)."""
+    as_of_dt = datetime.now(timezone.utc)
+    tasks = await _store_person_tasks(person_id)
+    return {"person_id": person_id, "tasks": tasks, "as_of": as_of_dt.isoformat()}
+
+
+@router.post("/{person_id}/note")
+async def add_person_note(person_id: str, body: PersonNoteRequest):
+    """Append a note to the store, keyed by the EXACT person id sent.
+
+    Convenience side-log: when person_id is a colon-prefixed lead id and no
+    people_notes row exists for it yet, the note ALSO lands in the legacy
+    lead-activity log via the same '_log_activity("manual", ...)' path the
+    admin notes use — with the BARE lead id, so it never 404s the class of
+    bare-vs-prefixed id mismatches. Best-effort: a miss there never fails
+    the note itself.
+    """
+    text = (body.text or "").strip()
+    if not text or len(text) > PEOPLE_NOTE_TEXT_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "text must be a non-empty string between 1 and "
+                f"{PEOPLE_NOTE_TEXT_LIMIT} characters"
+            ),
+        )
+    now = datetime.now(timezone.utc)
+    note_id = f"pn_{uuid.uuid4().hex[:12]}"
+    await db.people_notes.insert_one(
+        {
+            "note_id": note_id,
+            "person_id": person_id,
+            "text": text,
+            "at": now,
+            "source": "os_service",
+        }
+    )
+    bare = _bare_lead_id(person_id)
+    side_logged = False
+    if bare is not None:
+        # First stored note for this colon id only — repeat notes live in the
+        # store and must not double-log in the legacy lead timeline.
+        existing = await db.people_notes.count_documents({"person_id": person_id})
+        if existing <= 1:
+            side_logged = await _side_log_lead_activity(bare, text)
+    return {
+        "success": True,
+        "note": {"id": note_id, "text": text, "at": now.isoformat()},
+        "side_logged": side_logged,
+    }
+
+
+@router.post("/{person_id}/task")
+async def add_person_task(person_id: str, body: PersonTaskRequest):
+    """Append a task to the store, keyed by the EXACT person id sent."""
+    title = (body.title or "").strip()
+    if not title or len(title) > PEOPLE_TASK_TITLE_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "title must be a non-empty string between 1 and "
+                f"{PEOPLE_TASK_TITLE_LIMIT} characters"
+            ),
+        )
+    status = (body.status or "open").strip().lower()
+    if status not in PEOPLE_TASK_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unknown task status — expected one of: "
+            + ", ".join(PEOPLE_TASK_STATUSES) + ".",
+        )
+    now = datetime.now(timezone.utc)
+    task_id = f"pt_{uuid.uuid4().hex[:12]}"
+    await db.people_tasks.insert_one(
+        {
+            "task_id": task_id,
+            "person_id": person_id,
+            "title": title,
+            "status": status if status == "done" else "open",
+            "at": now,
+            "source": "os_service",
+        }
+    )
+    return {
+        "success": True,
+        "task": {"id": task_id, "title": title, "status": status if status == "done" else "open", "at": now.isoformat()},
+    }
+
+
+@router.post("/{person_id}/task-status")
+async def set_person_task_status(person_id: str, body: PersonTaskStatusRequest):
+    """Flip one stored task's status (404 when the task id is unknown)."""
+    status = (body.status or "").strip().lower()
+    if status not in PEOPLE_TASK_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unknown task status — expected one of: "
+            + ", ".join(PEOPLE_TASK_STATUSES) + ".",
+        )
+    task_id = (body.task_id or "").strip()
+    if not task_id:
+        raise HTTPException(status_code=400, detail="task_id is required")
+    now = datetime.now(timezone.utc)
+    result = await db.people_tasks.update_one(
+        {"task_id": task_id, "person_id": person_id},
+        {"$set": {"status": status, "updated_at": now}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="That task isn't on this person's card anymore.",
+        )
+    return {"success": True, "task_id": task_id, "status": status}
