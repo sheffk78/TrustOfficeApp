@@ -1,12 +1,20 @@
 """TrustOffice "leads service" lane (Phase 1).
 
 Scoped, service-to-service endpoints consumed by the Agentic OS overview
-card (Kit's command center). Authenticated with a single static service key
-sent in the `X-Service-Key` header â NOT a user JWT. The OS backend calls
-these server-side, so no browser CORS is opened here.
+card (Kit's command center) and the Bland.ai calling assistant. Authenticated
+with a single static service key sent in the `X-Service-Key` header — NOT a
+user JWT. The OS backend calls these server-side, so no browser CORS is
+opened here.
 
 Endpoints (mounted under /api/service/leads):
   GET  /latest                 -> 3 newest leads + each lead's 3 latest activities
+  GET  /queue                  -> Bland calling queue: leads with a phone in
+                                  call-eligible stages (new/engaged/warm/
+                                  registered), oldest first, paginated
+  GET  /{lead_id}              -> single lead + up to 10 activities (Bland
+                                  resolves a lead before dialing)
+  POST /{lead_id}/call-outcome -> record an AI call disposition (+ stage
+                                  transitions: opt_out/interested/booked)
   POST /{lead_id}/note         -> append a manual note (through the same
                                   _log_activity helper the admin notes use)
   PATCH /{lead_id}/stage       -> set stage (validated) + log a system activity
@@ -17,9 +25,9 @@ import secrets
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import db
 from routers.leads import LEAD_STAGES, _log_activity
@@ -76,6 +84,30 @@ class ServiceNoteRequest(BaseModel):
 
 class ServiceStageRequest(BaseModel):
     stage: str
+
+
+# Valid dispositions the Bland.ai agent can report back after a call.
+CALL_DISPOSITIONS = [
+    "interested",
+    "booked",
+    "not_interested",
+    "opt_out",
+    "voicemail",
+    "no_answer",
+    "callback_requested",
+]
+
+# Stages a lead must be in to appear in the Bland calling queue. do_not_call
+# (opt-out) and lost (went cold) are deliberately excluded — never re-call.
+CALLABLE_STAGES = ["new", "engaged", "warm", "registered"]
+
+
+class CallOutcomeRequest(BaseModel):
+    disposition: str
+    summary: str = ''
+    booking_ref: Optional[str] = Field(default=None, max_length=200)
+    opt_out: bool = False
+    call_duration_sec: Optional[int] = None
 
 
 # ==================== ROUTER ====================
@@ -139,6 +171,142 @@ async def get_latest_leads():
         )
 
     return {"leads": leads_out, "asOf": datetime.now(timezone.utc).isoformat()}
+
+
+# ==================== BLAND.AI CALLING (Bland agent fe709e36) ====================
+
+def _lead_view(lead: dict) -> dict:
+    """Shared projection shape for queue + single-lead lookups (no Mongo _id)."""
+    return {
+        "lead_id": lead.get("lead_id"),
+        "name": lead.get("name"),
+        "email": lead.get("email"),
+        "phone": lead.get("phone"),
+        "stage": lead.get("stage"),
+        "source": lead.get("source"),
+        "created_at": _iso(lead.get("created_at")),
+        "updated_at": _iso(lead.get("updated_at")),
+        "notes": lead.get("notes"),
+    }
+
+
+async def _activities_for(lead_id: str, limit: int = 10) -> List[dict]:
+    """Most recent N activities for a lead, newest first, trimmed view."""
+    activities: List[dict] = []
+    act_cursor = (
+        db.lead_activities.find({"lead_id": lead_id})
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+    async for act in act_cursor:
+        activities.append(_activity_view(act))
+    return activities
+
+
+@router.get("/queue")
+async def get_calling_queue(
+    limit: int = Query(default=10, ge=1, le=25),
+    offset: int = Query(default=0, ge=0),
+):
+    """Paginated Bland.ai calling queue, oldest leads first.
+
+    Only leads with a non-empty phone in a call-eligible stage
+    (new/engaged/warm/registered) — do_not_call and lost leads are never
+    re-called. count is the total matching the filter (after offset/limit
+    applied separately) so the caller knows how many remain.
+    """
+    query = {
+        "phone": {"$exists": True, "$nin": [None, ""]},
+        "stage": {"$in": CALLABLE_STAGES},
+    }
+    total = await db.leads.count_documents(query)
+    leads_out: List[dict] = []
+    cursor = (
+        db.leads.find(query, LEAD_PROJECTION)
+        .sort("created_at", 1)
+        .skip(offset)
+        .limit(limit)
+    )
+    async for lead in cursor:
+        leads_out.append(_lead_view(lead))
+
+    return {
+        "leads": leads_out,
+        "count": total,
+        "asOf": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/{lead_id}")
+async def get_service_lead(lead_id: str):
+    """Single-lead lookup: same projection as /latest plus up to 10 activities.
+
+    Bland uses this to resolve (and re-contextualize) a lead before dialing.
+    """
+    lead = await db.leads.find_one({"lead_id": lead_id}, LEAD_PROJECTION)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    view = _lead_view(lead)
+    view["activities"] = await _activities_for(lead_id, limit=10)
+    return {"lead": view}
+
+
+@router.post("/{lead_id}/call-outcome")
+async def record_call_outcome(lead_id: str, body: CallOutcomeRequest):
+    """Record a Bland.ai call disposition on a lead.
+
+    Stage transitions:
+      - opt_out flag true, OR disposition==opt_out -> do_not_call (+ logged)
+      - not_interested -> lost
+      - booked -> engaged (+ booking_ref logged)
+      - anything else -> stage unchanged
+    """
+    disposition = (body.disposition or "").strip()
+    if disposition not in CALL_DISPOSITIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid disposition. Must be one of: {', '.join(CALL_DISPOSITIONS)}",
+        )
+    lead = await db.leads.find_one({"lead_id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    call_stage = body.call_duration_sec if body.call_duration_sec is not None else None
+    content = f"AI call via Bland: {disposition}"
+    summary = (body.summary or "").strip()
+    if summary:
+        content += f" — {summary}"
+    if call_stage:
+        content += f" ({call_stage}s)"
+    await _log_activity(lead_id, "manual", content)
+
+    now = datetime.now(timezone.utc)
+    stage = lead.get("stage")
+    if body.opt_out or disposition == "opt_out":
+        stage = "do_not_call"
+        await db.leads.update_one(
+            {"lead_id": lead_id},
+            {"$set": {"stage": "do_not_call", "updated_at": now.isoformat()}},
+        )
+        await _log_activity(
+            lead_id, "system", "Opt-out recorded from AI call — do not call"
+        )
+    elif disposition == "not_interested":
+        stage = "lost"
+        await db.leads.update_one(
+            {"lead_id": lead_id},
+            {"$set": {"stage": "lost", "updated_at": now.isoformat()}},
+        )
+    elif disposition == "booked":
+        stage = "engaged"
+        await db.leads.update_one(
+            {"lead_id": lead_id},
+            {"$set": {"stage": "engaged", "updated_at": now.isoformat()}},
+        )
+        if body.booking_ref:
+            await _log_activity(lead_id, "manual", f"Booking ref: {body.booking_ref}")
+
+    return {"success": True, "lead_id": lead_id, "stage": stage}
 
 
 @router.post("/{lead_id}/note")

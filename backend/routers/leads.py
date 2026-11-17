@@ -70,6 +70,7 @@ LEAD_STAGES = [
     "registered",  # Email matched a created account (lead -> user linkage)
     "converted",   # Subscribed to TrustOffice
     "lost",        # Went cold or unsubscribed
+    "do_not_call", # Opted out of calls (AI-call opt-out) — never re-call
 ]
 
 STAGE_LABELS = {
@@ -79,6 +80,7 @@ STAGE_LABELS = {
     "registered": "Registered",
     "converted": "Converted",
     "lost": "Lost",
+    "do_not_call": "Do Not Call",
 }
 
 # Valid lead sources — any marketing form that captures emails
