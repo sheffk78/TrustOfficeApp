@@ -21,6 +21,7 @@ Endpoints (mounted under /api/service/leads):
 """
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -108,6 +109,16 @@ class CallOutcomeRequest(BaseModel):
     booking_ref: Optional[str] = Field(default=None, max_length=200)
     opt_out: bool = False
     call_duration_sec: Optional[int] = None
+
+
+class BookingByEmailRequest(BaseModel):
+    """Body the booking app POSTs after a successful (immediate or confirmed) booking."""
+
+    status: Optional[str] = None
+    when: Optional[str] = None
+    booking_ref: Optional[str] = Field(default=None, max_length=200)
+    event_type: Optional[str] = None
+    channel: Optional[str] = None
 
 
 # ==================== ROUTER ====================
@@ -350,3 +361,46 @@ async def set_service_stage(lead_id: str, body: ServiceStageRequest):
         lead_id, "system", f"Stage set to {stage} from OS overview by Kit"
     )
     return {"success": True, "stage": stage}
+
+
+@router.post("/by-email/{email}/booking")
+async def record_booking_by_email(email: str, body: BookingByEmailRequest):
+    """Record a governance-consultation booking by lead email (booking-app callback).
+
+    Consumed by the TrustOffice booking service after ANY successful booking
+    confirm (public click OR agent/trusted immediate booking). Idempotent by
+    email; a miss returns success+matched=false with no side effects.
+    """
+    raw_email = (email or "").strip().lower()
+    when = (body.when or "").strip()
+    booking_ref = (body.booking_ref or "").strip()
+    event_type = (body.event_type or "governance-consultation").strip() or "governance-consultation"
+
+    lead = await db.leads.find_one(
+        {"email": {"$regex": f"^{re.escape(raw_email)}$", "$options": "i"}},
+    )
+    if not lead:
+        # Unknown lead: no side effects, just log server-side.
+        logger.info("Booking callback for unknown lead email: %s", raw_email)
+        return {"success": True, "matched": False}
+
+    lead_id = lead.get("lead_id")
+    stage = lead.get("stage") or "new"
+    content = f"Governance consultation BOOKED — slot {when or 'n/a'}, ref {booking_ref or 'n/a'}"
+
+    now = datetime.now(timezone.utc)
+    if stage == "do_not_call":
+        # Opted out: never re-engage via a booking callback; log only.
+        content += f" (stage: {stage} — not changed)"
+    else:
+        if stage != "engaged":
+            content += f" (stage: {stage} → engaged)"
+        stage = "engaged"
+        await db.leads.update_one(
+            {"lead_id": lead_id},
+            {"$set": {"stage": "engaged", "updated_at": now.isoformat()}},
+        )
+
+    await _log_activity(lead_id, "system", content)
+
+    return {"success": True, "matched": True, "lead_id": lead_id, "stage": stage}

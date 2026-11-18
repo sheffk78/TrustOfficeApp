@@ -423,3 +423,93 @@ class TestDoNotCallStageWiring:
         assert r.json()["stage"] == "do_not_call"
         lead = await db.leads.find_one({"lead_id": "lead_q"})
         assert lead["stage"] == "do_not_call"
+
+
+# ==================== POST /by-email/{email}/booking ====================
+
+BOOKING_BY_EMAIL_URL = "/api/service/leads/by-email/lead_q@example.com/booking"
+
+
+class TestBookingByEmail:
+    @pytest.mark.asyncio
+    async def test_booking_by_email_matched_sets_engaged_and_logs(self, client):
+        await _seed(stage="new")
+        r = client.post(
+            BOOKING_BY_EMAIL_URL,
+            headers=AUTH,
+            json={
+                "status": "booked",
+                "when": "2026-10-05T16:00:00+00:00",
+                "booking_ref": "hold_abc123",
+                "event_type": "governance-consultation",
+                "channel": "booking-app",
+            },
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["success"] is True
+        assert body["matched"] is True
+        assert body["lead_id"] == "lead_q"
+        assert body["stage"] == "engaged"
+
+        lead = await db.leads.find_one({"lead_id": "lead_q"})
+        assert lead is not None
+        assert lead["stage"] == "engaged"
+
+        acts = await db.lead_activities.find({"lead_id": "lead_q"}).to_list(None)
+        contents = [a.get("content") for a in acts]
+        assert any(
+            "Governance consultation BOOKED" in (c or "") and "hold_abc123" in (c or "")
+            for c in contents
+        )
+        assert any(a.get("action_type") == "system" for a in acts)
+
+    @pytest.mark.asyncio
+    async def test_booking_by_email_unmatched_returns_matched_false_no_side_effects(self, client):
+        r = client.post(
+            "/api/service/leads/by-email/lead_nope@example.com/booking",
+            headers=AUTH,
+            json={"status": "booked", "when": "2026-10-05T16:00:00+00:00", "booking_ref": "hold_x"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json() == {"success": True, "matched": False}
+        # no side effects on a miss
+        assert await db.lead_activities.count_documents({}) == 0
+
+    @pytest.mark.asyncio
+    async def test_booking_by_email_do_not_call_respected(self, client):
+        await _seed(stage="do_not_call")
+        r = client.post(
+            BOOKING_BY_EMAIL_URL,
+            headers=AUTH,
+            json={"status": "booked", "when": "2026-10-05T16:00:00+00:00", "booking_ref": "hold_abc123"},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["success"] is True
+        assert body["matched"] is True
+        assert body["stage"] == "do_not_call"
+        lead = await db.leads.find_one({"lead_id": "lead_q"})
+        assert lead is not None
+        assert lead["stage"] == "do_not_call"
+        acts = await db.lead_activities.find({"lead_id": "lead_q"}).to_list(None)
+        assert any("Governance consultation BOOKED" in (a.get("content") or "") for a in acts)
+
+    @pytest.mark.asyncio
+    async def test_booking_by_email_case_insensitive_match(self, client):
+        await db.leads.insert_one(_lead("lead_mixed", stage="new", email="Mixed.Case@Example.com"))
+        r = client.post(
+            "/api/service/leads/by-email/mixed.case@example.com/booking",
+            headers=AUTH,
+            json={"status": "booked", "when": "2026-10-05T16:00:00+00:00", "booking_ref": "hold_m1"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["matched"] is True
+        assert r.json()["lead_id"] == "lead_mixed"
+        assert r.json()["stage"] == "engaged"
+
+    @pytest.mark.asyncio
+    async def test_booking_by_email_requires_auth(self, client):
+        r = client.post(BOOKING_BY_EMAIL_URL, json={"status": "booked"})
+        assert r.status_code == 401
+        assert await db.lead_activities.count_documents({}) == 0
