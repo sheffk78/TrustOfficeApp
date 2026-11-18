@@ -26,7 +26,12 @@ DB_NAME = os.environ.get('DB_NAME', 'test_database')
 DRIP_MAX_PER_RUN = 80
 
 # Booking-reminder windows (item 2), mirror leads_monitor.check_leads_pipeline_health.
-BOOKING_DAY_BEFORE_LOWER = timedelta(hours=23)
+# 2026-11-18: widened so an hourly tick can never phase-miss a booking.
+# Old day-before band was 23-25h (2h wide -> a booking made inside 23h was
+# skipped FOREVER); old 1h band was 55-65min (10 min wide vs hourly ticks =
+# ~83% of bookings could never hit a tick). New bands are catch-up style:
+# send on the first hourly tick inside the band while the flag is unset.
+BOOKING_DAY_BEFORE_LOWER = timedelta(hours=13)
 BOOKING_DAY_BEFORE_UPPER = timedelta(hours=25)
 BOOKING_ONE_HOUR_LOWER = timedelta(minutes=55)
 BOOKING_ONE_HOUR_UPPER = timedelta(minutes=65)
@@ -1191,6 +1196,12 @@ class BackgroundTaskRunner:
                         or "https://trustoffice.app/book-a-call/",  # 2026-10-05: /meeting 404 on app domain; scheduler page is the safe fallback
                     }
 
+                    # 2026-11-18: catch-up day-before band (internal probe
+                    # booking + tick-phase miss paged a false RED — see
+                    # leads_monitor waivers). Any booking made >= 13h out now
+                    # gets its day-before on the FIRST hourly tick inside
+                    # 13-25h, instead of being permanently skipped when the
+                    # booking lands inside 23h.
                     if (
                         now + BOOKING_DAY_BEFORE_LOWER <= booked_at <= now + BOOKING_DAY_BEFORE_UPPER
                         and not lead.get("reminder_day_before_sent_at")
@@ -1209,8 +1220,16 @@ class BackgroundTaskRunner:
                             )
                             result["day_before"] += 1
 
+                    # 2026-11-18: catch-up 1h band. The old 55-65min window
+                    # (10 min wide) vs hourly ticks guaranteed ~83% of bookings
+                    # could never hit a send tick (internal probe booking +
+                    # tick-phase miss paged a false RED). Now the 1h reminder
+                    # fires on the first hourly tick after entering the last
+                    # hour while the call is still upcoming (aligned with
+                    # leads_monitor's LATE_BOOKING_1H_WAIVER).
                     if (
-                        now + BOOKING_ONE_HOUR_LOWER <= booked_at <= now + BOOKING_ONE_HOUR_UPPER
+                        booked_at - now <= BOOKING_ONE_HOUR_UPPER
+                        and booked_at > now
                         and not lead.get("reminder_1h_sent_at")
                     ):
                         r = await email_service.send_booking_reminder_1h(

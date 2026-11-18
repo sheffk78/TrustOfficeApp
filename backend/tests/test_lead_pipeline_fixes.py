@@ -537,3 +537,189 @@ async def test_real_notify_pipeline_alert_accepts_alert_level_kw(monkeypatch):
     # And calling without alert_level must still work (backward compatible).
     res2 = await real_mod.notify_pipeline_alert(title="t", message="m")
     assert isinstance(res2, dict)
+
+
+# --------------------------------------------------------------------------- #
+# 2026-11-18: false-RED fix — internal test leads + late-booking waivers.
+#
+# Production evidence (JOB-20261118-PIPELINE-REDIS): kit-bland-test@
+# trustoffice.app (Bland console probe) booked a call 17.7h out — inside the
+# day-before band — and the 10-minute 1h window caught no hourly tick, so the
+# monitor paged a false RED on 2026-11-18. Real lead lead_9d0390f5f50d ALSO
+# missed its 1h reminder to the same tick-phase bug.
+# --------------------------------------------------------------------------- #
+def _insert_booking_event(db, lead_id, at):
+    """Insert the lead_activities 'booked_call' row the monitor reads to
+    compute the booking EVENT time (gap = booked_call_at - event time)."""
+    return db.lead_activities.insert_one({
+        "activity_id": f"bk-{lead_id}",
+        "lead_id": lead_id,
+        "action_type": "booked_call",
+        "created_at": at,
+    })
+
+
+def test_is_internal_test_lead_detection():
+    # Exact suffix match (lowercased) for both internal domains; real
+    # customer emails never match.
+    assert leads_monitor._is_internal_test_lead("kit-bland-test@trustoffice.app") is True
+    assert leads_monitor._is_internal_test_lead("kit-bland-test@AGENTICtrust.APP") is True
+    assert leads_monitor._is_internal_test_lead("julio@gmail.com") is False
+    assert leads_monitor._is_internal_test_lead(None) is False
+    assert leads_monitor._is_internal_test_lead("trustoffice.app@gmail.com") is False
+
+
+@pytest.mark.asyncio
+async def test_monitor_internal_test_lead_never_books_a_violation(db):
+    """(i) Internal probe leads (@trustoffice.app AND @agentictrust.app) with
+    an un-reminded booked call produce NO booking_violations — the exact
+    kit-bland-test@trustoffice.app shape that paged false RED 2026-11-18."""
+    # Call 18h out (day-before window open), booking event 0.3h before the
+    # call — inside scope, nothing sent: without the internal-lead skip this
+    # was a guaranteed violation.
+    now = datetime.now(timezone.utc)
+    call_at = now + timedelta(hours=18)
+    await db.leads.insert_one(_make_lead(
+        "IT1", booked_call=True, booked_call_at=call_at,
+        email="kit-bland-test@trustoffice.app",
+    ))
+    await db.leads.insert_one(_make_lead(
+        "IT2", booked_call=True, booked_call_at=call_at,
+        email="probe@agentictrust.app",
+    ))
+    await _insert_booking_event(db, "IT1", now - timedelta(hours=17.7))
+    await _insert_booking_event(db, "IT2", now - timedelta(hours=17.7))
+
+    result = await leads_monitor.check_leads_pipeline_health(db)
+    assert result["booking_violations"] == 0
+    assert not any("booking" in f.lower() for f in result["failures"])
+
+
+@pytest.mark.asyncio
+async def test_monitor_day_before_waiver_when_booking_inside_band(db):
+    """(ii) A REAL lead that books < 14h before the call can never have had a
+    day-before reminder (13-25h band, hourly ticks) — waived, not RED."""
+    now = datetime.now(timezone.utc)
+    call_at = now + timedelta(hours=12)  # day-before window has opened (< 23h)
+    await db.leads.insert_one(_make_lead(
+        "LATE1", booked_call=True, booked_call_at=call_at,
+        email="real.late.booking@example.com",
+    ))
+    # Booking event 2h before the call -> gap = 2h < 14h waiver.
+    await _insert_booking_event(db, "LATE1", call_at - timedelta(hours=2))
+
+    result = await leads_monitor.check_leads_pipeline_health(db)
+    assert result["booking_violations"] == 0
+    assert not any("booking" in f.lower() for f in result["failures"])
+
+
+@pytest.mark.asyncio
+async def test_monitor_1h_waiver_when_booking_inside_last_hour(db):
+    """(iii) A booking made < 75min before the call lands inside (or adjacent
+    to) the 1h send window with no tick opportunity — waived, not RED."""
+    now = datetime.now(timezone.utc)
+    call_at = now + timedelta(minutes=50)  # 1h window has opened (< 55min)
+    await db.leads.insert_one(_make_lead(
+        "LATE2", booked_call=True, booked_call_at=call_at,
+        email="real.last.minute@example.com",
+        reminder_day_before_sent_at=now.isoformat(),  # day-before covered
+    ))
+    # Booking event 30min before the call -> gap = 30min < 75min waiver.
+    await _insert_booking_event(db, "LATE2", call_at - timedelta(minutes=30))
+
+    result = await leads_monitor.check_leads_pipeline_health(db)
+    assert result["booking_violations"] == 0
+    assert not any("booking" in f.lower() for f in result["failures"])
+
+
+@pytest.mark.asyncio
+async def test_monitor_real_lead_with_both_reminders_stays_green(db):
+    """(iv) Regression guard: a REAL lead, booked >= waiver out, with both
+    reminders logged, must stay green (no false positives from the waivers)."""
+    now = datetime.now(timezone.utc)
+    call_at = now + timedelta(hours=20)
+    await db.leads.insert_one(_make_lead(
+        "REALOK", booked_call=True, booked_call_at=call_at,
+        email="real.customer@example.com",
+        reminder_day_before_sent_at=now.isoformat(),
+        reminder_1h_sent_at=now.isoformat(),
+    ))
+    await _insert_booking_event(db, "REALOK", call_at - timedelta(days=2))
+    result = await leads_monitor.check_leads_pipeline_health(db)
+    assert result["booking_violations"] == 0
+    assert result["all_ok"] is True
+    discord_module.notify_pipeline_alert.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_monitor_real_late_booking_without_reminders_still_violates(db):
+    """(iv) Regression guard the other way: a REAL lead booked >= 14h out
+    (waiver does NOT apply) with no reminder logged must still go RED —
+    the waivers must not swallow genuine missed-reminder failures."""
+    now = datetime.now(timezone.utc)
+    call_at = now + timedelta(hours=20)  # inside 36h, day-before window open
+    await db.leads.insert_one(_make_lead(
+        "REALBAD", booked_call=True, booked_call_at=call_at,
+        email="genuine.miss@example.com",
+    ))
+    # Booking event 2 DAYS before the call -> gap 48h >= 14h: no waiver.
+    await _insert_booking_event(db, "REALBAD", call_at - timedelta(days=2))
+
+    result = await leads_monitor.check_leads_pipeline_health(db)
+    assert result["booking_violations"] >= 1
+    assert any("booking" in f.lower() for f in result["failures"])
+
+
+# --------------------------------------------------------------------------- #
+# 2026-11-18: catch-up send bands in background_tasks.send_booking_reminder_emails
+# (the monitor waivers mirror these — internal probe booking + tick-phase miss
+# paged false RED).
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_day_before_sends_for_booking_20h_out(runner, db):
+    """The old 23h lower bound permanently skipped a booking made 20h out.
+    The 13h lower bound must catch it on the first tick inside the band."""
+    at = datetime.now(timezone.utc) + timedelta(hours=20)
+    await db.leads.insert_one(_make_lead("CB1", booked_call=True, booked_call_at=at))
+    res = await runner.send_booking_reminder_emails()
+    assert res == {"day_before": 1, "one_hour": 0}
+    lead = await db.leads.find_one({"lead_id": "CB1"})
+    assert lead["reminder_day_before_sent_at"]
+    # Idempotent: second run sends nothing.
+    res2 = await runner.send_booking_reminder_emails()
+    assert res2 == {"day_before": 0, "one_hour": 0}
+
+
+@pytest.mark.asyncio
+async def test_day_before_still_skips_12h_out_booking(runner, db):
+    """Below the 13h lower bound there is no day-before (it would arrive
+    same-day, not day-before) — the boundary is still respected."""
+    at = datetime.now(timezone.utc) + timedelta(hours=12)
+    await db.leads.insert_one(_make_lead("CB2", booked_call=True, booked_call_at=at))
+    res = await runner.send_booking_reminder_emails()
+    assert res == {"day_before": 0, "one_hour": 0}
+
+
+@pytest.mark.asyncio
+async def test_1h_sends_on_first_tick_inside_last_hour(runner, db):
+    """The old 55-65min window (10 min wide vs hourly ticks) phase-missed ~83%
+    of bookings. A call 40min out must now get its 1h reminder."""
+    at = datetime.now(timezone.utc) + timedelta(minutes=40)
+    await db.leads.insert_one(_make_lead("CB3", booked_call=True, booked_call_at=at))
+    res = await runner.send_booking_reminder_emails()
+    assert res == {"day_before": 0, "one_hour": 1}
+    lead = await db.leads.find_one({"lead_id": "CB3"})
+    assert lead["reminder_1h_sent_at"]
+    # Idempotent: second run sends nothing.
+    res2 = await runner.send_booking_reminder_emails()
+    assert res2 == {"day_before": 0, "one_hour": 0}
+
+
+@pytest.mark.asyncio
+async def test_1h_never_sends_for_past_call(runner, db):
+    """The catch-up band must stop at the call start (0 < bca - now) — a
+    past call must never receive a 'your call is in an hour' email."""
+    at = datetime.now(timezone.utc) - timedelta(minutes=10)
+    await db.leads.insert_one(_make_lead("CB4", booked_call=True, booked_call_at=at))
+    res = await runner.send_booking_reminder_emails()
+    assert res == {"day_before": 0, "one_hour": 0}

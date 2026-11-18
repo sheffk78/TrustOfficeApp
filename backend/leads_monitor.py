@@ -16,6 +16,11 @@ Asserts (run on a schedule by background_tasks.check_leads_pipeline_health):
   2. Booking reminders: any booked call landing within 36h whose reminder
      window has already opened MUST have reminder activity logged
      (day-before and/or 1-hour). Missed reminders => RED alert.
+     2026-11-18: internal test mailboxes (@trustoffice.app /
+     @agentictrust.app) are excluded, and a booking made too close to the
+     call to have received any hourly reminder tick (< 14h for day-before,
+     < 75min for 1h) is waived — a late booking is not a silent failure
+     (false RED paged 2026-11-18 on a 17.7h-out internal probe booking).
 
 `created_at` in lead_activities may be a STRING during the type migration
 (item 5) or a BSON Date after it. `_as_dt` normalizes both so time-range
@@ -103,6 +108,42 @@ DAY_BEFORE_UPPER = timedelta(hours=25)
 ONE_HOUR_LOWER = timedelta(minutes=55)
 ONE_HOUR_UPPER = timedelta(minutes=65)
 BOOKING_LOOKAHEAD = timedelta(hours=36)
+
+# 2026-11-18 fix: internal test leads + late-booking waivers.
+# Production evidence: kit-bland-test@trustoffice.app (lead_39d0ada2c987,
+# 'Bland console integration probe', created 2026-11-17T23:36Z) booked a call
+# 17.7h out — inside the day-before band, before any hourly reminder tick
+# could send — and its 10-minute 1h window (pre-widening) caught no hourly
+# tick. The monitor asserted BOTH reminders with no waiver or internal-lead
+# exclusion and paged a false RED on 2026-11-18. The same phase miss also
+# skipped the REAL 1h reminder for lead_9d0390f5f50d.
+#
+# Internal test mailboxes are never emailed by design (background_tasks guards
+# @agentictrust.app; the @trustoffice.app probe variant slipped through) —
+# the monitor must never count them as booking-reminder violations.
+INTERNAL_TEST_EMAIL_SUFFIXES = ("@trustoffice.app", "@agentictrust.app")
+
+# Waiver thresholds: if the BOOKING EVENT (lead_activities 'booked_call' row)
+# happened less than this long before the call, an hourly scheduler could not
+# have sent the reminder, so the assert is waived (not a silent-failure).
+# background_tasks now sends day-before for bookings >= 13h out (band 13-25h,
+# hourly ticks guarantee a tick inside it) and 1h for any booking with
+# 0 < now-to-call <= 65min, so these thresholds align with the widened bands.
+LATE_BOOKING_DAY_BEFORE_WAIVER = timedelta(hours=14)
+LATE_BOOKING_1H_WAIVER = timedelta(minutes=75)
+
+
+def _is_internal_test_lead(email) -> bool:
+    """True when the lead's email marks it as an internal test mailbox.
+
+    2026-11-18: internal probes (e.g. kit-bland-test@trustoffice.app) book
+    test calls but are never emailed by design — they must not produce
+    booking-reminder violations (the false-RED cause of 2026-11-18).
+    """
+    if not isinstance(email, str):
+        return False
+    lowered = email.strip().lower()
+    return lowered.endswith(INTERNAL_TEST_EMAIL_SUFFIXES)
 
 
 def _as_dt(value) -> Optional[datetime]:
@@ -375,12 +416,17 @@ async def _run_asserts(
             "lead_id": 1,
             "email": 1,
             "name": 1,
+            "created_at": 1,
             "booked_call_at": 1,
             "reminder_day_before_sent_at": 1,
             "reminder_1h_sent_at": 1,
         },
     ).to_list(2000)
     for lead in booked_leads:
+        # 2026-11-18: internal test mailboxes (Bland/console probes etc.) are
+        # never emailed by design — never count them as violations.
+        if _is_internal_test_lead(lead.get("email")):
+            continue
         bca = _as_dt(lead.get("booked_call_at"))
         if bca is None:
             continue
@@ -391,6 +437,16 @@ async def _run_asserts(
             # Call is long past — reminders (if any) already fired; not our concern.
             continue
 
+        # 2026-11-18: booking EVENT time — when the booking was made, not when
+        # the call is. Latest 'booked_call' activity row wins; fallbacks keep
+        # the gap computable even when the activity row is missing.
+        booking_event_dt = await _latest_booking_event_dt(db, lead.get("lead_id"))
+        if booking_event_dt is None:
+            booking_event_dt = _as_dt(lead.get("created_at"))
+        if booking_event_dt is None:
+            booking_event_dt = bca  # fallback: treat booking as made at call time (gap=0)
+        gap = bca - booking_event_dt  # how long before the call the booking was made
+
         day_before_logged = bool(lead.get("reminder_day_before_sent_at")) or await _has_reminder_activity(
             db, lead.get("lead_id"), "booking_reminder_day_before"
         )
@@ -399,12 +455,24 @@ async def _run_asserts(
         )
 
         # Day-before window has opened (call is within 23h) -> day-before must be logged.
-        if bca <= now + DAY_BEFORE_LOWER and not day_before_logged:
+        # 2026-11-18 waiver: booking made < 14h before the call could not hit
+        # ANY hourly tick in a 13-25h band — never a silent-failure.
+        if (
+            bca <= now + DAY_BEFORE_LOWER
+            and not day_before_logged
+            and gap >= LATE_BOOKING_DAY_BEFORE_WAIVER
+        ):
             booking_violations.append(
                 f"{lead.get('email')}: day-before reminder missing for call at {bca.isoformat()}"
             )
         # 1-hour window has opened (call is within 55min) -> 1h must be logged.
-        if bca <= now + ONE_HOUR_LOWER and not one_h_logged:
+        # 2026-11-18 waiver: booking made < 75min before the call entered or
+        # landed inside the 1h window — no send opportunity.
+        if (
+            bca <= now + ONE_HOUR_LOWER
+            and not one_h_logged
+            and gap >= LATE_BOOKING_1H_WAIVER
+        ):
             booking_violations.append(
                 f"{lead.get('email')}: 1-hour reminder missing for call at {bca.isoformat()}"
             )
@@ -435,3 +503,24 @@ async def _has_reminder_activity(db, lead_id: str, action_type: str) -> bool:
         {"lead_id": lead_id, "action_type": action_type}, {"_id": 1}
     )
     return doc is not None
+
+
+async def _latest_booking_event_dt(db, lead_id) -> Optional[datetime]:
+    """Latest 'booked_call' activity row for the lead, as a tz-aware UTC dt.
+
+    2026-11-18: the booking EVENT time (when the lead booked) decides whether
+    the reminder asserts are waivable — a booking made hours before the call
+    could never have received a day-before (or 1h) reminder, so the assert is
+    waived instead of paging RED. Latest row wins (a rebook updates the event
+    time). Returns None when no row exists; callers fall back to lead.created_at.
+    """
+    if not lead_id:
+        return None
+    doc = await db.lead_activities.find_one(
+        {"lead_id": lead_id, "action_type": "booked_call"},
+        {"_id": 0, "created_at": 1},
+        sort=[("created_at", -1)],
+    )
+    if not doc:
+        return None
+    return _as_dt(doc.get("created_at"))
