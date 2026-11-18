@@ -484,7 +484,22 @@ async def report_error(
             "severity": severity or ("info" if is_info else None),
             **{k: v for k, v in _ctx.items() if k not in ("location", "user_agent", "operation", "severity")},
         },
-        "resolved": False,
+        # Auto-resolve the benign BaseHTTPMiddleware client-disconnect class
+        # (bot probes aborting mid-response) at insert — these are info
+        # severity and must never pile up in the unresolved-error feed.
+        # All other classes stay unresolved=False for the auto-fixer loop.
+        **(
+            {
+                "resolved": True,
+                "resolved_note": (
+                    "Auto-resolved at insert: benign BaseHTTPMiddleware "
+                    "client-disconnect (info severity). "
+                ),
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if _BASE_MW_DISCONNECT
+            else {"resolved": False}
+        ),
         "ip_address": None,
     }
     try:
