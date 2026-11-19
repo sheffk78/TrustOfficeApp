@@ -49,10 +49,10 @@ db = database.db
 
 @pytest_asyncio.fixture(autouse=True)
 async def clean_db():
-    for coll in ("leads", "lead_activities", "bland_call_log"):
+    for coll in ("leads", "lead_activities", "bland_call_log", "bland_aged_budget"):
         await db[coll].delete_many({})
     yield
-    for coll in ("leads", "lead_activities", "bland_call_log"):
+    for coll in ("leads", "lead_activities", "bland_call_log", "bland_aged_budget"):
         await db[coll].delete_many({})
 
 
@@ -1097,3 +1097,173 @@ class TestClaimFlow:
         lead = body["leads"][0]
         assert "claimed_by" not in lead and "claimed_until" not in lead
         assert body["claimed"] == 0
+
+
+# ==================== TIERED QUEUE (fresh speed lane + aged drip cap) ====================
+# tier=fresh|aged ride on top of the suppression-filtered queue. The aged cap
+# is a per-UTC-day ledger doc in bland_aged_budget ({day, lead_ids}).
+
+class TestQueueTiers:
+    LEGACY_KEYS = {
+        "leads", "count", "cooldown", "claimed", "suppressed_booked",
+        "suppressed_human_touch", "exhausted_30d", "asOf",
+    }
+
+    async def _act(self, lead_id, action_type, content, created_at=None):
+        await db.lead_activities.insert_one(
+            {
+                "activity_id": "act_" + uuid.uuid4().hex[:12],
+                "lead_id": lead_id,
+                "action_type": action_type,
+                "content": content,
+                "created_at": created_at or datetime.now(timezone.utc),
+            }
+        )
+
+    @staticmethod
+    def _aged_seeds(n, *, stage="new", base_hours=169):
+        """n aged leads (older than the default 7d fresh window); seed 0 is
+        the most recently created -> first in line under the priority tie."""
+        now = datetime.now(timezone.utc)
+        return [
+            _lead(f"aged_s{i}", stage=stage, created_at=now - timedelta(hours=base_hours + i))
+            for i in range(n)
+        ]
+
+    @pytest.mark.asyncio
+    async def test_no_param_response_is_untouched_by_tier_lane(self, client):
+        """No tier -> byte-identical legacy payload: legacy keys only, no
+        tier/fresh_cutoff/daily-cap leak, oldest-first ordering intact."""
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(_lead("lead_a"))  # newest
+        await db.leads.insert_one(
+            _lead("lead_b", stage="warm", created_at=now - timedelta(days=2))
+        )
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert set(body) == self.LEGACY_KEYS
+        assert [l["lead_id"] for l in body["leads"]] == ["lead_b", "lead_a"]
+        assert "tier" not in body["leads"][0]
+
+    @pytest.mark.asyncio
+    async def test_invalid_tier_400(self, client):
+        resp = client.get(QUEUE_URL + "?tier=foo", headers=AUTH)
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "invalid_tier"
+
+    @pytest.mark.asyncio
+    async def test_fresh_newest_first_window_and_suppression(self, client):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(
+            _lead("L_fresh_new", stage="warm", created_at=now - timedelta(hours=1))
+        )
+        await db.leads.insert_one(
+            _lead("L_edge_in", created_at=now - timedelta(hours=167))
+        )
+        await db.leads.insert_one(
+            _lead("L_edge_out", created_at=now - timedelta(hours=169))
+        )
+        await db.leads.insert_one(
+            _lead("L_aged", stage="engaged", created_at=now - timedelta(days=30))
+        )
+        await db.leads.insert_one(
+            _lead("L_booked", phone="5550002000", created_at=now - timedelta(hours=2))
+        )
+        # Rule 1 (permanent): any booked_call activity -> suppressed
+        await self._act("L_booked", "booked_call", "Booked consultation 2026-11-15")
+        body = client.get(QUEUE_URL + "?tier=fresh", headers=AUTH).json()
+        assert set(body) == self.LEGACY_KEYS | {"tier", "fresh_cutoff"}
+        # newest first, window boundary respected, suppression inherited
+        assert [l["lead_id"] for l in body["leads"]] == ["L_fresh_new", "L_edge_in"]
+        assert body["count"] == 2
+        assert body["tier"] == "fresh"
+        assert body["suppressed_booked"] == 1
+        cutoff = datetime.fromisoformat(body["fresh_cutoff"])
+        assert abs((now - timedelta(hours=168)) - cutoff).total_seconds() < 300
+
+    @pytest.mark.asyncio
+    async def test_fresh_window_env_override_and_fallback(self, client, monkeypatch):
+        now = datetime.now(timezone.utc)
+        await db.leads.insert_one(_lead("L_hot", created_at=now - timedelta(hours=2)))
+        await db.leads.insert_one(_lead("L_stale", created_at=now - timedelta(hours=30)))
+        monkeypatch.setenv("BLAND_FRESH_WINDOW_HOURS", "24")
+        body = client.get(QUEUE_URL + "?tier=fresh", headers=AUTH).json()
+        assert [l["lead_id"] for l in body["leads"]] == ["L_hot"]
+        assert body["count"] == 1
+        # garbage value falls back to the 168h default -> both inside
+        monkeypatch.setenv("BLAND_FRESH_WINDOW_HOURS", "not-a-number")
+        body = client.get(QUEUE_URL + "?tier=fresh", headers=AUTH).json()
+        assert body["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_aged_priority_warm_engaged_new_with_updated_desc(self, client):
+        now = datetime.now(timezone.utc)
+        seeds = [
+            ("W2", "warm", 14), ("W1", "warm", 10),
+            ("E2", "engaged", 12), ("E1", "engaged", 6),
+            ("N2", "new", 9), ("N1", "new", 2),
+            ("R1", "registered", 13),
+        ]
+        for lead_id, stage, updated_days_ago in seeds:
+            await db.leads.insert_one(
+                _lead(
+                    lead_id,
+                    stage=stage,
+                    created_at=now - timedelta(days=20),
+                    updated_at=now - timedelta(days=updated_days_ago),
+                )
+            )
+        body = client.get(QUEUE_URL + "?tier=aged&limit=25", headers=AUTH).json()
+        # warm > engaged > new (registered sinks below new); updated_at DESC
+        # inside each stage
+        assert [l["lead_id"] for l in body["leads"]] == [
+            "W1", "W2", "E1", "E2", "N1", "N2", "R1",
+        ]
+        assert body["tier"] == "aged"
+        assert body["aged_emitted_today"] == 7
+        assert body["daily_cap_reached"] is False
+
+    @pytest.mark.asyncio
+    async def test_aged_daily_cap_idempotent_behind_cap_and_reset(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setenv("BLAND_AGED_DAILY_CAP", "10")
+        for doc in self._aged_seeds(12):
+            await db.leads.insert_one(doc)
+        budget_coll = db.bland_aged_budget
+
+        # First aged pull: 12 eligible, cap 10 -> exactly 10 emitted, cap
+        # flagged because a larger limit (25) was requested.
+        day1 = client.get(QUEUE_URL + "?tier=aged&limit=25", headers=AUTH).json()
+        ids1 = [l["lead_id"] for l in day1["leads"]]
+        assert ids1 == [f"aged_s{i}" for i in range(10)]
+        assert "aged_s10" not in ids1 and "aged_s11" not in ids1  # behind cap
+        assert day1["count"] == 12
+        assert day1["daily_cap_reached"] is True
+        assert day1["aged_emitted_today"] == 10
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        ledger = await budget_coll.find_one({"day": today})
+        assert set(ledger["lead_ids"]) == set(ids1)
+
+        # Same-day re-query: identical set returned idempotently (no
+        # double-count), budget stays at 10.
+        day1_again = client.get(QUEUE_URL + "?tier=aged&limit=25", headers=AUTH).json()
+        assert [l["lead_id"] for l in day1_again["leads"]] == ids1
+        assert day1_again["aged_emitted_today"] == 10
+        ledger2 = await budget_coll.find_one({"day": today})
+        assert set(ledger2["lead_ids"]) == set(ids1)
+        # default-limit re-query still returns the whole emitted set
+        day1_default = client.get(QUEUE_URL + "?tier=aged", headers=AUTH).json()
+        assert [l["lead_id"] for l in day1_default["leads"]] == ids1
+        assert day1_default["daily_cap_reached"] is False  # limit fully served
+
+        # Next UTC day: budget resets -> new ledger doc, fresh 10 emitted.
+        tomorrow = (
+            datetime.now(timezone.utc) + timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        monkeypatch.setattr(leads_service, "_aged_budget_day", lambda: tomorrow)
+        day2 = client.get(QUEUE_URL + "?tier=aged&limit=25", headers=AUTH).json()
+        assert [l["lead_id"] for l in day2["leads"]] == ids1
+        assert day2["aged_emitted_today"] == 10
+        ledgers = await budget_coll.find().to_list(None)
+        assert {d["day"] for d in ledgers} == {today, tomorrow}
+        assert all(len(set(d["lead_ids"])) == 10 for d in ledgers)

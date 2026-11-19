@@ -57,6 +57,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
+from pymongo import ReturnDocument
 
 from database import db
 from email_service import email_service as _email_service
@@ -677,10 +678,214 @@ async def _activities_for(lead_id: str, limit: int = 10) -> List[dict]:
     return activities
 
 
+# ==================== TIERED CALLING QUEUE ====================
+# Additive tier selection on GET /queue (absent/empty tier = exactly the
+# legacy no-param path). tier=fresh is the speed lane (newest-first, restricted
+# to the BLAND_FRESH_WINDOW_HOURS window); tier=aged is the drip lane (the
+# suppression-filtered remainder, warm-first priority, hard per-UTC-day
+# BLAND_AGED_DAILY_CAP enforced through a bland_aged_budget ledger). The only
+# write the tier path makes is the ledger doc -- leads themselves are never
+# mutated here.
+
+QUEUE_TIER_FRESH = "fresh"
+QUEUE_TIER_AGED = "aged"
+DEFAULT_FRESH_WINDOW_HOURS = 168.0  # 7 days of hot inbound
+DEFAULT_AGED_DAILY_CAP = 10
+AGED_BUDGET_COLLECTION = "bland_aged_budget"
+
+
+def _fresh_window_hours() -> float:
+    """BLAND_FRESH_WINDOW_HOURS at request time; falls back to 168h.
+
+    Read at request time so tests and ops can retune without redeploy;
+    mirrors the _cooldown_hours() pattern.
+    """
+    raw = (os.environ.get("BLAND_FRESH_WINDOW_HOURS") or "").strip()
+    if not raw:
+        return DEFAULT_FRESH_WINDOW_HOURS
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_FRESH_WINDOW_HOURS
+    if value < 0:
+        return DEFAULT_FRESH_WINDOW_HOURS
+    return value
+
+
+def _aged_daily_cap() -> int:
+    """BLAND_AGED_DAILY_CAP at request time; falls back to 10.
+
+    Cap 0 is honored as "nothing emits today" (the drip lane is off but the
+    ledger/idempotent contract still holds); negatives fall back to default.
+    """
+    raw = (os.environ.get("BLAND_AGED_DAILY_CAP") or "").strip()
+    if not raw:
+        return DEFAULT_AGED_DAILY_CAP
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_AGED_DAILY_CAP
+    if value < 0:
+        return DEFAULT_AGED_DAILY_CAP
+    return value
+
+
+def _aged_budget_day() -> str:
+    """UTC date key for the aged daily-cap ledger (patchable in tests)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+# Aged priority: warm leads (recent nurture engagement) first, then engaged,
+# then new. `registered` stays callable (legacy CALLABLE_STAGES) but sinks
+# below new -- it is post-nurture and never a drip priority.
+_AGED_STAGE_PRIORITY = {"warm": 0, "engaged": 1, "new": 2, "registered": 3}
+
+
+def _aged_priority(lead: dict) -> int:
+    return _AGED_STAGE_PRIORITY.get(
+        lead.get("stage") or "", len(_AGED_STAGE_PRIORITY)
+    )
+
+
+def _queued_view(lead: dict, now_iso: str) -> dict:
+    """Lead projection + active-claim surfacing, shared by every queue path
+    (legacy, fresh, aged) so lead shapes stay byte-identical."""
+    view = _lead_view(lead)
+    claim = lead.get("claim")
+    if isinstance(claim, dict) and claim.get("claimed_until"):
+        if claim["claimed_until"] > now_iso:  # still active
+            view["claimed_by"] = claim.get("claimed_by")
+            view["claimed_until"] = claim.get("claimed_until")
+    return view
+
+
+async def _fresh_tier_response(
+    final_query: dict,
+    meta: dict,
+    limit: int,
+    offset: int,
+    now_iso: str,
+) -> dict:
+    """tier=fresh speed lane: newest-first over the suppression-filtered set
+    restricted to leads created within the fresh window.
+
+    Same base payload keys as the legacy queue (leads/count/cooldown/claimed/
+    suppressed_*/asOf) plus tier + fresh_cutoff; leads shapes identical.
+    """
+    cutoff_iso = (
+        datetime.now(timezone.utc) - timedelta(hours=_fresh_window_hours())
+    ).isoformat()
+    window_query = {**final_query, "created_at": {"$gte": cutoff_iso}}
+    total = await db.leads.count_documents(window_query)
+    leads_out: List[dict] = []
+    cursor = (
+        db.leads.find(window_query, {**LEAD_PROJECTION, "claim": 1})
+        .sort("created_at", -1)
+        .skip(offset)
+        .limit(limit)
+    )
+    async for lead in cursor:
+        leads_out.append(_queued_view(lead, now_iso))
+    return {
+        "leads": leads_out,
+        "count": total,
+        "tier": "fresh",
+        "fresh_cutoff": cutoff_iso,
+        **meta,
+        "asOf": now_iso,
+    }
+
+
+async def _aged_tier_response(
+    final_query: dict,
+    meta: dict,
+    limit: int,
+    now_iso: str,
+) -> dict:
+    """tier=aged drip lane: the suppression-filtered remainder outside the
+    fresh window, warm-first priority, hard per-UTC-day cap via the
+    bland_aged_budget ledger.
+
+    Budget contract: one ledger doc per UTC day ({day, lead_ids}); emitters
+    append with findOneAndUpdate($addToSet $each, upsert) -- atomic, and
+    re-adds of an already-lead_id never double-count. A same-day re-query
+    therefore returns the already-emitted set idempotently instead of
+    emitting fresh leads behind the cap.
+    """
+    cutoff_iso = (
+        datetime.now(timezone.utc) - timedelta(hours=_fresh_window_hours())
+    ).isoformat()
+    aged_query = {**final_query, "created_at": {"$lt": cutoff_iso}}
+    total = await db.leads.count_documents(aged_query)
+    aged_docs = await db.leads.find(
+        aged_query, {**LEAD_PROJECTION, "claim": 1}
+    ).to_list(None)
+    # warm > engaged > new (registered sinks below new); newest updated_at
+    # first inside a stage; created_at breaks exact ties deterministically
+    # (stable sorts applied last-priority-first).
+    aged_docs.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    aged_docs.sort(key=lambda d: d.get("updated_at") or "", reverse=True)
+    aged_docs.sort(key=_aged_priority)
+
+    budget_day = _aged_budget_day()
+    budget_coll = db[AGED_BUDGET_COLLECTION]
+    budget_doc = await budget_coll.find_one({"day": budget_day})
+    emitted = list((budget_doc or {}).get("lead_ids") or [])
+    cap = _aged_daily_cap()
+    room = cap - len(emitted)
+    new_ids: List[str] = []
+    emitted_set: set = set(emitted)
+    if room > 0:
+        for doc in aged_docs:  # priority order = budget refill order
+            lid = doc.get("lead_id")
+            if not lid or lid in emitted_set:
+                continue
+            new_ids.append(lid)
+            emitted_set.add(lid)
+            room -= 1
+            if room == 0:
+                break
+    if new_ids:
+        saved = await budget_coll.find_one_and_update(
+            {"day": budget_day},
+            {
+                "$addToSet": {"lead_ids": {"$each": new_ids}},
+                "$setOnInsert": {"created_at": now_iso},
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        emitted = list((saved or {}).get("lead_ids") or [])
+        emitted_set = set(emitted)
+
+    # Response = current aged set intersected with the day ledger (already
+    # emitted leads stay visible idempotently), still priority-ordered.
+    aged_leads: List[dict] = []
+    for doc in aged_docs:
+        if doc.get("lead_id") in emitted_set:
+            aged_leads.append(_queued_view(doc, now_iso))
+            if len(aged_leads) >= limit:
+                break
+    return {
+        "leads": aged_leads,
+        "count": total,
+        "tier": "aged",
+        "aged_emitted_today": len(emitted),
+        # Budget consumed AND the caller asked for more than it got back.
+        "daily_cap_reached": len(emitted) >= cap and len(aged_leads) < limit,
+        **meta,
+        "asOf": now_iso,
+    }
+
+
 @router.get("/queue")
 async def get_calling_queue(
     limit: int = Query(default=10, ge=1, le=25),
     offset: int = Query(default=0, ge=0),
+    # Plain Optional (NOT Query()): the dispatcher calls get_calling_queue()
+    # directly with plain kwargs, so a Query object default would leak
+    # through. FastAPI still coerces this for HTTP query params.
+    tier: Optional[str] = None,
 ):
     """Paginated Bland.ai calling queue, oldest leads first.
 
@@ -722,8 +927,30 @@ async def get_calling_queue(
       suppressed_booked: leads excluded by rule 1 (booked/consult)
       suppressed_human_touch: leads excluded by rule 2 (human-touch pause)
       exhausted_30d: leads excluded by rule 3 (3-in-30 attempt cap)
+
+    Tier selection (additive; every tier inherits the same suppression
+    pipeline, cooldown/claim guards and lead shapes -- no-param is unchanged):
+
+      tier=fresh  speed lane: suppression-filtered leads created within
+        BLAND_FRESH_WINDOW_HOURS (default 168h), created_at DESC (newest
+        first). Meta: fresh_cutoff (ISO instant of the window start).
+      tier=aged   drip lane: the suppression-filtered remainder (created_at
+        older than the fresh window), ordered warm > engaged > new
+        (registered sinks below new) with updated_at DESC inside a stage.
+        Hard daily cap BLAND_AGED_DAILY_CAP (default 10) unique leads per
+        UTC day, enforced through the bland_aged_budget ledger
+        ({day, lead_ids}; atomic findOneAndUpdate $addToSet append, no
+        double-count). Same-day re-queries return the already-emitted set
+        idempotently. Meta: aged_emitted_today, daily_cap_reached (budget
+        consumed and the caller asked for more than it got back).
+      anything else -> 400 invalid_tier; absent/empty -> legacy path.
     """
     now_iso = _iso_utc_now()
+    # Tier validation happens before any pipeline work; empty/absent tier is
+    # exactly the legacy no-param behavior.
+    tier_key = (tier or "").strip().lower()
+    if tier_key and tier_key not in (QUEUE_TIER_FRESH, QUEUE_TIER_AGED):
+        raise HTTPException(status_code=400, detail="invalid_tier")
     cutoff_iso = (
         datetime.now(timezone.utc) - timedelta(hours=_cooldown_hours())
     ).isoformat()
@@ -830,6 +1057,21 @@ async def get_calling_queue(
         else fresh_query
     )
     total = await db.leads.count_documents(final_query)
+
+    # ---- Tier dispatch (additive; absent/empty tier falls through) ----
+    meta = {
+        "cooldown": cooldown_count,
+        "claimed": claimed_count,
+        "suppressed_booked": suppressed_booked,
+        "suppressed_human_touch": suppressed_human_touch,
+        "exhausted_30d": exhausted_30d,
+    }
+    if tier_key == QUEUE_TIER_FRESH:
+        return await _fresh_tier_response(
+            final_query, meta, limit, offset, now_iso
+        )
+    if tier_key == QUEUE_TIER_AGED:
+        return await _aged_tier_response(final_query, meta, limit, now_iso)
 
     leads_out: List[dict] = []
     cursor = (
