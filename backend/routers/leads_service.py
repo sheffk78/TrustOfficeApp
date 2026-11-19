@@ -67,7 +67,17 @@ LEAD_PROJECTION = {
     "notes": 1,
 }
 
-ACTIVITY_CONTENT_LIMIT = 160
+# Activity feed display cap (read-side render; storage is always full content).
+# 2026-11-18: AI-call summaries from Bland were being cut at ~150 visible chars
+# — our chain was the cutter (this view cap at 160). Raised so a call-outcome
+# summary of the full validated allowance (CALL_SUMMARY_MAX = 500) always
+# displays uncut: "AI call via Bland: {disposition}" prefix + " — {summary}" +
+# optional " ({sec}s)" stays under 600.
+ACTIVITY_CONTENT_LIMIT = 600
+# POST /{lead_id}/call-outcome accepted summary length (agent retry hardening,
+# 2026-11-18): call-outcome summaries above this reject with 400, never
+# truncate; anything ≤ 500 renders uncut in activity feeds (see cap above).
+CALL_SUMMARY_MAX = 500
 
 
 # ==================== AUTH ====================
@@ -407,6 +417,13 @@ async def record_call_outcome(lead_id: str, body: CallOutcomeRequest):
         raise HTTPException(
             status_code=400,
             detail=f"Invalid disposition. Must be one of: {', '.join(CALL_DISPOSITIONS)}",
+        )
+    # 2026-11-18 (agent retry hardening): validate the summary length with an
+    # explicit 400 instead of letting any layer silently cut the agent's words.
+    if len(body.summary or "") > CALL_SUMMARY_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid summary: {len(body.summary)} chars exceeds the {CALL_SUMMARY_MAX}-char limit",
         )
     lead = await db.leads.find_one({"lead_id": lead_id})
     if not lead:

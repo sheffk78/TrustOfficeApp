@@ -91,8 +91,8 @@ async def _seed_leads(n=3, with_activities=True):
                         "activity_id": f"act_{lid}_{j}",
                         "lead_id": lid,
                         "action_type": "note",
-                        # >160 chars to verify truncation downstream
-                        "content": f"activity {j} for lead {i} " + "y" * 200,
+                        # >600 chars to verify view truncation downstream
+                        "content": f"activity {j} for lead {i} " + "y" * 700,
                         "created_at": now - timedelta(minutes=(3 - j) * 10),
                     }
                 )
@@ -147,7 +147,7 @@ class TestLatest:
             for a in acts:
                 assert set(a.keys()) == {"action_type", "content", "created_at"}
                 assert a["content"].startswith("activity")
-                assert len(a["content"]) == 160  # truncated to 160 chars
+                assert len(a["content"]) == 600  # truncated to ACTIVITY_CONTENT_LIMIT (600 since 2026-11-18)
                 # iso timestamp parses
                 datetime.fromisoformat(a["created_at"])
 
@@ -716,7 +716,7 @@ class TestPersonEmails:
         out_row = by_subject["Sent via MailerCloud: Your trust checklist"]
         assert out_row["direction"] == "out"
         assert out_row["snippet"].startswith("inside: 5 steps")
-        assert len(out_row["snippet"]) <= 160
+        assert len(out_row["snippet"]) <= 600  # ACTIVITY_CONTENT_LIMIT (600 since 2026-11-18)
         assert out_row["type"] == "email"
         note_row = by_subject["spoke on phone, wants pricing"]
         assert note_row["direction"] == "system"  # manual notes are system rows

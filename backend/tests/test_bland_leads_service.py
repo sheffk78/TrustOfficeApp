@@ -411,6 +411,43 @@ class TestCallOutcome:
         assert r.status_code == 422
 
     @pytest.mark.asyncio
+    async def test_summary_500_chars_accepted_stored_full_and_viewed_uncut(self, client):
+        """2026-11-18 (agent retry hardening): the call-outcome summary allowance
+        is 500 chars — accepted, stored full, and still renders uncut in
+        activity feeds (the ACTIVITY_CONTENT_LIMIT view cap was raised 160→600
+        on the same day; it was cutting live Bland summaries at ~150 chars)."""
+        await _seed()
+        summary = "s" * 500
+        r = client.post(
+            "/api/service/leads/lead_q/call-outcome",
+            headers=AUTH,
+            json={"disposition": "booked", "summary": summary},
+        )
+        assert r.status_code == 200, r.text
+        # storage is FULL: prefix + separator + summary, nothing cut
+        stored = [a["content"] for a in await self._acts()]
+        assert f"AI call via Bland: booked — {summary}" in stored
+        # and the /latest-style view renders it uncut (600 view cap > ~535 composed)
+        r2 = client.get("/api/service/leads/latest", headers=AUTH)
+        assert r2.status_code == 200
+        lead_view = r2.json()["leads"][0]
+        act = next(a for a in lead_view["activities"] if "AI call via Bland" in a["content"])
+        assert act["content"] == f"AI call via Bland: booked — {summary}"
+
+    @pytest.mark.asyncio
+    async def test_summary_over_500_chars_rejected_400(self, client):
+        await _seed()
+        r = client.post(
+            "/api/service/leads/lead_q/call-outcome",
+            headers=AUTH,
+            json={"disposition": "booked", "summary": "x" * 501},
+        )
+        assert r.status_code == 400, r.text
+        assert "501 chars" in r.json()["detail"]
+        # nothing written
+        assert [a async for a in db.lead_activities.find({"lead_id": "lead_q"})] == []
+
+    @pytest.mark.asyncio
     async def test_unknown_lead_404(self, client):
         r = client.post(
             "/api/service/leads/lead_nope/call-outcome",
