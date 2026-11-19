@@ -44,7 +44,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 
 from database import db
@@ -221,8 +221,12 @@ def _user_agent(request: Request) -> str:
 
 
 @router.post("/webhook")
-async def bland_call_completed(request: Request):
-    """Bland call-completed receiver — see module docstring for the contract."""
+async def bland_call_completed(request: Request, background_tasks: BackgroundTasks):
+    """Bland call-completed receiver — see module docstring for the contract.
+
+    Mapped outcomes run the exact /{lead_id}/call-outcome logic (_apply_call_outcome),
+    which now includes the founder fallback email trigger queued on background_tasks.
+    """
     expected = os.environ.get("BLAND_WEBHOOK_SECRET")
     if not expected:
         logger.warning(
@@ -365,6 +369,7 @@ async def bland_call_completed(request: Request):
             summary=_summary_from_payload(payload),
             call_duration_sec=_call_duration_sec(payload),
             current_stage=lead.get("stage"),
+            background_tasks=background_tasks,
         )
         await db.bland_webhook_events.update_one(
             {"_id": event_id},

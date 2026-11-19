@@ -6,6 +6,18 @@ with a single static service key sent in the `X-Service-Key` header — NOT a
 user JWT. The OS backend calls these server-side, so no browser CORS is
 opened here.
 
+Founder fallback email (2026-11-18): after a successful AI-call outcome write,
+an instant actionable email goes to the founder (Jeff) when
+  (a) disposition == callback_requested, OR
+  (b) disposition == booked with NO confirmed booking_ref.
+It is the backup channel for direct in-call bookings that fail — the booking
+app already auto-notifies for direct bookings, so booked-with-ref never
+triggers it. Dedupe: max 1 email per lead per 6 hours (activity marker
+`fallback_email_sent`); send runs as a FastAPI background task (never blocks
+nor fails the call-outcome response; failures mark `fallback_email_failed`).
+Recipient: TRUSTOFFICE_FALLBACK_EMAIL (default kenneth@agentictrust.app;
+set it EMPTY to disable the feature — kill switch).
+
 Endpoints (mounted under /api/service/leads):
   GET  /latest                 -> 3 newest leads + each lead's 3 latest activities
   GET  /queue                  -> Bland calling queue: leads with a phone in
@@ -33,6 +45,7 @@ Endpoints (mounted under /api/service/leads):
 Bland's call-completed webhook receiver lives in routers/bland_webhook.py
 (mounted at /api/service/bland/webhook) and reuses _apply_call_outcome below.
 """
+import html
 import logging
 import os
 import re
@@ -40,12 +53,13 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from database import db
+from email_service import email_service as _email_service
 from routers.leads import LEAD_STAGES, _log_activity
 
 logger = logging.getLogger(__name__)
@@ -78,6 +92,282 @@ ACTIVITY_CONTENT_LIMIT = 600
 # 2026-11-18): call-outcome summaries above this reject with 400, never
 # truncate; anything ≤ 500 renders uncut in activity feeds (see cap above).
 CALL_SUMMARY_MAX = 500
+
+
+# ==================== FOUNDER FALLBACK EMAIL (2026-11-18) ====================
+# Instant backup channel for AI-call bookings that did not land: the founder
+# (Jeff) emails/confirm-manually within minutes. Deterministic trigger in
+# _apply_call_outcome (shared by the call-outcome endpoint AND the Bland
+# webhook receiver) so behavior is identical on both paths.
+
+# Recipient at request time. Kill switch: set TRUSTOFFICE_FALLBACK_EMAIL to an
+# EMPTY string to disable the feature entirely (tests use this); unset uses
+# the founder default.
+FOUNDER_FALLBACK_EMAIL_DEFAULT = "kenneth@agentictrust.app"
+EMAIL_TAG_FALLBACK = "ai-call-fallback"
+# Anti-spam: max 1 fallback email per lead per 6 hours — dedupe checks the
+# most recent `fallback_email_sent` activity marker's timestamp.
+FALLBACK_EMAIL_DEDUPE_HOURS = 6
+# Confirm/hold link for the founder (booking app, 14-day window).
+BOOKING_SLOTS_URL_DEFAULT = (
+    "https://booking-trustoffice-production.up.railway.app/slots?days=14"
+)
+
+# Slot date-time phrase extraction (best-effort, deterministic): a chunk of
+# the call summary that contains BOTH a day-ish token and a time token is
+# surfaced to the founder as "Reported agreed slot: <phrase>".
+_SLOT_DAY_RE = re.compile(
+    r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    r"|\b(?:january|february|march|april|may|june|july|august"
+    r"|september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?\b"
+    r"|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b"
+    r"|\b(?:today|tomorrow|tonight)\b",
+    re.IGNORECASE,
+)
+# 12h clock with am/pm, or 24h clock (not a duration like "3:25 minutes").
+_SLOT_TIME_RE = re.compile(
+    r"\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b"
+    r"|\b(?:[01]?\d|2[0-3]):[0-5]\d\b(?!\s*(?:min|mins|minutes|sec|seconds|hrs|hours)\b)",
+    re.IGNORECASE,
+)
+_SLOT_MAX_CHARS = 120
+
+
+def _fallback_recipient() -> str:
+    """Founder email at request time; empty string disables the feature."""
+    raw = os.environ.get("TRUSTOFFICE_FALLBACK_EMAIL")
+    if raw is None:
+        return FOUNDER_FALLBACK_EMAIL_DEFAULT
+    return raw.strip()
+
+
+def _booking_slots_url() -> str:
+    raw = (os.environ.get("TRUSTOFFICE_BOOKING_SLOTS_URL") or "").strip()
+    return raw or BOOKING_SLOTS_URL_DEFAULT
+
+
+def _fallback_email_due(disposition: str, booking_ref: Optional[str]) -> bool:
+    """Deterministic trigger rule: callback_requested, or booked unconfirmed.
+
+    booked WITH a booking_ref is a verified direct booking — the booking app
+    already auto-notifies those, so the fallback must NOT double-fire.
+    """
+    if disposition == "callback_requested":
+        return True
+    if disposition == "booked" and not (booking_ref or "").strip():
+        return True
+    return False
+
+
+def _fallback_reason(disposition: str, booking_ref: Optional[str]) -> str:
+    if disposition == "callback_requested":
+        return 'the AI call ended with disposition "callback_requested"'
+    if disposition == "booked":
+        return (
+            'the AI call reported "booked" but no booking reference was '
+            "confirmed — the direct booking is NOT verified"
+        )
+    return f"AI call disposition: {disposition}"
+
+
+def _extract_slot(text: str) -> Optional[str]:
+    """Best-effort date-time phrase out of a call summary (or None).
+
+    Splits the summary into sentence-ish chunks and returns the first chunk
+    holding both a day-ish token and a time token, trimmed to the phrase
+    spanning both tokens ("Tuesday, November 24 at 2:00 PM").
+    """
+    for chunk in re.split(r"[.;\n]", text or ""):
+        day = _SLOT_DAY_RE.search(chunk)
+        time_m = _SLOT_TIME_RE.search(chunk)
+        if not (day and time_m):
+            continue
+        start = min(day.start(), time_m.start())
+        end = max(day.end(), time_m.end())
+        phrase = chunk[start:end].strip(" ,:-")
+        phrase = re.sub(r"^(?:on|at|for|around|maybe)\s+", "", phrase,
+                        flags=re.IGNORECASE)
+        if phrase:
+            return phrase[:_SLOT_MAX_CHARS]
+    return None
+
+
+def _fallback_email_subject(lead: dict, disposition: str) -> str:
+    name = ((lead or {}).get("name") or "").strip()
+    return f"[AI CALL] {name or 'Unknown lead'} — {disposition}"
+
+
+def _fallback_email_text(lead: dict, disposition: str, summary: str,
+                         booking_ref: Optional[str]) -> str:
+    """Plain-text body: lead identity, FULL summary, slot (if any), CTA."""
+    slot = _extract_slot(summary)
+    lines = ["AI CALL — instant founder fallback (TrustOffice leads)", ""]
+    if slot:
+        lines += [f"Reported agreed slot: {slot}", ""]
+    lines += [
+        f"Fallback reason: {_fallback_reason(disposition, booking_ref)}",
+        "",
+        "LEAD",
+        f"  name:    {((lead or {}).get('name') or '').strip() or 'n/a'}",
+        f"  email:   {(lead or {}).get('email') or 'n/a'}",
+        f"  phone:   {(lead or {}).get('phone') or 'n/a'}",
+        f"  stage:   {(lead or {}).get('stage') or 'n/a'}",
+        f"  lead_id: {(lead or {}).get('lead_id') or 'n/a'}",
+        "",
+        f"CALL SUMMARY (disposition: {disposition})",
+        (summary or "").strip() or "(no summary captured)",
+        "",
+        f"Confirm/hold the slot now: {_booking_slots_url()}",
+        "",
+        "(Automated backup channel from TrustOfficeApp — sent because the "
+        "outcome matched the fallback trigger. The booking app still sends "
+        "its own notice for direct confirmed bookings.)",
+    ]
+    return "\n".join(lines)
+
+
+def _fallback_email_html(lead: dict, disposition: str, summary: str,
+                         booking_ref: Optional[str]) -> str:
+    """HTML body mirroring the text body; slot line prominent when present."""
+    esc = html.escape
+    slot = _extract_slot(summary)
+    name = esc(((lead or {}).get("name") or "").strip() or "n/a")
+    email = esc((lead or {}).get("email") or "n/a")
+    phone = esc((lead or {}).get("phone") or "n/a")
+    stage = esc((lead or {}).get("stage") or "n/a")
+    lead_id = esc((lead or {}).get("lead_id") or "n/a")
+    summary_escaped = esc((summary or "").strip() or "(no summary captured)")
+    reason = esc(_fallback_reason(disposition, booking_ref))
+    url = esc(_booking_slots_url())
+    slot_html = (
+        f'<p style="margin:0 0 12px;font-size:17px;font-weight:700;'
+        f'color:#b45309">Reported agreed slot: {esc(slot)}</p>'
+        if slot else ""
+    )
+    return (
+        '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;'
+        'color:#1f2937;max-width:640px">'
+        '<h2 style="margin:0 0 8px;font-size:18px">AI call — instant founder'
+        ' fallback (TrustOffice leads)</h2>'
+        f"{slot_html}"
+        f'<p style="margin:0 0 16px;color:#374151">Fallback reason: {reason}</p>'
+        '<table style="border-collapse:collapse;font-size:14px">'
+        f"<tr><td style='padding:2px 12px 2px 0;color:#6b7280'>name</td>"
+        f"<td style='padding:2px 0'>{name}</td></tr>"
+        f"<tr><td style='padding:2px 12px 2px 0;color:#6b7280'>email</td>"
+        f"<td style='padding:2px 0'>{email}</td></tr>"
+        f"<tr><td style='padding:2px 12px 2px 0;color:#6b7280'>phone</td>"
+        f"<td style='padding:2px 0'>{phone}</td></tr>"
+        f"<tr><td style='padding:2px 12px 2px 0;color:#6b7280'>stage</td>"
+        f"<td style='padding:2px 0'>{stage}</td></tr>"
+        f"<tr><td style='padding:2px 12px 2px 0;color:#6b7280'>lead_id</td>"
+        f"<td style='padding:2px 0'>{lead_id}</td></tr>"
+        "</table>"
+        f'<p style="margin:16px 0 4px;font-weight:600">Call summary —'
+        f" disposition: {esc(disposition)}</p>"
+        f'<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:'
+        f'3px solid #d1d5db;white-space:pre-wrap">{summary_escaped}</blockquote>'
+        f'<p style="margin:0 0 8px">Confirm/hold the slot now: '
+        f'<a href="{url}">{url}</a></p>'
+        '<p style="margin:16px 0 0;color:#6b7280;font-size:12px">Automated '
+        "backup channel from TrustOfficeApp — outcome matched the fallback "
+        "trigger. The booking app still sends its own notice for direct "
+        "confirmed bookings.</p>"
+        "</div>"
+    )
+
+
+async def _send_founder_fallback_email(
+    lead_id: str,
+    *,
+    disposition: str,
+    summary: str = "",
+    booking_ref: Optional[str] = None,
+) -> None:
+    """Send the founder fallback email for one outcome + record the marker.
+
+    Runs as a FastAPI background task (or inline for direct helper callers) —
+    NEVER blocks or fails the call-outcome response. Dedupes on the
+    `fallback_email_sent` activity marker (max 1 per lead per 6 hours);
+    provider status != "sent" (incl. not-configured) records
+    `fallback_email_failed` instead, so a later legit trigger can retry.
+    """
+    recipient = _fallback_recipient()
+    if not recipient:
+        return
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            hours=FALLBACK_EMAIL_DEDUPE_HOURS
+        )
+        recent = await db.lead_activities.find_one(
+            {
+                "lead_id": lead_id,
+                "action_type": "fallback_email_sent",
+                "created_at": {"$gte": cutoff},
+            }
+        )
+        if recent:
+            logger.info(
+                "Founder fallback email suppressed for %s (sent at %s, "
+                "dedupe window %sh)", lead_id, recent.get("created_at"),
+                FALLBACK_EMAIL_DEDUPE_HOURS,
+            )
+            return
+        lead = await db.leads.find_one(
+            {"lead_id": lead_id},
+            {"_id": 0, "lead_id": 1, "name": 1, "email": 1, "phone": 1,
+             "stage": 1},
+        )
+        if not lead:
+            logger.warning(
+                "Founder fallback email skipped for %s: lead not found",
+                lead_id,
+            )
+            return
+        result = await _email_service.send_email(
+            to_email=recipient,
+            subject=_fallback_email_subject(lead, disposition),
+            html_body=_fallback_email_html(lead, disposition, summary,
+                                           booking_ref),
+            text_body=_fallback_email_text(lead, disposition, summary,
+                                           booking_ref),
+            to_name="Jeff",
+            tag=EMAIL_TAG_FALLBACK,
+            metadata={
+                "lead_id": lead_id[:20],
+                "disposition": disposition[:20],
+            },
+        )
+        if isinstance(result, dict) and result.get("status") == "sent":
+            msg_id = str(result.get("message_id") or "").strip()
+            marker = f"Founder fallback email sent — {disposition}"
+            marker += f" — postmark {msg_id}" if msg_id else ""
+            await _log_activity(lead_id, "fallback_email_sent", marker)
+        else:
+            err = ""
+            if isinstance(result, dict):
+                err = str(result.get("error") or result.get("reason")
+                          or "unknown provider status")
+            await _log_activity(
+                lead_id,
+                "fallback_email_failed",
+                f"Founder fallback email failed — {disposition}: "
+                f"{err[:300]}",
+            )
+            logger.warning("Founder fallback email failed for %s: %s",
+                           lead_id, err)
+    except Exception:  # noqa: BLE001 — must never propagate to the response
+        logger.exception("Founder fallback email pipeline error for %s",
+                         lead_id)
+        try:
+            await _log_activity(
+                lead_id, "fallback_email_failed",
+                "Founder fallback email pipeline error (see server logs)",
+            )
+        except Exception:  # noqa: BLE001 — last resort, log only
+            logger.exception(
+                "Could not record fallback_email_failed for %s", lead_id
+            )
 
 
 # ==================== AUTH ====================
@@ -399,7 +689,11 @@ async def get_service_lead(lead_id: str):
 
 
 @router.post("/{lead_id}/call-outcome")
-async def record_call_outcome(lead_id: str, body: CallOutcomeRequest):
+async def record_call_outcome(
+    lead_id: str,
+    body: CallOutcomeRequest,
+    background_tasks: BackgroundTasks,
+):
     """Record a Bland.ai call disposition on a lead.
 
     Stage transitions:
@@ -411,6 +705,10 @@ async def record_call_outcome(lead_id: str, body: CallOutcomeRequest):
     Batch-mode guard: every outcome also stamps last_ai_call_at=now (UTC) and
     increments ai_call_attempts so /queue can hold the lead out for the
     BLAND_RETRY_COOLDOWN_HOURS window (default 24h).
+
+    Founder fallback email: callback_requested, or booked with no confirmed
+    booking_ref, queues an instant founder email as a background task (never
+    blocks or fails this response).
     """
     disposition = (body.disposition or "").strip()
     if disposition not in CALL_DISPOSITIONS:
@@ -437,6 +735,7 @@ async def record_call_outcome(lead_id: str, body: CallOutcomeRequest):
         opt_out=body.opt_out,
         call_duration_sec=body.call_duration_sec,
         current_stage=lead.get("stage"),
+        background_tasks=background_tasks,
     )
     return {"success": True, "lead_id": lead_id, "stage": stage}
 
@@ -450,12 +749,17 @@ async def _apply_call_outcome(
     opt_out: bool = False,
     call_duration_sec: Optional[int] = None,
     current_stage: Optional[str] = None,
+    background_tasks: Optional[BackgroundTasks] = None,
 ) -> Optional[str]:
     """Shared AI-call outcome write path (call-outcome endpoint + webhook).
 
     Logs the activity, applies the stage transition, and stamps the cooldown
     guard (last_ai_call_at + ai_call_attempts). Lead existence is checked by
     the caller. Returns the resulting stage.
+
+    When background_tasks is provided (both HTTP callers do), a due founder
+    fallback email is queued on it and runs after the response; direct
+    (non-HTTP) callers run the email inline, deterministically.
     """
     content = f"AI call via Bland: {disposition}"
     summary = (summary or "").strip()
@@ -500,6 +804,34 @@ async def _apply_call_outcome(
         {"lead_id": lead_id},
         {"$set": {"last_ai_call_at": now_iso}, "$inc": {"ai_call_attempts": 1}},
     )
+    # Founder fallback email (2026-11-18): deterministic trigger AFTER the
+    # outcome write — callback_requested, or booked with no confirmed ref.
+    # Background task keeps the HTTP response fast; provider errors never
+    # propagate (they mark fallback_email_failed instead). The scheduling call
+    # itself is guarded so the outcome write can never fail because of it.
+    if _fallback_email_due(disposition, booking_ref):
+        try:
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    _send_founder_fallback_email,
+                    lead_id,
+                    disposition=disposition,
+                    summary=summary,
+                    booking_ref=booking_ref,
+                )
+            else:
+                # Direct helper callers (non-HTTP paths / unit tests) run
+                # inline so the effect is deterministic.
+                await _send_founder_fallback_email(
+                    lead_id,
+                    disposition=disposition,
+                    summary=summary,
+                    booking_ref=booking_ref,
+                )
+        except Exception:  # noqa: BLE001 — outcome already written; never fail it
+            logger.exception(
+                "Founder fallback email scheduling failed for %s", lead_id
+            )
     return stage
 
 

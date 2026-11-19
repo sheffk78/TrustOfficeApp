@@ -17,6 +17,10 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "trustoffice_test_leads_service")
 os.environ.setdefault("JWT_SECRET", "test-secret-leads-service")
 os.environ.setdefault("TRUSTOFFICE_LEADS_SERVICE_KEY", "test-service-key-1234")
+# Disable the founder fallback email in THIS module's scope (kill switch):
+# these tests assert exact activity lists on call-outcome writes; the fallback
+# email trigger matrix lives in tests/test_founder_fallback_email.py.
+os.environ.setdefault("TRUSTOFFICE_FALLBACK_EMAIL", "")
 
 # Reuse the exact same shim pattern as test_leads_service.py — capture the
 # real motor BEFORE any module under test runs, then patch.

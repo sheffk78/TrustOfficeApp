@@ -22,6 +22,10 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "trustoffice_test_bland_webhook")
 os.environ.setdefault("JWT_SECRET", "test-secret-bland-webhook")
 os.environ.setdefault("TRUSTOFFICE_LEADS_SERVICE_KEY", "test-service-key-1234")
+# Disable the founder fallback email in THIS module's scope (kill switch):
+# webhook mapping tests target mapping behavior; the fallback trigger matrix
+# lives in tests/test_founder_fallback_email.py.
+os.environ.setdefault("TRUSTOFFICE_FALLBACK_EMAIL", "")
 
 import motor.motor_asyncio
 import mongomock_motor
