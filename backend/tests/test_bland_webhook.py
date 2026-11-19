@@ -1,7 +1,9 @@
 """Bland.ai call-completed webhook receiver tests (batch-mode lane).
 
 Covers routers/bland_webhook.py mounted at /api/service/bland/webhook:
-  - secret gating: BLAND_WEBHOOK_SECRET unset -> 503; missing/wrong header -> 401
+  - secret gating: BLAND_WEBHOOK_SECRET unset -> 503; missing/wrong header or
+    ?secret= query param -> 401 (query-param auth is the Bland-canonical path:
+    secret carried in the webhook URL, same constant-time compare)
   - deterministic mapping onto _apply_call_outcome (same path as
     POST /{lead_id}/call-outcome — incl. last_ai_call_at/ai_call_attempts)
   - unmapped dispositions / missing lead ref / unknown lead -> 202 stored,
@@ -164,6 +166,25 @@ class TestSecretGating:
         # valid auth + empty payload => stored-unmapped, not an auth failure
         assert r.status_code == 202, r.text
         assert r.json()["status"] == "stored_unmapped"
+
+    @pytest.mark.asyncio
+    async def test_secret_via_query_param_accepted(self, client, secret_on):
+        """Dispatcher webhook URL carries ?secret=<BLAND_WEBHOOK_SECRET>."""
+        r = client.post(WEBHOOK_URL + f"?secret={SECRET}", json={})
+        assert r.status_code == 202, r.text
+        assert r.json()["status"] == "stored_unmapped"
+
+    @pytest.mark.asyncio
+    async def test_secret_via_query_param_wrong_401(self, client, secret_on):
+        r = client.post(WEBHOOK_URL + "?secret=nope", json={})
+        assert r.status_code == 401, r.text
+        assert await db.bland_webhook_events.count_documents({}) == 0
+
+    @pytest.mark.asyncio
+    async def test_secret_via_query_param_empty_401(self, client, secret_on):
+        r = client.post(WEBHOOK_URL + "?secret=", json={})
+        assert r.status_code == 401, r.text
+        assert await db.bland_webhook_events.count_documents({}) == 0
 
 
 # ==================== MAPPED HAPPY PATH ====================

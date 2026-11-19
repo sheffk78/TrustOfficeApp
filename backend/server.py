@@ -743,6 +743,17 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to start cloud backup scheduler: {e}")
         startup_errors.append(f"backup_scheduler: {e}")
+
+    # Bland dispatch controller --- dormant unless BLAND_DISPATCH_ENABLED=true
+    # AND BLAND_API_KEY is provisioned in Railway. No new env vars are set by
+    # this deploy; the controller ships dormant and stays dormant until the key
+    # exists and Jeff flips BLAND_FRESH_ENABLED / BLAND_AGED_ENABLED.
+    try:
+        from routers.bland_dispatcher import maybe_start_dispatcher
+        await maybe_start_dispatcher()
+    except Exception as e:  # noqa: BLE001 --- never crash startup
+        logger.error(f"Bland dispatch controller failed to start: {e}")
+        startup_errors.append(f"bland_dispatcher: {e}")
     
     # Create database indexes for performance
     try:
@@ -1215,6 +1226,11 @@ async def ensure_primary_admin():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     """Stop background tasks and close database connection"""
+    try:
+        from routers.bland_dispatcher import stop_dispatcher
+        await stop_dispatcher()
+    except Exception:  # noqa: BLE001
+        logger.exception("Bland dispatch controller shutdown failed")
     await background_runner.stop()
     shutdown_backup_scheduler()
     client.close()

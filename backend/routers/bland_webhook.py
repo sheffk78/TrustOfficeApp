@@ -237,9 +237,13 @@ async def bland_call_completed(request: Request, background_tasks: BackgroundTas
             status_code=503, content={"detail": "webhook not configured"}
         )
     provided = request.headers.get(WEBHOOK_SECRET_HEADER, "")
+    if not provided:
+        # Bland's webhook URL carries the secret as a query param; accept it
+        # with the same constant-time compare so no custom header is needed.
+        provided = request.query_params.get("secret", "")
     if not provided or not secrets.compare_digest(provided, expected):
-        logger.warning("Bland webhook rejected: missing/invalid %s header",
-                       WEBHOOK_SECRET_HEADER)
+        logger.warning("Bland webhook rejected: missing/invalid webhook secret "
+                       "(header %s or ?secret=)", WEBHOOK_SECRET_HEADER)
         return JSONResponse(
             status_code=401, content={"detail": "invalid webhook secret"}
         )
