@@ -554,3 +554,296 @@ class TestBookingByEmail:
         r = client.post(BOOKING_BY_EMAIL_URL, json={"status": "booked"})
         assert r.status_code == 401
         assert await db.lead_activities.count_documents({}) == 0
+
+
+# ==================== BATCH-MODE GUARD: cooldown + claim ====================
+
+CLAIM_URL = "/api/service/leads/{lead_id}/claim"
+
+
+def _claim_url(lead_id: str) -> str:
+    return CLAIM_URL.format(lead_id=lead_id)
+
+
+class TestCallOutcomeCooldownStamp:
+    """POST /{id}/call-outcome stamps last_ai_call_at + ai_call_attempts."""
+
+    @pytest.mark.asyncio
+    async def test_call_outcome_stamps_cooldown_fields(self, client):
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        r = client.post(
+            f"/api/service/leads/lead_q/call-outcome",
+            headers=AUTH,
+            json={"disposition": "interested", "summary": "warm signal"},
+        )
+        assert r.status_code == 200, r.text
+        lead = await db.leads.find_one({"lead_id": "lead_q"})
+        # ISO-aware-UTC string, lexicographically comparable in the queue query
+        assert isinstance(lead.get("last_ai_call_at"), str)
+        assert lead["last_ai_call_at"].endswith("+00:00")
+        assert lead.get("ai_call_attempts") == 1
+        # second call increments the counter
+        client.post(
+            f"/api/service/leads/lead_q/call-outcome",
+            headers=AUTH,
+            json={"disposition": "voicemail"},
+        )
+        lead = await db.leads.find_one({"lead_id": "lead_q"})
+        assert lead["ai_call_attempts"] == 2
+
+    @pytest.mark.asyncio
+    async def test_booking_by_email_does_not_stamp_cooldown(self, client):
+        """Booking callbacks are not AI calls — no cooldown stamp (additive-only)."""
+        await db.leads.insert_one(
+            _lead("lead_q", stage="new", email="fixture@example.com")
+        )
+        r = client.post(
+            "/api/service/leads/by-email/fixture@example.com/booking",
+            headers=AUTH,
+            json={"status": "booked", "booking_ref": "hold_x"},
+        )
+        assert r.status_code == 200, r.text
+        lead = await db.leads.find_one({"lead_id": "lead_q"})
+        assert "last_ai_call_at" not in lead
+        assert "ai_call_attempts" not in lead
+
+
+class TestQueueCooldown:
+    """GET /queue excludes leads inside the retry-cooldown window."""
+
+    @pytest.mark.asyncio
+    async def test_fresh_lead_in_queue_then_excluded_after_outcome(self, client):
+        await db.leads.insert_one(_lead("lead_a", stage="new"))
+        r = client.get("/api/service/leads/queue?limit=25", headers=AUTH)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert [l["lead_id"] for l in body["leads"]] == ["lead_a"]
+        assert body["count"] == 1
+        assert body["cooldown"] == 0
+        assert body["claimed"] == 0
+        assert set(body) == {"leads", "count", "cooldown", "claimed", "asOf"}
+
+        r = client.post(
+            "/api/service/leads/lead_a/call-outcome",
+            headers=AUTH,
+            json={"disposition": "interested", "summary": "TEST — cooldown plumbing write"},
+        )
+        assert r.status_code == 200, r.text
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        # the called lead is gone from the result set, but still accounted for
+        assert [l["lead_id"] for l in body["leads"]] == []
+        assert body["count"] == 0
+        assert body["cooldown"] == 1
+        # total ledger stays accurate: count + cooldown == call-eligible
+        assert body["count"] + body["cooldown"] == 1
+
+    @pytest.mark.asyncio
+    async def test_cooldown_expiry_returns_lead_to_queue(self, client):
+        await db.leads.insert_one(_lead("lead_a", stage="new"))
+        client.post(
+            "/api/service/leads/lead_a/call-outcome",
+            headers=AUTH,
+            json={"disposition": "interested", "summary": "TEST — cooldown plumbing write"},
+        )
+        # backdate the stamp past the default 24h window
+        stale_iso = (
+            datetime.now(timezone.utc) - timedelta(hours=25)
+        ).isoformat()
+        await db.leads.update_one(
+            {"lead_id": "lead_a"}, {"$set": {"last_ai_call_at": stale_iso}}
+        )
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        assert [l["lead_id"] for l in body["leads"]] == ["lead_a"]
+        assert body["count"] == 1
+        assert body["cooldown"] == 0
+
+    @pytest.mark.asyncio
+    async def test_cooldown_env_override_zero_disables_exclusion(self, client, monkeypatch):
+        monkeypatch.setenv("BLAND_RETRY_COOLDOWN_HOURS", "0")
+        await db.leads.insert_one(_lead("lead_a", stage="new"))
+        client.post(
+            "/api/service/leads/lead_a/call-outcome",
+            headers=AUTH,
+            json={"disposition": "interested"},
+        )
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        # 0h window → the just-called lead is immediately callable again
+        assert [l["lead_id"] for l in body["leads"]] == ["lead_a"]
+        assert body["cooldown"] == 0
+
+    @pytest.mark.asyncio
+    async def test_queue_meta_counts_across_cooldown_and_claim(self, client):
+        """cooldown + claimed metas count correctly TOGETHER (independent sets)."""
+        await db.leads.insert_many([
+            _lead("lead_a", stage="new"),   # goes into cooldown
+            _lead("lead_b", stage="new"),   # gets claimed (stays visible)
+            _lead("lead_c", stage="new"),   # untouched
+        ])
+        client.post(
+            "/api/service/leads/lead_a/call-outcome",
+            headers=AUTH,
+            json={"disposition": "interested"},
+        )
+        assert client.post(
+            _claim_url("lead_b"), headers=AUTH, json={"claimed_by": "bland-worker-1"}
+        ).status_code == 200
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        ids = {l["lead_id"] for l in body["leads"]}
+        # claimed lead_b stays visible; cooldown lead_a is excluded
+        assert ids == {"lead_b", "lead_c"}
+        assert body["count"] == 2
+        assert body["cooldown"] == 1
+        assert body["claimed"] == 1
+
+
+class TestClaimFlow:
+    """POST/DELETE /{id}/claim — TTLs, conflicts, releases, queue visibility."""
+
+    @pytest.mark.asyncio
+    async def test_claim_sets_fields_default_ttl_20(self, client):
+        lead = _lead("lead_q", stage="new")
+        await db.leads.insert_one(lead)
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "bland-worker-1"}
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["success"] is True
+        assert body["claimed_until"].endswith("+00:00")
+        until = datetime.fromisoformat(body["claimed_until"])
+        # default TTL is 20 minutes
+        assert 19 <= (until - datetime.now(timezone.utc)).total_seconds() / 60 <= 21
+        doc = await db.leads.find_one({"lead_id": "lead_q"})
+        assert doc["claim"]["claimed_by"] == "bland-worker-1"
+        assert doc["claim"]["claimed_until"] == body["claimed_until"]
+        assert doc["claim"]["claimed_at"].endswith("+00:00")
+
+    @pytest.mark.asyncio
+    async def test_claim_conflict_409_with_unexpired_claim(self, client):
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1"})
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "bland-worker-2"}
+        )
+        assert r.status_code == 409, r.text
+        assert r.json()["detail"] == "already_claimed"
+        assert r.json()["claimed_until"].endswith("+00:00")
+        assert r.json()["claimed_by"] == "w1"
+
+    @pytest.mark.asyncio
+    async def test_same_claimer_refreshes_claim(self, client):
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1"})
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1", "ttl_minutes": 60}
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["success"] is True
+        assert r.json()["ttl_minutes"] == 60
+        until = datetime.fromisoformat(r.json()["claimed_until"])
+        assert 59 <= (until - datetime.now(timezone.utc)).total_seconds() / 60 <= 61
+
+    @pytest.mark.asyncio
+    async def test_claim_ttl_bounds_validated(self, client):
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1", "ttl_minutes": 61}
+        )
+        assert r.status_code == 422
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1", "ttl_minutes": 0}
+        )
+        assert r.status_code == 422
+        r = client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": ""})
+        assert r.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_delete_claim_releases(self, client):
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1"})
+        r = client.delete(_claim_url("lead_q"), headers=AUTH)
+        assert r.status_code == 200, r.text
+        assert r.json()["success"] is True
+        doc = await db.leads.find_one({"lead_id": "lead_q"})
+        assert "claim" not in (doc or {})
+        # different claimant can take it immediately after release
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "bland-worker-2"}
+        )
+        assert r.status_code == 200, r.text
+
+    @pytest.mark.asyncio
+    async def test_release_is_idempotent_on_unclaimed_lead(self, client):
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        r = client.delete(_claim_url("lead_q"), headers=AUTH)
+        assert r.status_code == 200, r.text
+
+    @pytest.mark.asyncio
+    async def test_expired_claim_is_auto_released(self, client):
+        """Expired claims are ignored by the 409 check — TTL auto-release."""
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1", "ttl_minutes": 60})
+        past_iso = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        await db.leads.update_one(
+            {"lead_id": "lead_q"},
+            {"$set": {"claim": {"claimed_by": "w1", "claimed_until": past_iso,
+                                "claimed_at": past_iso}}},
+        )
+        r = client.post(
+            _claim_url("lead_q"), headers=AUTH, json={"claimed_by": "bland-worker-2"}
+        )
+        assert r.status_code == 200, r.text  # stale w1 claim does NOT block w2
+
+    @pytest.mark.asyncio
+    async def test_claim_unknown_lead_404(self, client):
+        assert client.post(
+            _claim_url("lead_missing"), headers=AUTH, json={"claimed_by": "w1"}
+        ).status_code == 404
+        assert client.delete(_claim_url("lead_missing"), headers=AUTH).status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_claim_requires_auth(self, client):
+        assert client.post(
+            _claim_url("lead_q"), json={"claimed_by": "w1"}
+        ).status_code == 401
+        assert client.delete(_claim_url("lead_q")).status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_queue_additive_claim_fields_on_lead_objects(self, client):
+        """Claimed leads stay in the queue payload (worker skips them itself)."""
+        base_fields = {"lead_id", "name", "phone", "stage", "created_at", "updated_at",
+                       "email", "source", "notes"}
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        unclaimed = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        assert set(unclaimed["leads"][0]) == base_fields  # shape unchanged
+
+        client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1", "ttl_minutes": 30})
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        lead = body["leads"][0]
+        # claimed lead still present, additive fields only
+        assert lead["lead_id"] == "lead_q"
+        assert set(lead) == base_fields | {"claimed_by", "claimed_until"}
+        assert lead["claimed_by"] == "w1"
+        assert lead["claimed_until"].endswith("+00:00")
+        assert body["claimed"] == 1
+
+        client.delete(_claim_url("lead_q"), headers=AUTH)
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        assert set(body["leads"][0]) == base_fields  # fields drop on release
+        assert body["claimed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_expired_claim_hidden_from_queue_annotation(self, client):
+        """A backdated (expired) claim must not annotate the lead or the meta."""
+        await db.leads.insert_one(_lead("lead_q", stage="new"))
+        client.post(_claim_url("lead_q"), headers=AUTH, json={"claimed_by": "w1"})
+        past_iso = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        await db.leads.update_one(
+            {"lead_id": "lead_q"},
+            {"$set": {"claim": {"claimed_by": "w1", "claimed_until": past_iso,
+                                "claimed_at": past_iso}}},
+        )
+        body = client.get("/api/service/leads/queue?limit=25", headers=AUTH).json()
+        lead = body["leads"][0]
+        assert "claimed_by" not in lead and "claimed_until" not in lead
+        assert body["claimed"] == 0

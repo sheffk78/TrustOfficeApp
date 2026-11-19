@@ -149,7 +149,13 @@ NON_DATA_ROUTERS = {
     "investments", "meetings", "trust_admin_kits", "trust_doc_analysis",
     "marketing_expenses", "error_reports", "trust_admin_service",
     "account_summary", "repository", "trust_archive", "totp_2fa",
+    # Bland call-completed webhook receiver (2026-11-18): public receiver at
+    # /api/service/bland/webhook, NOT tenant data — locked behind
+    # X-Webhook-Secret (503 until BLAND_WEBHOOK_SECRET is set); persists raw
+    # call events to bland_webhook_events and maps dispositions onto CRM
+    # leads via routers/leads_service._apply_call_outcome.
     "internal_agent",
+    "bland_webhook",
     # WingPoint Connect Flow v2 (2026-10-22): pre-authentication connect
     # surface. These endpoints run BEFORE a session exists (that is the point
     # — the member is mid-handoff from WingPoint), so the unauthenticated
