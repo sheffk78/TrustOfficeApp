@@ -11,6 +11,7 @@ STAGE_LABELS wiring in routers/leads.py is asserted here too.
 """
 import os
 import sys
+import uuid
 from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
@@ -48,10 +49,10 @@ db = database.db
 
 @pytest_asyncio.fixture(autouse=True)
 async def clean_db():
-    for coll in ("leads", "lead_activities"):
+    for coll in ("leads", "lead_activities", "bland_call_log"):
         await db[coll].delete_many({})
     yield
-    for coll in ("leads", "lead_activities"):
+    for coll in ("leads", "lead_activities", "bland_call_log"):
         await db[coll].delete_many({})
 
 
@@ -142,6 +143,11 @@ class TestQueue:
             }
         assert "asOf" in body
         datetime.fromisoformat(body["asOf"])
+        assert set(body) == {
+            "leads", "count", "cooldown", "claimed",
+            "suppressed_booked", "suppressed_human_touch", "exhausted_30d",
+            "asOf",
+        }
 
     @pytest.mark.asyncio
     async def test_queue_default_limit_10_max_25(self, client):
@@ -221,6 +227,205 @@ class TestQueue:
         body = r.json()
         assert body["count"] == 1
         assert body["leads"][0]["phone"] == "8128015542"
+
+
+# ==================== SUPPRESSION RULES (Jeff's annoyance-proof plan) ====================
+# mongomock matrix: booked/consult permanent exclusion, human-touch pause
+# with AI-prefix exception, system-activity non-triggers, 3-in-30 attempt cap,
+# meta counts, byte-identical lead shapes.
+
+
+class TestQueueSuppression:
+    async def _act(
+        self, lead_id, action_type, content, created_at=None
+    ):
+        await db.lead_activities.insert_one(
+            {
+                "activity_id": f"act_{uuid.uuid4().hex[:12]}",
+                "lead_id": lead_id,
+                "action_type": action_type,
+                "content": content,
+                "created_at": created_at or datetime.now(timezone.utc),
+            }
+        )
+
+    async def _log_call(self, lead_id, ts, ok=True, tier="fresh"):
+        await db.bland_call_log.insert_one(
+            {
+                "lead_id": lead_id,
+                "tier": tier,
+                "claim_id": f"claim_{uuid.uuid4().hex[:8]}",
+                "ts": ts,
+                "ok": ok,
+                "http": 200 if ok else 400,
+                "error_code": None if ok else "bland_400",
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_booked_call_lead_excluded_from_queue(self, client):
+        # Rule 1 (permanent): any booked_call activity ever -> never queued.
+        await db.leads.insert_one(_lead("lead_booked", stage="warm"))
+        await self._act(
+            "lead_booked",
+            "booked_call",
+            "Booked a TrustOffice Governance Consultation at 2026-11-15T17:00Z",
+            created_at=datetime.now(timezone.utc) - timedelta(days=5),
+        )
+        await db.leads.insert_one(_lead("lead_clean", stage="new"))
+
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 1
+        assert [l["lead_id"] for l in body["leads"]] == ["lead_clean"]
+        assert body["suppressed_booked"] == 1
+        assert body["suppressed_human_touch"] == 0
+        assert body["exhausted_30d"] == 0
+
+    @pytest.mark.asyncio
+    async def test_human_touch_latest_excludes_lead(self, client):
+        # Rule 2: latest activity human-style -> paused (no booked_call in
+        # history, so the exclusion is via the human-touch rule only).
+        await db.leads.insert_one(_lead("lead_human", stage="engaged"))
+        await self._act(
+            "lead_human",
+            "manual",
+            "Called back manually â asked to be called next week.",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        )
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 0
+        assert body["suppressed_human_touch"] == 1
+        assert body["suppressed_booked"] == 0
+        assert body["exhausted_30d"] == 0
+
+    @pytest.mark.asyncio
+    async def test_ai_prefixed_latest_stays_callable(self, client):
+        # Rule 2 exception: latest content starts with the AI prefix ->
+        # callable even though action_type is "manual".
+        await db.leads.insert_one(_lead("lead_ai_ok", stage="warm"))
+        await self._act(
+            "lead_ai_ok",
+            "manual",
+            "AI call via Bland: booked â TEST correction label",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 1
+        assert body["leads"][0]["lead_id"] == "lead_ai_ok"
+        assert body["suppressed_human_touch"] == 0
+
+    @pytest.mark.asyncio
+    async def test_booked_rule_outranks_ai_prefixed_latest(self, client):
+        # booked_call history + AI-prefixed latest ("AI call via Bland:
+        # booked â TEST..."): excluded ONLY via the booked_call rule; rule 2
+        # does not count it as a human touch.
+        await db.leads.insert_one(_lead("lead_booked_ai", stage="warm"))
+        await self._act(
+            "lead_booked_ai",
+            "booked_call",
+            "Booking confirmed via CRM",
+            created_at=datetime.now(timezone.utc) - timedelta(days=2),
+        )
+        await self._act(
+            "lead_booked_ai",
+            "manual",
+            "AI call via Bland: booked â TEST correction label",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 0
+        assert body["suppressed_booked"] == 1
+        assert body["suppressed_human_touch"] == 0
+
+    @pytest.mark.asyncio
+    async def test_system_activities_never_trigger_human_pause(self, client):
+        # Rule 2 non-triggers: fallback_email_sent, booking_reminder_*,
+        # DIAGNOSTIC notes leave the lead callable.
+        for lead_id, at, content in (
+            ("lead_fallback", "fallback_email_sent", "Fallback founder email sent"),
+            ("lead_reminder", "booking_reminder_24h", "Reminder: booking tomorrow"),
+            ("lead_diag", "note", "DIAGNOSTIC: corrected transcript label"),
+        ):
+            await db.leads.insert_one(_lead(lead_id, stage="new"))
+            await self._act(lead_id, at, content)
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 3
+        assert {l["lead_id"] for l in body["leads"]} == {
+            "lead_fallback", "lead_reminder", "lead_diag",
+        }
+        assert body["suppressed_human_touch"] == 0
+        assert body["suppressed_booked"] == 0
+        assert body["exhausted_30d"] == 0
+
+    @pytest.mark.asyncio
+    async def test_thirty_day_attempt_cap(self, client):
+        # Rule 3: >= 3 ok==true bland_call_log entries per lead_id in 30d.
+        now = datetime.now(timezone.utc)
+        recent = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        old = (now - timedelta(days=45)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+        for lid in ("lead_two", "lead_three", "lead_mixed", "lead_old_logs"):
+            await db.leads.insert_one(_lead(lid, stage="new"))
+
+        await self._log_call("lead_two", recent, ok=True)     # 2 -> callable
+        await self._log_call("lead_two", recent, ok=True)
+        for _ in range(3):                                    # 3 -> excluded
+            await self._log_call("lead_three", recent, ok=True)
+        await self._log_call("lead_mixed", recent, ok=True)   # 2 ok + 1 fail -> callable
+        await self._log_call("lead_mixed", recent, ok=True)
+        await self._log_call("lead_mixed", recent, ok=False)
+        for _ in range(3):                                    # 3 ok but all >30d -> callable
+            await self._log_call("lead_old_logs", old, ok=True)
+
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 3
+        assert {l["lead_id"] for l in body["leads"]} == {
+            "lead_two", "lead_mixed", "lead_old_logs",
+        }
+        assert body["exhausted_30d"] == 1
+        assert body["suppressed_booked"] == 0
+        assert body["suppressed_human_touch"] == 0
+
+    @pytest.mark.asyncio
+    async def test_meta_counts_coherent_and_shapes_unchanged(self, client):
+        now = datetime.now(timezone.utc)
+        recent = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+        await db.leads.insert_one(_lead("lead_booked", stage="warm"))
+        await self._act(
+            "lead_booked", "booked_call", "Booked via CRM",
+            created_at=now - timedelta(days=3),
+        )
+        await db.leads.insert_one(_lead("lead_human", stage="new"))
+        await self._act(
+            "lead_human", "manual", "Human note latest",
+            created_at=now - timedelta(hours=1),
+        )
+        await db.leads.insert_one(_lead("lead_exhausted", stage="warm"))
+        for _ in range(3):
+            await self._log_call("lead_exhausted", recent, ok=True)
+        await db.leads.insert_one(_lead("lead_clean_1", stage="engaged"))
+        await db.leads.insert_one(_lead("lead_clean_2", stage="new"))
+
+        body = client.get(QUEUE_URL, headers=AUTH).json()
+        assert body["count"] == 2
+        assert body["suppressed_booked"] == 1
+        assert body["suppressed_human_touch"] == 1
+        assert body["exhausted_30d"] == 1
+        # coherence: every suppressed lead counted exactly once
+        assert (
+            body["suppressed_booked"]
+            + body["suppressed_human_touch"]
+            + body["exhausted_30d"]
+            + body["count"]
+            == 5
+        )
+        # lead shapes byte-identical to today (body gains only meta keys)
+        for lead in body["leads"]:
+            assert set(lead) == {
+                "lead_id", "name", "email", "phone", "stage", "source",
+                "created_at", "updated_at", "notes",
+            }
 
 
 # ==================== GET /{lead_id} ====================
@@ -662,7 +867,11 @@ class TestQueueCooldown:
         assert body["count"] == 1
         assert body["cooldown"] == 0
         assert body["claimed"] == 0
-        assert set(body) == {"leads", "count", "cooldown", "claimed", "asOf"}
+        assert set(body) == {
+            "leads", "count", "cooldown", "claimed",
+            "suppressed_booked", "suppressed_human_touch", "exhausted_30d",
+            "asOf",
+        }
 
         r = client.post(
             "/api/service/leads/lead_a/call-outcome",

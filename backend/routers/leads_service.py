@@ -422,6 +422,72 @@ CALLABLE_STAGES = ["new", "engaged", "warm", "registered"]
 WEBHOOK_DISPOSITIONS = set(CALL_DISPOSITIONS)
 
 
+# ---------------------------------------------------------------------------
+# Jeff's annoyance-proof suppression rules (server-side)
+#
+# These live in the shared queue logic so the no-param path and every tier
+# path inherit them â no dispatcher behavior can violate them:
+#   1. APPOINTMENT/CONSULT SUPPRESSION (permanent): any lead with a
+#      lead_activities action_type `booked_call` is never queued again.
+#   2. HUMAN-TOUCH PAUSE: a lead whose latest activity is human-style
+#      (not "AI call via Bland: ...-prefixed and not system/bookkeeping:
+#      booked_call, booking_reminder_*, fallback_email_sent/failed,
+#      diagnostic notes) is paused â the queue never talks over a human.
+#   3. THIRTY-DAY ATTEMPT CAP: >= 3 ok==true bland_call_log entries per
+#      lead_id within the last 30 days exhausts the lead; failed Bland
+#      submissions do not count.
+#
+# Meta (additive, on top of cooldown/claimed): suppressed_booked,
+# suppressed_human_touch, exhausted_30d. Lead shapes are otherwise
+# byte-identical.
+# ---------------------------------------------------------------------------
+
+AI_CALL_PREFIX = "AI call via Bland:"
+
+# System/bookkeeping activity types that are never "human touches".
+BOOKED_CALL_ACTION = "booked_call"
+SYSTEM_ACTION_TYPES = {
+    BOOKED_CALL_ACTION,
+    "fallback_email_sent",
+    "fallback_email_failed",
+}
+REMINDER_ACTION_PREFIX = "booking_reminder_"
+
+THIRTY_DAYS = timedelta(days=30)
+ATTEMPT_CAP_30D = 3
+
+
+def _is_ai_call_activity(activity: dict) -> bool:
+    """True when the activity content is an AI call report from Bland."""
+    content = activity.get("content") or ""
+    return content.startswith(AI_CALL_PREFIX)
+
+
+def _is_system_activity(activity: dict) -> bool:
+    """True when the activity is system/bookkeeping, never a human touch."""
+    at = activity.get("action_type") or ""
+    if at in SYSTEM_ACTION_TYPES or at.startswith(REMINDER_ACTION_PREFIX):
+        return True
+    content = activity.get("content") or ""
+    return "diagnostic" in content.lower()
+
+
+def _latest_activity_is_human(latest: Optional[dict]) -> bool:
+    """True when the lead's latest activity is a human-style touch.
+
+    AI-prefixed and system/bookkeeping latest activities keep the lead
+    callable; anything else (manual/note/call/email-style human content)
+    pauses the queue for that lead.
+    """
+    if latest is None:
+        return False
+    if _is_ai_call_activity(latest):
+        return False
+    if _is_system_activity(latest):
+        return False
+    return True
+
+
 class CallOutcomeRequest(BaseModel):
     disposition: str
     summary: str = ''
@@ -604,16 +670,43 @@ async def get_calling_queue(
     """Paginated Bland.ai calling queue, oldest leads first.
 
     Only leads with a non-empty phone in a call-eligible stage
-    (new/engaged/warm/registered) — do_not_call and lost leads are never
+    (new/engaged/warm/registered) Ã¢ÂÂ do_not_call and lost leads are never
     re-called. count is the total matching the filter (after offset/limit
     applied separately) so the caller knows how many remain.
+
+    Jeff's annoyance-proof suppression rules (server-side, live in the
+    shared queue logic so the no-param path and every tier path inherit
+    them Ã¢ÂÂ no dispatcher behavior can violate them):
+
+    1. APPOINTMENT/CONSULT SUPPRESSION (permanent): a lead with any
+       lead_activities action_type `booked_call` is never queued again Ã¢ÂÂ
+       Jeff's pipeline owns booked/consulted people forever (booked AND met
+       both covered).
+    2. HUMAN-TOUCH PAUSE: a lead whose latest activity is human-style
+       (content/action does NOT start with the AI prefix "AI call via
+       Bland:" and is not a system/bookkeeping type Ã¢ÂÂ booked_call,
+       booking_reminder_*, fallback_email_sent, fallback_email_failed,
+       diagnostic notes) is paused Ã¢ÂÂ the queue never talks over a human.
+       An AI-prefixed or system latest activity keeps the lead callable.
+    3. THIRTY-DAY ATTEMPT CAP: a lead with >= 3 ok==true entries in
+       bland_call_log (per lead_id, 30-day window) is exhausted. Failed
+       Bland submissions do not count.
+
+    A lead excluded by an earlier rule is counted under that rule only,
+    so suppressed_booked + suppressed_human_touch + exhausted_30d + count
+    == the pre-suppression fresh-eligible total.
 
     Batch-mode guard meta (additive):
       cooldown: eligible leads currently excluded because last_ai_call_at is
         within BLAND_RETRY_COOLDOWN_HOURS (default 24h).
       claimed: leads in the result set holding an unexpired claim. Claimed
-        leads are NOT hidden — they carry claimed_by/claimed_until so Norm's
+        leads are NOT hidden Ã¢ÂÂ they carry claimed_by/claimed_until so Norm's
         worker skips them itself while keeping queue visibility.
+
+    Suppression meta (additive):
+      suppressed_booked: leads excluded by rule 1 (booked/consult)
+      suppressed_human_touch: leads excluded by rule 2 (human-touch pause)
+      exhausted_30d: leads excluded by rule 3 (3-in-30 attempt cap)
     """
     now_iso = _iso_utc_now()
     cutoff_iso = (
@@ -623,8 +716,8 @@ async def get_calling_queue(
         "phone": {
             "$exists": True,
             "$nin": [None, ""],
-            # ≥10 consecutive digits (Bland needs a dialable number) — blocks
-            # masked CRM junk like '+184****4495'; 'p:+1201…' quirks still pass
+            # Ã¢ÂÂ¥10 consecutive digits (Bland needs a dialable number) Ã¢ÂÂ blocks
+            # masked CRM junk like '+184****4495'; 'p:+1201Ã¢ÂÂ¦' quirks still pass
             # and are normalized in the view below.
             "$regex": re.compile(r"\d{10}"),
         },
@@ -632,7 +725,7 @@ async def get_calling_queue(
     }
     # Cooldown guard: a fresh last_ai_call_at (missing/null never matches the
     # $lt comparison, so they pass either branch) keeps the lead out of the
-    # result set. All stamps are same-format ISO strings → lexical compare ok.
+    # result set. All stamps are same-format ISO strings Ã¢ÂÂ lexical compare ok.
     fresh_clause = {
         "$or": [
             {"last_ai_call_at": {"$exists": False}},
@@ -642,16 +735,90 @@ async def get_calling_queue(
     }
     eligible_total = await db.leads.count_documents(query)
     fresh_query = {**query, **fresh_clause}
-    total = await db.leads.count_documents(fresh_query)
-    cooldown_count = eligible_total - total
+    total_pre = await db.leads.count_documents(fresh_query)
+    cooldown_count = eligible_total - total_pre
     # "claimed" meta: fresh-eligible leads with an unexpired claim (TTL is a
-    # plain field comparison — expired claims are ignored, no Mongo TTL index).
+    # plain field comparison Ã¢ÂÂ expired claims are ignored, no Mongo TTL index).
     claimed_count = await db.leads.count_documents(
         {**fresh_query, "claim.claimed_until": {"$gt": now_iso}}
     )
+
+    # ---- Suppression rules (shared by tier + no-param paths) ----
+    candidate_ids = [
+        doc["lead_id"]
+        async for doc in db.leads.find(fresh_query, {"lead_id": 1}).sort(
+            "created_at", 1
+        )
+    ]
+
+    suppressed_booked = suppressed_human_touch = exhausted_30d = 0
+    suppressed_all: set[str] = set()
+    if candidate_ids:
+        candidate_set = set(candidate_ids)
+
+        # Rule 1 Ã¢ÂÂ permanent: any booked_call activity ever.
+        booked_ids = await db.lead_activities.distinct(
+            "lead_id", {"action_type": BOOKED_CALL_ACTION}
+        )
+        booked_set = {
+            lid for lid in (booked_ids or []) if lid in candidate_set
+        }
+
+        # Rule 2 Ã¢ÂÂ human-touch pause: latest activity is human-style.
+        latest_by_lead: dict[str, dict] = {}
+        act_cursor = db.lead_activities.find(
+            {"lead_id": {"$in": candidate_ids}}
+        ).sort("created_at", -1)
+        async for act in act_cursor:
+            lid = act.get("lead_id")
+            if lid not in latest_by_lead:
+                latest_by_lead[lid] = act
+        human_set = {
+            lid
+            for lid, act in latest_by_lead.items()
+            if lid not in booked_set and _latest_activity_is_human(act)
+        }
+
+        # Rule 3 Ã¢ÂÂ 30-day attempt cap: >= 3 ok==true bland_call_log entries.
+        thirty_d_ago_iso = (
+            datetime.now(timezone.utc) - THIRTY_DAYS
+        ).isoformat()
+        remaining = [
+            lid
+            for lid in candidate_ids
+            if lid not in booked_set and lid not in human_set
+        ]
+        attempt_counts: dict[str, int] = {}
+        if remaining:
+            log_cursor = db.bland_call_log.find(
+                {
+                    "ok": True,
+                    "ts": {"$gte": thirty_d_ago_iso},
+                    "lead_id": {"$in": remaining},
+                }
+            )
+            async for log in log_cursor:
+                lid = log.get("lead_id")
+                attempt_counts[lid] = attempt_counts.get(lid, 0) + 1
+        exhausted_set = {
+            lid for lid in remaining if attempt_counts.get(lid, 0) >= 3
+        }
+
+        suppressed_booked = len(booked_set)
+        suppressed_human_touch = len(human_set)
+        exhausted_30d = len(exhausted_set)
+        suppressed_all = booked_set | human_set | exhausted_set
+
+    final_query = (
+        {**fresh_query, "lead_id": {"$nin": sorted(suppressed_all)}}
+        if suppressed_all
+        else fresh_query
+    )
+    total = await db.leads.count_documents(final_query)
+
     leads_out: List[dict] = []
     cursor = (
-        db.leads.find(fresh_query, {**LEAD_PROJECTION, "claim": 1})
+        db.leads.find(final_query, {**LEAD_PROJECTION, "claim": 1})
         .sort("created_at", 1)
         .skip(offset)
         .limit(limit)
@@ -670,6 +837,9 @@ async def get_calling_queue(
         "count": total,
         "cooldown": cooldown_count,
         "claimed": claimed_count,
+        "suppressed_booked": suppressed_booked,
+        "suppressed_human_touch": suppressed_human_touch,
+        "exhausted_30d": exhausted_30d,
         "asOf": now_iso,
     }
 
