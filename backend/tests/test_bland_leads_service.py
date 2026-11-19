@@ -61,7 +61,17 @@ def client():
 QUEUE_URL = "/api/service/leads/queue"
 
 
-def _lead(lead_id, *, stage="new", phone="555-000-1", created_at=None, **extra):
+def _lead(
+    lead_id,
+    *,
+    stage="new",
+    # Default phone must be call-eligible: ≥10 CONSECUTIVE digits in the raw
+    # stored string (no separators) so legacy queue tests pass the queue's
+    # dialable-number regex.
+    phone="5550001000",
+    created_at=None,
+    **extra,
+):
     now = created_at or datetime.now(timezone.utc)
     doc = {
         "lead_id": lead_id,
@@ -176,6 +186,37 @@ class TestQueue:
     async def test_queue_requires_auth(self, client):
         r = client.get(QUEUE_URL)
         assert r.status_code == 401
+
+    # ---- phone normalization (Meta 'p:' backfill quirk + masked junk) ----
+
+    @pytest.mark.asyncio
+    async def test_queue_normalizes_p_prefixed_phone(self, client):
+        # Meta ad-export backfill stores phones like 'p:+1201…' — the view
+        # must strip the prefix so Bland dials a real number.
+        await _seed(phone="p:+1202987655")
+        r = client.get(QUEUE_URL, headers=AUTH)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["count"] == 1
+        assert body["leads"][0]["phone"] == "+1202987655"
+
+    @pytest.mark.asyncio
+    async def test_queue_excludes_masked_asterisk_phones(self, client):
+        # Masked CRM junk ('+184****4495') has no 10-digit run — never queued.
+        await _seed(phone="+184****4495")
+        r = client.get(QUEUE_URL, headers=AUTH)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["leads"] == [] and body["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_queue_plain_stored_phone_unchanged(self, client):
+        await _seed(phone="8128015542")
+        r = client.get(QUEUE_URL, headers=AUTH)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["count"] == 1
+        assert body["leads"][0]["phone"] == "8128015542"
 
 
 # ==================== GET /{lead_id} ====================

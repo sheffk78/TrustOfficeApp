@@ -171,7 +171,7 @@ async def get_latest_leads():
                 "lead_id": lead_id,
                 "name": lead.get("name"),
                 "email": lead.get("email"),
-                "phone": lead.get("phone"),
+                "phone": _normalize_phone(lead.get("phone")),
                 "stage": lead.get("stage"),
                 "source": lead.get("source"),
                 "created_at": _iso(lead.get("created_at")),
@@ -186,13 +186,35 @@ async def get_latest_leads():
 
 # ==================== BLAND.AI CALLING (Bland agent fe709e36) ====================
 
+def _normalize_phone(raw):
+    """Normalize a stored phone for the calling lane — view-layer only,
+    never a DB write, never raises.
+
+    The Meta ad-export backfill stores phones like 'p:+1XXXXXXXXXX' (leading
+    'p:' quirk) and some CRM rows carry masked junk. Strips a leading
+    'p:'/'p' + whitespace (case-insensitive), then removes spaces, dashes,
+    dots and parens; keeps '+' and digit runs intact. None (or any non-str)
+    passes through unchanged; a malformed value is returned as-is rather
+    than raising.
+    """
+    if raw is None or not isinstance(raw, str):
+        return raw
+    try:
+        s = raw.strip()
+        s = re.sub(r"^[pP]\s*:?\s*", "", s)  # 'p:+1…' / 'P: +1…' / 'p +1…'
+        s = re.sub(r"[ \-.\(\)]", "", s)  # separators out, '+' and digits stay
+        return s
+    except Exception:
+        return raw
+
+
 def _lead_view(lead: dict) -> dict:
     """Shared projection shape for queue + single-lead lookups (no Mongo _id)."""
     return {
         "lead_id": lead.get("lead_id"),
         "name": lead.get("name"),
         "email": lead.get("email"),
-        "phone": lead.get("phone"),
+        "phone": _normalize_phone(lead.get("phone")),
         "stage": lead.get("stage"),
         "source": lead.get("source"),
         "created_at": _iso(lead.get("created_at")),
@@ -227,7 +249,14 @@ async def get_calling_queue(
     applied separately) so the caller knows how many remain.
     """
     query = {
-        "phone": {"$exists": True, "$nin": [None, ""]},
+        "phone": {
+            "$exists": True,
+            "$nin": [None, ""],
+            # ≥10 consecutive digits (Bland needs a dialable number) — blocks
+            # masked CRM junk like '+184****4495'; 'p:+1201…' quirks still pass
+            # and are normalized in the view below.
+            "$regex": re.compile(r"\d{10}"),
+        },
         "stage": {"$in": CALLABLE_STAGES},
     }
     total = await db.leads.count_documents(query)
