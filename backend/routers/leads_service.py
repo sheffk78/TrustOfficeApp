@@ -453,6 +453,17 @@ SYSTEM_ACTION_TYPES = {
 }
 REMINDER_ACTION_PREFIX = "booking_reminder_"
 
+# Explicit human-touch indicators (whitelist). A lead pauses only when its
+# latest activity matches one of these explicitly human-logged types; every
+# other activity -- AI call reports, system/bookkeeping types, reminders,
+# diagnostics, AND automated production types (email via MailerCloud,
+# Facebook lead capture, CRM create, ...) that are not on the system list --
+# keeps the lead callable. The old blacklist treated every unlisted type as
+# human, which false-positive paused nearly all leads once the CRM vocabulary
+# outgrew the short exemption list (production regression: queue count 0,
+# suppressed_human_touch=102).
+HUMAN_ACTION_TYPES = {"manual", "note"}
+
 THIRTY_DAYS = timedelta(days=30)
 ATTEMPT_CAP_30D = 3
 
@@ -473,11 +484,14 @@ def _is_system_activity(activity: dict) -> bool:
 
 
 def _latest_activity_is_human(latest: Optional[dict]) -> bool:
-    """True when the lead's latest activity is a human-style touch.
+    """True only when the latest activity is a genuine human touch (whitelist).
 
     AI-prefixed and system/bookkeeping latest activities keep the lead
-    callable; anything else (manual/note/call/email-style human content)
-    pauses the queue for that lead.
+    callable. A lead pauses only when its latest activity is explicitly
+    human-logged (action_type manual/note with non-AI, non-diagnostic
+    content). Automated production types (email, facebook_lead, created, ...)
+    that are not on the system exemption list are treated as system -- they
+    never trigger the human-touch pause.
     """
     if latest is None:
         return False
@@ -485,7 +499,8 @@ def _latest_activity_is_human(latest: Optional[dict]) -> bool:
         return False
     if _is_system_activity(latest):
         return False
-    return True
+    at = latest.get("action_type") or ""
+    return at in HUMAN_ACTION_TYPES
 
 
 class CallOutcomeRequest(BaseModel):
