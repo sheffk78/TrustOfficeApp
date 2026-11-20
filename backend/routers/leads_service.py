@@ -561,6 +561,8 @@ class BookingByEmailRequest(BaseModel):
     booking_ref: Optional[str] = Field(default=None, max_length=200)
     event_type: Optional[str] = None
     channel: Optional[str] = None
+    phone: Optional[str] = Field(default=None, max_length=40)     # Kit 2026-11-19: caller-dictated phone
+    lead_id: Optional[str] = Field(default=None, max_length=80)   # Kit 2026-11-19: agent trusted-path linkage
 
 
 # ==================== ROUTER ====================
@@ -1389,13 +1391,42 @@ async def record_booking_by_email(email: str, body: BookingByEmailRequest):
     when = (body.when or "").strip()
     booking_ref = (body.booking_ref or "").strip()
     event_type = (body.event_type or "governance-consultation").strip() or "governance-consultation"
+    cb_phone = (body.phone or "").strip()
+    cb_lead_id = (body.lead_id or "").strip()
 
-    lead = await db.leads.find_one(
-        {"email": {"$regex": f"^{re.escape(raw_email)}$", "$options": "i"}},
-    )
+    def _phone_digits(p: str) -> str:
+        return re.sub(r"\D", "", p or "")[-10:]
+
+    # Kit 2026-11-19 resolution ladder: lead_id → email → phone last-10.
+    # The AI agent collects the caller's email live, which regularly differs
+    # from the Meta signup email, so email alone misses the lead and the
+    # booking (and its phone) never reaches the CRM record.
+    lead = None
+    match_by = None
+    if cb_lead_id:
+        lead = await db.leads.find_one({"lead_id": cb_lead_id})
+        if lead:
+            match_by = "lead_id"
+    if lead is None and raw_email:
+        lead = await db.leads.find_one(
+            {"email": {"$regex": f"^{re.escape(raw_email)}$", "$options": "i"}},
+        )
+        if lead:
+            match_by = "email"
+    if lead is None and cb_phone:
+        digits = _phone_digits(cb_phone)
+        if len(digits) == 10:
+            lead = await db.leads.find_one(
+                {"phone": {"$regex": digits, "$options": "i"}},
+            )
+            if lead:
+                match_by = "phone"
     if not lead:
         # Unknown lead: no side effects, just log server-side.
-        logger.info("Booking callback for unknown lead email: %s", raw_email)
+        logger.info(
+            "Booking callback for unknown lead (email=%s phone=%s lead_id=%s)",
+            raw_email, cb_phone or "-", cb_lead_id or "-",
+        )
         return {"success": True, "matched": False}
 
     lead_id = lead.get("lead_id")
@@ -1412,9 +1443,17 @@ async def record_booking_by_email(email: str, body: BookingByEmailRequest):
         stage = "engaged"
         await db.leads.update_one(
             {"lead_id": lead_id},
-            {"$set": {"stage": "engaged", "updated_at": now.isoformat()}},
+            {"$set": {"stage": "engaged", "booked_call": True, "updated_at": now.isoformat()}},
+        )
+        # Kit 2026-11-19: booked_call activity = the permanent appointment/consult
+        # suppression key (see header §1) — booked AND met leads are never re-queued.
+        await _log_activity(
+            lead_id, BOOKED_CALL_ACTION,
+            f"Governance consultation booking recorded — slot {when or 'n/a'}, "
+            f"ref {booking_ref or 'n/a'}, source: {event_type} via booking callback "
+            f"(matched by {match_by or 'email'}; caller phone {cb_phone or 'n/a'})",
         )
 
     await _log_activity(lead_id, "system", content)
-
-    return {"success": True, "matched": True, "lead_id": lead_id, "stage": stage}
+    return {"success": True, "matched": True, "lead_id": lead_id, "stage": stage,
+            "match_by": match_by or "email"}
