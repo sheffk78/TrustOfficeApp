@@ -406,3 +406,184 @@ async def test_aged_poll_through_capped_queue_never_exceeds_ledger(
     ledger2 = await budget.find_one({})
     assert set(ledger2["lead_ids"]) == set(ledger["lead_ids"])
     await budget.delete_many({})
+
+
+# ===========================================================================
+# 2026-11-20 zero-dial regression: tier created_at date-vs-string mismatch
+# ---------------------------------------------------------------------------
+# Commits 635a15c filtered the tier=fresh / tier=aged lanes on created_at
+# against a bare ISO STRING. Production leads store created_at as a BSON
+# datetime, and MongoDB type ordering makes date-vs-string comparisons match
+# NOTHING, so both tier polls returned zero leads forever while the legacy
+# no-param /queue (no created_at filter) still showed the full pool. The
+# dispatcher kept ticking silently: zero claims, zero bland_call_log rows,
+# zero dials, no errors (dials stopped 2026-11-19 01:17 UTC once the tier
+# lane went live).
+#
+# Why the suite above missed it: the _lead() helper stores created_at as
+# now.isoformat() --- a STRING --- so every pre-existing test exercised only
+# the string-vs-string branch that always worked. The fix matches either
+# storage form via $or; these tests pin both the clause shape and an
+# end-to-end dispatch with a DATETIME-typed created_at lead.
+# ===========================================================================
+
+
+def _mtime(doc_value, comparator, op):
+    """Mongo type-ordered comparison for one field condition.
+
+    date~date and string~string compare normally; ANY cross-type comparison
+    (the bug shape: BSON datetime field vs ISO string comparator) matches
+    nothing, and a missing field matches neither $or branch.
+    """
+    if doc_value is None or op not in ("$gte", "$lt"):
+        return False
+    if isinstance(doc_value, datetime) and isinstance(comparator, datetime):
+        left = doc_value if doc_value.tzinfo else doc_value.replace(tzinfo=timezone.utc)
+        return left >= comparator if op == "$gte" else left < comparator
+    if isinstance(doc_value, str) and isinstance(comparator, str):
+        return doc_value >= comparator if op == "$gte" else doc_value < comparator
+    return False
+
+
+def _matches(doc, clause):
+    """Evaluate {'$or': [{'created_at': {op: val}}, ...]}."""
+    for branch in clause.get("$or", []):
+        for op, val in branch.get("created_at", {}).items():
+            if _mtime(doc.get("created_at"), val, op):
+                return True
+    return False
+
+
+@pytest.mark.asyncio
+async def test_tier_clauses_pin_datetime_and_string_comparisors(clean_db):
+    cutoff = datetime.now(timezone.utc).isoformat()
+    fresh = leads_service._created_at_gte_clause(cutoff)
+    aged = leads_service._created_at_lt_clause(cutoff)
+    fresh_vals = [b["created_at"]["$gte"] for b in fresh["$or"]]
+    aged_vals = [b["created_at"]["$lt"] for b in aged["$or"]]
+    for vals, op in ((fresh_vals, "$gte"), (aged_vals, "$lt")):
+        assert any(isinstance(v, datetime) and v.tzinfo for v in vals), op
+        assert any(isinstance(v, str) for v in vals), op
+
+
+@pytest.mark.asyncio
+async def test_old_string_clause_misses_datetime_doc_fix_matches(clean_db):
+    """THE regression, pinned: the pre-fix bare-string $gte clause is blind
+    to a BSON-datetime created_at; the fixed $or clause sees it."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=168)).isoformat()
+    doc_dt = {"created_at": datetime.now(timezone.utc) - timedelta(hours=24)}
+    doc_str = {"created_at": cutoff}
+    old_clause = {"created_at": {"$gte": cutoff}}  # pre-fix shape (635a15c)
+    assert not _mtime(doc_dt["created_at"], cutoff, "$gte"), (
+        "old string clause must MISS a datetime-typed created_at (the bug)"
+    )
+    assert _mtime(doc_str["created_at"], cutoff, "$gte")
+    fixed = leads_service._created_at_gte_clause(cutoff)
+    assert _matches(doc_dt, fixed)
+    assert _matches(doc_str, fixed)
+
+
+@pytest.mark.asyncio
+async def test_fresh_aged_partition_datetime_typed_leads(clean_db):
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(hours=168)).isoformat()
+    fresh = leads_service._created_at_gte_clause(cutoff)
+    aged = leads_service._created_at_lt_clause(cutoff)
+    new_lead = {"created_at": now - timedelta(hours=1)}     # hot inbound
+    old_lead = {"created_at": now - timedelta(hours=400)}   # drip lane
+    assert _matches(new_lead, fresh) and not _matches(new_lead, aged)
+    assert _matches(old_lead, aged) and not _matches(old_lead, fresh)
+    assert not _matches({}, fresh) and not _matches({}, aged)  # no widening
+
+
+@pytest.mark.asyncio
+async def test_fresh_poll_dispatches_datetime_created_at_lead(clean_db, reset_env, monkeypatch):
+    """End-to-end through the REAL tier queue: a lead whose created_at is
+    stored as a BSON datetime (production storage form) must be dispatched,
+    claimed and audit-logged by tier=fresh. Before the fix the tier query
+    match nothing and the poll returned zero leads (silent outage)."""
+    _enable(monkeypatch)
+    monkeypatch.setenv("BLAND_FRESH_ENABLED", "true")
+    monkeypatch.setattr(disp, "_HAS_TIER", True)
+
+    now = datetime.now(timezone.utc)
+    await db.leads.insert_one({
+        "lead_id": "DTC1",
+        "name": "Datetime Lead",
+        "email": "dtc1@example.com",
+        "phone": "5550001000",  # >= 10 digits -> dialable regex
+        "stage": "new",
+        "source": "unit-test",
+        "created_at": now - timedelta(hours=2),   # BSON datetime, NOT isoformat
+        "updated_at": (now - timedelta(hours=2)).isoformat(),
+        "notes": "",
+    })
+
+    caller = disp.BlandCaller(session=FakeSession([FakeResp(200)]))
+    summary = await disp.tick(caller)
+
+    assert summary["fresh_called"] == 1, "datetime-typed lead must be visible to tier=fresh"
+    assert len(caller.session.calls) == 1
+    assert caller.session.calls[0][1]["json"]["external_id"] == "DTC1"
+    doc = await db.leads.find_one({"lead_id": "DTC1"})
+    assert doc["claim"]["claimed_by"] == disp.CLAIMED_BY
+    logs = await db.bland_call_log.find().to_list(None)
+    assert len(logs) == 1 and logs[0]["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_aged_poll_dispatches_datetime_created_at_lead(clean_db, reset_env, monkeypatch):
+    """Same as above through the REAL capped aged queue: an old lead with a
+    BSON-datetime created_at must surface in tier=aged (pre-fix: aged_query
+    matched nothing -> aged dispatches stayed at zero)."""
+    _enable(monkeypatch)
+    monkeypatch.setenv("BLAND_AGED_ENABLED", "true")
+    monkeypatch.setattr(disp, "_HAS_TIER", True)
+    monkeypatch.setenv("BLAND_AGED_DAILY_CAP", "10")
+
+    now = datetime.now(timezone.utc)
+    await db.leads.insert_one({
+        "lead_id": "DTA1",
+        "name": "Old Datetime Lead",
+        "email": "dta1@example.com",
+        "phone": "5550001000",
+        "stage": "new",
+        "source": "unit-test",
+        "created_at": now - timedelta(hours=400),  # well outside fresh window
+        "updated_at": (now - timedelta(hours=400)).isoformat(),
+        "notes": "",
+    })
+    await db.bland_aged_budget.delete_many({})
+
+    summary = await disp._poll_aged(disp.BlandCaller(session=FakeSession([FakeResp(200)])))
+
+    assert summary["aged_called"] == 1, "datetime-typed lead must be visible to tier=aged"
+    budget = await db.bland_aged_budget.find_one({})
+    assert budget is not None and budget["lead_ids"] == ["DTA1"]
+
+
+@pytest.mark.asyncio
+async def test_call_window_boundary_and_dst_wall_time_math(reset_env):
+    """Pins the exonerated timezone suspect: window gates on Denver wall
+    time (zoneinfo-aware), start inclusive, end exclusive, DST-safe. The
+    caller must pass an already-Denver-converted datetime (as tick() does
+    via .astimezone(DENVER)); a raw datetime.timezone.utc-aware datetime
+    raises on naive/aware time comparison by design."""
+    f = disp._call_window_open
+    d = disp.DENVER
+
+    def denver(y, m, day, hh, mm):
+        return datetime(y, m, day, hh, mm, tzinfo=timezone.utc).astimezone(d)
+
+    assert f(denver(2026, 11, 20, 16, 0))   # 09:00 MST, window start inclusive
+    assert f(denver(2026, 11, 20, 16, 5))   # 09:05 MT
+    assert f(denver(2026, 11, 20, 22, 0))   # 15:00 MT, mid-window
+    assert f(denver(2026, 11, 21, 2, 29))   # 19:29 MST
+    assert not f(denver(2026, 11, 21, 2, 30))   # 19:30 MST, end exclusive
+    assert not f(denver(2026, 11, 20, 15, 59))  # 08:59 MST, before start
+    assert not f(denver(2026, 11, 20, 13, 0))   # 06:00 MST
+    # DST: 09:00 MT is 16:00 UTC in Nov (MST, UTC-7) but 15:00 UTC in Jul (MDT, UTC-6)
+    assert not f(denver(2026, 11, 20, 15, 59))
+    assert f(denver(2026, 7, 20, 15, 0))    # 09:00 MDT start
+    assert not f(denver(2026, 7, 20, 14, 59))
+    assert not f(denver(2026, 7, 21, 1, 30))    # 19:30 MDT end exclusive

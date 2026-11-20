@@ -776,6 +776,35 @@ def _queued_view(lead: dict, now_iso: str) -> dict:
     return view
 
 
+def _created_at_gte_clause(cutoff_iso: str) -> dict:
+    """Type-safe ``created_at >= cutoff`` for the tier lanes.
+
+    2026-11-20 zero-dial regression fix: 635a15c compared created_at against
+    a bare ISO STRING. Facebook/CRM lead capture stamps created_at as a BSON
+    datetime, and a date-vs-string $gte can never match in MongoDB (type
+    ordering), so tier=fresh polls returned zero leads forever while the
+    legacy no-param /queue (which has no created_at filter) still returned
+    the full pool. The dispatcher kept ticking silently: zero claims, zero
+    bland_call_log rows, zero dials, no errors. The clause matches either
+    storage form ($or), so mixed-type collections behave like before.
+    """
+    cutoff_dt = datetime.fromisoformat(cutoff_iso)
+    return {"$or": [
+        {"created_at": {"$gte": cutoff_dt}},
+        {"created_at": {"$gte": cutoff_iso}},
+    ]}
+
+
+def _created_at_lt_clause(cutoff_iso: str) -> dict:
+    """Type-safe ``created_at < cutoff`` for the tier lanes (see
+    _created_at_gte_clause for the 2026-11-20 regression it fixes)."""
+    cutoff_dt = datetime.fromisoformat(cutoff_iso)
+    return {"$or": [
+        {"created_at": {"$lt": cutoff_dt}},
+        {"created_at": {"$lt": cutoff_iso}},
+    ]}
+
+
 async def _fresh_tier_response(
     final_query: dict,
     meta: dict,
@@ -792,7 +821,7 @@ async def _fresh_tier_response(
     cutoff_iso = (
         datetime.now(timezone.utc) - timedelta(hours=_fresh_window_hours())
     ).isoformat()
-    window_query = {**final_query, "created_at": {"$gte": cutoff_iso}}
+    window_query = {**final_query, **_created_at_gte_clause(cutoff_iso)}
     total = await db.leads.count_documents(window_query)
     leads_out: List[dict] = []
     cursor = (
@@ -832,7 +861,7 @@ async def _aged_tier_response(
     cutoff_iso = (
         datetime.now(timezone.utc) - timedelta(hours=_fresh_window_hours())
     ).isoformat()
-    aged_query = {**final_query, "created_at": {"$lt": cutoff_iso}}
+    aged_query = {**final_query, **_created_at_lt_clause(cutoff_iso)}
     total = await db.leads.count_documents(aged_query)
     aged_docs = await db.leads.find(
         aged_query, {**LEAD_PROJECTION, "claim": 1}
