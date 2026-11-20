@@ -68,6 +68,21 @@ logger = logging.getLogger(__name__)
 # Service key header (constant-time compare against TRUSTOFFICE_LEADS_SERVICE_KEY).
 SERVICE_KEY_HEADER = APIKeyHeader(name="X-Service-Key", auto_error=False)
 
+
+def _constant_time_compare(a: str, b: str) -> bool:
+    """Constant-time comparison that safely handles non-ASCII input.
+
+    secrets.compare_digest raises TypeError when comparing strings that use
+    different character sets (ASCII vs non-ASCII). In that case they can never
+    be equal, so return False instead of crashing the auth middleware with a
+    500 (see err_521f967b9189 / fingerprint 1e90e65c...: 'comparing strings
+    with non-ASCII characters is not supported' on /api/service/people/counts).
+    """
+    try:
+        return secrets.compare_digest(a, b)
+    except TypeError:
+        return False
+
 # Projected lead fields returned to the OS card (never the Mongo _id).
 LEAD_PROJECTION = {
     "_id": 0,
@@ -388,7 +403,7 @@ async def require_leads_service(service_key: str = Depends(SERVICE_KEY_HEADER)) 
             status_code=401,
             detail="Missing service key. Send the key in the X-Service-Key header.",
         )
-    if not secrets.compare_digest(service_key, expected):
+    if not _constant_time_compare(service_key, expected):
         raise HTTPException(status_code=401, detail="Invalid service key")
     return service_key
 
