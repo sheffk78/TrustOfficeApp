@@ -1149,12 +1149,19 @@ async def _send_provision_email(
         # but retry when the earlier send failed (self-healing).
         prior_send = None
         try:
-            prior_send = await db.external_provisions.find_one(
-                {"email": email, "email_status": {"$in": ["sent", "delivered"]},
-                 "set_password_url": set_password_url, "user_id": {"$ne": None}},
-                {"_id": 0, "provision_id": 1},
-                sort=[("created_at", -1)],
-            )
+            # Dedupe on the shared live activation link, not the exact URL:
+            # the plan-suggestion params can differ per trust while the token
+            # (what the customer actually clicks) is identical.
+            import re as _re
+            _m = _re.search(r"token=([^&]+)", set_password_url or "")
+            _tok = _m.group(1) if _m else None
+            if _tok:
+                prior_send = await db.external_provisions.find_one(
+                    {"email": email, "email_status": {"$in": ["sent", "delivered"]},
+                     "set_password_url": {"$regex": _re.escape(_tok)}, "user_id": {"$ne": None}},
+                    {"_id": 0, "provision_id": 1},
+                    sort=[("created_at", -1)],
+                )
         except Exception as e:
             logger.warning(f"Provision: email dedupe lookup failed for {email}: {e}")
         if prior_send:
@@ -1260,10 +1267,18 @@ async def _fetch_and_store_irs_letter(
         return True
 
     # Download the PDF
+    # WingPoint's /external-admin/documents route requires its external-admin
+    # API key (Bearer). Without it the fetch 401s and the letter silently
+    # never lands (observed live 2026-11-23). Attach the key when configured.
     import httpx
+    import os as _os
+    _headers = {"User-Agent": "TrustOffice-Provision/1.0"}
+    _wp_doc_key = _os.environ.get("WINGPOINT_DOCUMENT_API_KEY", "")
+    if _wp_doc_key and "wingpointtrust.com" in (parsed.netloc or ""):
+        _headers["Authorization"] = f"Bearer {_wp_doc_key}"
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.get(str(ein_confirmation_url))
+            resp = await client.get(str(ein_confirmation_url), headers=_headers)
         resp.raise_for_status()
     except httpx.HTTPError as e:
         logger.warning(f"Failed to fetch IRS letter from {ein_confirmation_url}: {e}")
