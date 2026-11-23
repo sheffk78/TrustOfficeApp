@@ -1100,13 +1100,24 @@ def _stripe_sub_to_dict(stripe_sub):
         return None
     if isinstance(stripe_sub, dict):
         return stripe_sub
-    # Stripe SDK objects support __getitem__ via convert_to_dict internally,
-    # but repr is unreliable. Use _stripe_get helper style if available.
+    # Stripe SDK 9-16 exposes stripe.util; 17+ moved helpers to stripe._util and
+    # added to_dict() on resources. Use whatever works — never return the raw
+    # Stripe object because newer SDKs block .get() on it.
     try:
-        import stripe.util
-        return stripe.util.convert_to_dict(stripe_sub)
+        import stripe._util as _stripe_util
+        return _stripe_util.convert_to_dict(stripe_sub)
     except Exception:
-        return stripe_sub
+        pass
+    try:
+        import stripe.util as _stripe_util_legacy
+        return _stripe_util_legacy.convert_to_dict(stripe_sub)
+    except Exception:
+        pass
+    try:
+        return stripe_sub.to_dict()
+    except Exception:
+        pass
+    return stripe_sub
 
 
 def _first_item_price_unit_amount(stripe_sub) -> Optional[int]:
