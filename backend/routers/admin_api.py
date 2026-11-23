@@ -8,6 +8,7 @@ Audit: All actions logged to admin_api_audit collection
 Endpoints:
 - GET  /admin-api/stats/daily     - Daily statistics (new users, trials, purchases)
 - GET  /admin-api/stats/summary   - Overall summary statistics
+- GET  /admin-api/subscriptions/renewals - Subscription renewals / past-due / triage rows
 - GET  /admin-api/users           - List users with filters
 - GET  /admin-api/users/{user_id} - Get specific user details
 - POST /admin-api/users/{user_id}/extend-trial      - Extend trial period
@@ -1018,13 +1019,412 @@ async def fix_subscription(
     
     logger.info(f"API: Fixed subscription for {user['email']}: {list(update_fields.keys())}")
 
+
+
+# ==================== RENEWALS ENDPOINT ====================
+
+# Product label map (mirrors people_service.py + legacy; include wingpoint variants).
+# See RENEWALS-CARD-DESIGN.md for bucket/window/cancel rules.
+_RENEWAL_PRODUCT_LABELS = {
+    "trustee": "Trustee",
+    "estate": "Estate",
+    "advisor": "Advisor",
+    "wingpoint": "WingPoint",
+    "wingpoint_trustee": "WingPoint Trustee",
+    "monthly": "Trustee (Legacy)",
+    "annual": "Trustee (Legacy)",
+}
+
+
+async def _resolve_user_for_renewal(stripe_customer_id: str, stripe_subscription_id: str):
+    """Resolve a user doc from Stripe customer id, then subscription id fallback.
+
+    Returns (user_dict_or_none, subscription_dict_or_none).
+    """
+    if not stripe_customer_id and not stripe_subscription_id:
+        return None, None
+    if stripe_customer_id:
+        user = await db.users.find_one({"stripe_customer_id": stripe_customer_id}, {"_id": 0})
+        if user:
+            sub = await db.subscriptions.find_one({"user_id": user.get("user_id")}, {"_id": 0})
+            return user, sub
+    if stripe_subscription_id:
+        sub = await db.subscriptions.find_one({"stripe_subscription_id": stripe_subscription_id}, {"_id": 0})
+        if sub:
+            user = await db.users.find_one({"user_id": sub.get("user_id")}, {"_id": 0})
+            return user, sub
+    return None, None
+
+
+def _iso_or_none(value):
+    """Stripe timestamp (int) | datetime | ISO string | None -> ISO str | None."""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat()
+        except ValueError:
+            return value
+    return None
+
+
+def _days_until(target_iso: Optional[str], now: datetime) -> Optional[int]:
+    """Days from now to target; negative means overdue. None-safe."""
+    if not target_iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(target_iso.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (dt - now).days
+    except (ValueError, TypeError):
+        return None
+
+
+def _subscription_status_from_stripe(stripe_sub) -> str:
+    """Return normalized status string from Stripe subscription object/dict."""
+    if stripe_sub is None:
+        return "unknown"
+    if isinstance(stripe_sub, dict):
+        return stripe_sub.get("status", "unknown")
+    return getattr(stripe_sub, "status", "unknown") or "unknown"
+
+
+def _stripe_sub_to_dict(stripe_sub):
+    """Best-effort conversion of Stripe subscription object to plain dict."""
+    if stripe_sub is None:
+        return None
+    if isinstance(stripe_sub, dict):
+        return stripe_sub
+    # Stripe SDK objects support __getitem__ via convert_to_dict internally,
+    # but repr is unreliable. Use _stripe_get helper style if available.
+    try:
+        import stripe.util
+        return stripe.util.convert_to_dict(stripe_sub)
+    except Exception:
+        return stripe_sub
+
+
+def _first_item_price_unit_amount(stripe_sub) -> Optional[int]:
+    """Return the unit_amount cents from the first subscription item price."""
+    sub_dict = _stripe_sub_to_dict(stripe_sub) or {}
+    items = sub_dict.get("items") or getattr(stripe_sub, "items", None)
+    if not items:
+        return None
+    data = items.get("data", []) if isinstance(items, dict) else getattr(items, "data", [])
+    if not data:
+        return None
+    first = data[0]
+    price = first.get("price") if isinstance(first, dict) else getattr(first, "price", None)
+    if price is None:
+        return None
+    if isinstance(price, dict):
+        return price.get("unit_amount")
+    return getattr(price, "unit_amount", None)
+
+
+async def _recent_renewal_event(user_id: str, now: datetime):
+    """Look for a paid subscription_cycle transaction within the last 14 days.
+
+    Returns dict {event, event_at, amount_cents} or None.
+    """
+    if not user_id:
+        return None
+    cutoff = now - timedelta(days=14)
+    tx = await db.payment_transactions.find_one(
+        {
+            "user_id": user_id,
+            "payment_status": "paid",
+            "billing_reason": "subscription_cycle",
+        },
+        sort={"created_at": -1},
+        projection={"_id": 0, "created_at": 1, "amount": 1},
+    )
+    if not tx:
+        return None
+    created_at = _iso_or_none(tx.get("created_at"))
+    if not created_at:
+        return None
+    try:
+        created_dt = datetime.fromisoformat(created_at)
+        if created_dt.tzinfo is None:
+            created_dt = created_dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    if created_dt < cutoff:
+        return None
+    amount_dollars = tx.get("amount", 0) or 0
+    try:
+        amount_cents = int(round(float(amount_dollars) * 100))
+    except (TypeError, ValueError):
+        amount_cents = 0
     return {
-        "success": True,
-        "message": f"Subscription updated for {user.get('email')}",
+        "event": "renewed",
+        "event_at": created_at,
+        "amount_cents": amount_cents,
+    }
+
+
+async def _build_renewal_row(stripe_sub, now: datetime):
+    """Project a single Stripe subscription into a renewal row dict."""
+    sub_dict = _stripe_sub_to_dict(stripe_sub) or {}
+    customer_id = sub_dict.get("customer")
+    subscription_id = sub_dict.get("id")
+
+    # Resolve user via db.users stripe_customer_id, fallback db.subscriptions stripe_subscription_id
+    user, db_sub = await _resolve_user_for_renewal(customer_id, subscription_id)
+
+    status = _subscription_status_from_stripe(stripe_sub)
+    trial_end_ts = sub_dict.get("trial_end")
+    current_period_end_ts = sub_dict.get("current_period_end")
+    cancel_at_period_end = sub_dict.get("cancel_at_period_end", False)
+
+    if status == "trialing" and trial_end_ts:
+        due_iso = _iso_or_none(trial_end_ts)
+    else:
+        due_iso = _iso_or_none(current_period_end_ts)
+
+    days_until_due = _days_until(due_iso, now)
+
+    plan_type = None
+    billing_period = None
+    if db_sub:
+        plan_type = db_sub.get("plan_type")
+        billing_period = db_sub.get("billing_period")
+
+    # Derive from Stripe price metadata / nickname if DB missing
+    if not plan_type or not billing_period:
+        items = sub_dict.get("items", {}).get("data", [])
+        if items:
+            price = items[0].get("price", {})
+            price_id = price.get("id")
+            # Try reverse map from subscriptions router
+            try:
+                from routers.subscriptions import PRICE_ID_TO_PLAN
+            except Exception:
+                PRICE_ID_TO_PLAN = {}
+            mapped = PRICE_ID_TO_PLAN.get(price_id)
+            if mapped:
+                plan_type = plan_type or mapped[0]
+                billing_period = billing_period or mapped[1]
+            else:
+                nickname = (price.get("nickname") or "").lower()
+                if "annual" in nickname:
+                    billing_period = billing_period or "annual"
+                elif "month" in nickname:
+                    billing_period = billing_period or "monthly"
+            # product name fallback
+            product = price.get("product")
+            if isinstance(product, dict):
+                product_name = (product.get("name") or "").lower()
+            elif isinstance(product, str):
+                # Need product name; skip
+                product_name = ""
+            else:
+                product_name = ""
+            if product_name:
+                if "wingpoint" in product_name:
+                    if "trustee" in product_name:
+                        plan_type = plan_type or "wingpoint_trustee"
+                    else:
+                        plan_type = plan_type or "wingpoint"
+                elif "advisor" in product_name:
+                    plan_type = plan_type or "advisor"
+                elif "estate" in product_name:
+                    plan_type = plan_type or "estate"
+                elif "trustee" in product_name:
+                    plan_type = plan_type or "trustee"
+
+    if not plan_type and db_sub:
+        plan_type = db_sub.get("plan", db_sub.get("plan_type"))
+
+    plan_label = _RENEWAL_PRODUCT_LABELS.get(plan_type, plan_type)
+
+    # Resolve identity
+    user_id = user.get("user_id") if user else (db_sub.get("user_id") if db_sub else None)
+    name = user.get("name") if user else None
+    email = user.get("email") if user else None
+    unresolved = False
+    if not user:
+        unresolved = True
+        # Use Stripe customer email as identity fallback
+        customer = sub_dict.get("customer_details") or {}
+        if not customer:
+            # customer field might be expanded object
+            customer = sub_dict.get("customer")
+            if isinstance(customer, str):
+                customer = {}
+            elif customer is None:
+                customer = {}
+        email = customer.get("email") if isinstance(customer, dict) else getattr(customer, "email", None)
+        name = customer.get("name") if isinstance(customer, dict) else getattr(customer, "name", None)
+        if not name:
+            name = email or "Unknown"
+
+    # Last event: prefer recent renewal transaction, else derive from status/cancellation.
+    last_event = None
+    last_event_at = None
+    amount_cents = _first_item_price_unit_amount(stripe_sub)
+
+    renewal_event = await _recent_renewal_event(user_id, now) if user_id else None
+    if renewal_event:
+        last_event = renewal_event["event"]
+        last_event_at = renewal_event["event_at"]
+        amount_cents = renewal_event["amount_cents"] if renewal_event["amount_cents"] else amount_cents
+    elif cancel_at_period_end:
+        last_event = "cancel_at_period_end"
+        # event_at is when cancellation was scheduled (status update time is close enough)
+        last_event_at = _iso_or_none(sub_dict.get("canceled_at") or current_period_end_ts)
+    elif status == "past_due":
+        last_event = "past_due"
+        last_event_at = _iso_or_none(sub_dict.get("status_updated_at") or current_period_end_ts)
+    elif status == "trialing":
+        last_event = "trials_soon"
+        last_event_at = due_iso
+    elif status == "active":
+        last_event = "renews_soon"
+        last_event_at = due_iso
+
+    return {
         "user_id": user_id,
-        "email": user.get("email"),
-        "updated_fields": list(body.dict(exclude_none=True).keys()),
-        "subscription": updated_subscription
+        "name": name,
+        "email": email,
+        "plan_type": plan_type,
+        "plan_label": plan_label,
+        "billing_period": billing_period,
+        "status": status,
+        "current_period_end": _iso_or_none(current_period_end_ts),
+        "cancel_at_period_end": bool(cancel_at_period_end),
+        "days_until_due": days_until_due,
+        "last_event": last_event,
+        "last_event_at": last_event_at,
+        "amount_cents": amount_cents,
+        "unresolved": unresolved,
+    }
+
+
+async def _list_renewal_rows(now: datetime):
+    """Core projection + bucket logic for the renewals card.
+
+    Returns (rows, beyond_window_count, error_string_or_none).
+    """
+    rows = []
+    beyond_window_count = 0
+    try:
+        stripe_subs = stripe.Subscription.list(
+            limit=100,
+            expand=["data.customer"],
+        )
+    except Exception as exc:
+        logger.error("Stripe Subscription.list failed for renewals endpoint: %s", exc)
+        return [], 0, f"stripe error: {exc}"
+
+    window_end = now + timedelta(days=14)
+
+    for stripe_sub in stripe_subs.auto_paging_iter():
+        row = await _build_renewal_row(stripe_sub, now)
+
+        plan_type = row.get("plan_type") or ""
+        status = row.get("status") or ""
+        lower_plan = plan_type.lower()
+        # Exclusion: free / forever_free / gifted / legacy? Contract says legacy excluded,
+        # but people_service legacy means old monthly/annual price keys; here we exclude
+        # explicit free/forever_free/gifted. Legacy paid plans ARE renewal-relevant.
+        if lower_plan in ("free", "forever_free", "none"):
+            continue
+        if status == "canceled":
+            continue
+
+        # Check db gifted flag if we can
+        if row.get("user_id"):
+            db_sub = await db.subscriptions.find_one(
+                {"user_id": row["user_id"]},
+                {"_id": 0, "gifted": 1}
+            )
+            if db_sub and db_sub.get("gifted"):
+                continue
+
+        due_iso = row.get("current_period_end")
+        if status == "trialing":
+            # trialing rows key on trial_end_date (already set into current_period_end field)
+            due_iso = row.get("current_period_end")
+        if not due_iso and status not in ("past_due",):
+            continue
+
+        try:
+            due_dt = datetime.fromisoformat(due_iso.replace("Z", "+00:00")) if due_iso else None
+        except (ValueError, AttributeError):
+            due_dt = None
+
+        include = False
+        if status == "past_due":
+            include = True  # always include regardless of window
+        elif row.get("cancel_at_period_end"):
+            # include ONLY if period_end within window
+            if due_dt and now <= due_dt <= window_end:
+                include = True
+        elif due_dt and now <= due_dt <= window_end:
+            include = True
+
+        # Renewed rows from payment_transactions within last 14 days are included
+        # as rows regardless of period_end. _build_renewal_row already sets last_event='renewed'.
+        if row.get("last_event") == "renewed":
+            include = True
+
+        if include:
+            rows.append(row)
+        else:
+            # paid-active subs whose period_end > +14d count as beyond_window
+            if status == "active" and not row.get("cancel_at_period_end"):
+                beyond_window_count += 1
+
+    # Sort: past_due first (most overdue), then active/trialing by due date, then renewed recent first
+    def sort_key(r):
+        status = r.get("status") or ""
+        last_event = r.get("last_event") or ""
+        days = r.get("days_until_due")
+        if days is None:
+            days = 9999
+        # past_due first
+        group = 0 if status == "past_due" else (1 if last_event == "renewed" else 2)
+        return (group, days if status == "past_due" else -days if last_event == "renewed" else days)
+
+    rows.sort(key=sort_key)
+    return rows, beyond_window_count, None
+
+
+@router.get("/subscriptions/renewals")
+async def get_subscriptions_renewals(
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    """Return subscription renewal/past-due triage rows for the admin overview card.
+
+    See RENEWALS-CARD-DESIGN.md for data contract, bucket semantics and freshness.
+    """
+    now = datetime.now(timezone.utc)
+    rows, beyond_window_count, error = await _list_renewal_rows(now)
+
+    await log_api_action(
+        action="get_subscriptions_renewals",
+        details={
+            "row_count": len(rows),
+            "beyond_window_count": beyond_window_count,
+            "error": error,
+        },
+        ip_address=get_client_ip(request),
+    )
+
+    return {
+        "as_of": now.isoformat(),
+        "source": "stripe",
+        "rows": rows,
+        "beyond_window_count": beyond_window_count,
+        "error": error,
     }
 
 

@@ -1596,6 +1596,23 @@ async def _webhook_customer_subscription_deleted(event) -> None:
     
 
 
+def _iso_or_none(value):
+    """Stripe timestamp (int) | datetime | ISO string | None -> ISO str | None."""
+    from datetime import datetime, timezone
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat()
+        except ValueError:
+            return value
+    return None
+
+
 async def _webhook_invoice_paid(event) -> None:
     """Handle Stripe webhook event: invoice.paid."""
     invoice = event.data.object
@@ -1609,13 +1626,27 @@ async def _webhook_invoice_paid(event) -> None:
     if not user:
         return {"status": "ok", "message": "User not found"}
 
-    # Ensure subscription is active
+    # Ensure subscription is active and persist the freshly retrieved period end.
+    # This one-line fix is required by RENEWALS-CARD-DESIGN.md so Mongo
+    # current_period_end stays synchronized with Stripe renewal payments.
+    # See TrustOfficeApp/docs/RENEWALS-CARD-DESIGN.md § "Verified ground truth".
+    current_period_end_from_stripe = None
+    try:
+        stripe_sub = stripe.Subscription.retrieve(_stripe_get(invoice, "subscription"))
+        current_period_end_from_stripe = _iso_or_none(stripe_sub.current_period_end)
+    except Exception as e:
+        logger.error(f"Failed to retrieve subscription for period_end update: {e}")
+
+    update_fields = {
+        "status": "active",
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    if current_period_end_from_stripe:
+        update_fields["current_period_end"] = current_period_end_from_stripe
+
     await db.subscriptions.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {
-            "status": "active",
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"$set": update_fields}
     )
 
     # Record renewal payment transaction (BUG FIX: renewals were never logged, causing revenue undercount)
@@ -1649,8 +1680,7 @@ async def _webhook_invoice_paid(event) -> None:
     # Send renewal email
     if email_service.is_configured and billing_reason == "subscription_cycle":
         try:
-            # Get next billing date from subscription
-            stripe_sub = stripe.Subscription.retrieve(_stripe_get(invoice, "subscription"))
+            # Reuse already-fetched subscription for next billing date
             next_billing = format_date(stripe_sub.current_period_end)
             amount = format_amount(_stripe_get(invoice, "amount_paid", 0))
             plan_type = sub.get("plan_type", "monthly")

@@ -156,6 +156,8 @@ NON_DATA_ROUTERS = {
     # leads via routers/leads_service._apply_call_outcome.
     "internal_agent",
     "bland_webhook",
+    "bland_dispatcher",   # internal job dispatcher; no user-data endpoints
+    "service_errors",     # service error log sink; read-only aggregate, no object IDs
     # WingPoint Connect Flow v2 (2026-10-22): pre-authentication connect
     # surface. These endpoints run BEFORE a session exists (that is the point
     # — the member is mid-handoff from WingPoint), so the unauthenticated
