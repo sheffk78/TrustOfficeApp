@@ -166,13 +166,19 @@ PLAN_DISPLAY_NAMES = {
 def _resolve_suggested_plan(
     source_package: Optional[str], trust_count: int,
     plan_type: str, sub_state,
+    plan_tier: Optional[str] = None,
 ) -> str:
-    """Determine the recommended TrustOffice plan based on package, trust count, and current plan."""
-    suggested_plan = PACKAGE_TO_PLAN.get(source_package)
-    if not suggested_plan:
-        suggested_plan = _fallback_plan_by_trust_count(trust_count)
+    """Determine the recommended TrustOffice plan based on package, trust count, current plan, and explicit WP tier."""
+    # Prefer an explicit tier sent by WingPoint when the customer has already
+    # selected or paid for a specific TrustOffice tier on the WP side.
+    if plan_tier:
+        suggested_plan = plan_tier
     else:
-        suggested_plan = _adjust_plan_for_trust_count(suggested_plan, trust_count)
+        suggested_plan = PACKAGE_TO_PLAN.get(source_package) if source_package else None
+        if not suggested_plan:
+            suggested_plan = _fallback_plan_by_trust_count(trust_count)
+        else:
+            suggested_plan = _adjust_plan_for_trust_count(suggested_plan, trust_count)
 
     # Prevent recommending a downgrade for legacy plan users (legacy limit = 10)
     current_limit = get_trust_limit(plan_type, sub_state.legacy_trust_limit)
@@ -268,6 +274,7 @@ async def _determine_recommended_action(
     source_package: Optional[str],
     coupon_code: Optional[str],
     frontend_url: str,
+    plan_tier: Optional[str] = None,
 ) -> dict:
     """
     Determine the recommended action for a provisioned user based on their
@@ -290,7 +297,7 @@ async def _determine_recommended_action(
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 1})
     has_password = bool(user is not None and user.get("password_hash") is not None)
 
-    suggested_plan = _resolve_suggested_plan(source_package, trust_count, plan_type, sub_state)
+    suggested_plan = _resolve_suggested_plan(source_package, trust_count, plan_type, sub_state, plan_tier=plan_tier)
 
     current_limit = get_trust_limit(plan_type, sub_state.legacy_trust_limit)
     needs_upgrade = trust_count > current_limit if current_limit != float('inf') else False
@@ -490,6 +497,13 @@ class WingPointProvisionRequest(BaseModel):
     # Metadata
     wingpoint_ref: str = Field(..., description="Unique WingPoint reference (used as idempotency key)")
     source_package: Optional[Literal["single_trust", "estate_bundle", "builder_bundle"]] = None
+    # WingPoint can override the TrustOffice plan tier directly when the customer
+    # already paid for a specific tier on the WP side (e.g. annual governance).
+    plan_tier: Optional[Literal[
+        "trustee", "wingpoint_trustee", "estate", "advisor", "wingpoint", "free", "forever_free"
+    ]] = Field(None, description="TrustOffice tier selected/paid for on WingPoint")
+    # True when WingPoint is collecting governance payment on TrustOffice's behalf.
+    governance_financed: bool = Field(False, description="WingPoint is financing the governance subscription")
     coupon_code: Optional[str] = Field(None, pattern=r'^[A-Za-z0-9_-]+$', max_length=50)
 
     # Control flags
@@ -623,6 +637,7 @@ async def _handle_idempotent_replay(existing_provision: dict) -> dict:
             is_new_user=False,
             source_package=existing_provision.get("request_payload", {}).get("source_package"),
             coupon_code=existing_provision.get("request_payload", {}).get("coupon_code"),
+            plan_tier=(existing_provision.get("request_payload", {}) or {}).get("plan_tier"),
             frontend_url=_replay_frontend_url,
         )
     except Exception as e:
@@ -1122,6 +1137,7 @@ async def _build_race_complete_response(existing: dict) -> dict:
             is_new_user=False,
             source_package=existing.get("request_payload", {}).get("source_package"),
             coupon_code=existing.get("request_payload", {}).get("coupon_code"),
+            plan_tier=(existing.get("request_payload", {}) or {}).get("plan_tier"),
             frontend_url=_race_frontend_url,
         )
     except Exception:
@@ -1366,13 +1382,17 @@ async def provision_trustoffice(
     # Use wingpoint_ref as idempotency key if header not provided
     idem_key = idempotency_key or request.wingpoint_ref
 
+    # ---- DRY RUN ----
+    if request.dry_run:
+        return await _handle_dry_run(request)
+
     # ---- IDEMPOTENCY CHECK ----
     existing_provision = await db.external_provisions.find_one(
         {"idem_key": idem_key},
         {"_id": 0}
     )
 
-    if existing_provision and not request.dry_run:
+    if existing_provision:
         if request.resend:
             return await _resend_activation(existing_provision, partner)
 
@@ -1389,10 +1409,6 @@ async def provision_trustoffice(
             )
 
         return await _handle_idempotent_replay(existing_provision)
-
-    # ---- DRY RUN ----
-    if request.dry_run:
-        return await _handle_dry_run(request)
 
     # ---- MAP WINGPOINT DATA TO TRUSTOFFICE ----
     to_trust_type = WINGPOINT_TRUST_TYPE_MAP.get(request.trust_type, "family")
@@ -1465,6 +1481,7 @@ async def provision_trustoffice(
             is_new_user=is_new_user,
             source_package=request.source_package,
             coupon_code=request.coupon_code,
+            plan_tier=request.plan_tier,
             frontend_url=frontend_url,
         )
     except Exception as e:
