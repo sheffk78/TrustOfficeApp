@@ -902,6 +902,37 @@ async def _generate_set_password_token(user_id: str, now: datetime) -> tuple[str
     return set_password_token, expires_at
 
 
+async def _reuse_or_generate_set_password_token(user_id: str, now: datetime) -> tuple[str, datetime]:
+    """Reuse an unexpired set-password token; mint one only if none exists.
+
+    A customer may have several trusts provisioned before they ever activate
+    (e.g. an Estate Bundle: 3 apps finalized in one sitting). Minting a fresh
+    token per trust invalidates the link in the email they already have
+    (password_resets keeps one doc per user), so earlier welcome emails point
+    at dead tokens. Reusing the live token keeps every sent link valid; a new
+    token (and thus a fresh email) is only minted when no live token exists.
+    """
+    if user_id:
+        prior = await db.password_resets.find_one(
+            {"user_id": user_id, "purpose": "set_password"},
+            {"_id": 0, "token": 1, "expires_at": 1},
+        )
+        if prior and prior.get("token"):
+            try:
+                # Normalize legacy formats: 3.9-era fromisoformat rejects "Z",
+                # and naive datetimes compare invalidly against aware `now`.
+                prior_exp = datetime.fromisoformat(
+                    str(prior["expires_at"]).replace("Z", "+00:00")
+                )
+                if prior_exp.tzinfo is None:
+                    prior_exp = prior_exp.replace(tzinfo=timezone.utc)
+                if prior_exp > now:
+                    return prior["token"], prior_exp
+            except (ValueError, TypeError):
+                pass  # unparsable expiry — fall through and mint fresh
+    return await _generate_set_password_token(user_id, now)
+
+
 def _build_entity_doc(
     trust_id: str, user_id: str, trust_name: str,
     trust_formation_date: Optional[str], jurisdiction: str,
@@ -1112,6 +1143,25 @@ async def _send_provision_email(
     Returns (email_result, email_status).
     """
     if recommended["action"] == "set_password":
+        # Dedupe: multi-trust provisioning reuses one live token, so every
+        # trust would mail the same activation link. Send ONCE per link —
+        # skip when an earlier provision already delivered this exact URL,
+        # but retry when the earlier send failed (self-healing).
+        prior_send = None
+        try:
+            prior_send = await db.external_provisions.find_one(
+                {"email": email, "email_status": {"$in": ["sent", "delivered"]},
+                 "set_password_url": set_password_url, "user_id": {"$ne": None}},
+                {"_id": 0, "provision_id": 1},
+                sort=[("created_at", -1)],
+            )
+        except Exception as e:
+            logger.warning(f"Provision: email dedupe lookup failed for {email}: {e}")
+        if prior_send:
+            email_result = {"status": "skipped", "reason": "activation_email_already_sent_same_link"}
+            email_status = "skipped"
+            logger.info(f"Provision: Skipping duplicate activation email for {email} (same live link already sent)")
+            return email_result, email_status
         first_name = _resolve_first_name(
             grantor_first_name=request.grantor_first_name,
             grantor_full_name=request.grantor_full_name,
@@ -1374,7 +1424,9 @@ async def provision_trustoffice(
         logger.warning(f"Provision: IRS letter auto-fetch failed for {email}: {e}")
 
     # ---- GENERATE SET-PASSWORD TOKEN (7-day expiry) ----
-    set_password_token, expires_at = await _generate_set_password_token(user_id, now)
+    # Reuses the customer's live token when they haven't activated yet, so
+    # multi-trust provisioning never invalidates an already-sent email link.
+    set_password_token, expires_at = await _reuse_or_generate_set_password_token(user_id, now)
 
     frontend_url = os.environ.get('FRONTEND_URL', 'https://app.trustoffice.app')
     _prelim_plan = await _resolve_provision_plan(request.source_package, user_id)
