@@ -1633,7 +1633,20 @@ async def _webhook_invoice_paid(event) -> None:
     current_period_end_from_stripe = None
     try:
         stripe_sub = stripe.Subscription.retrieve(_stripe_get(invoice, "subscription"))
-        current_period_end_from_stripe = _iso_or_none(stripe_sub.current_period_end)
+        cpe_ts = None
+        try:
+            cpe_ts = stripe_sub.current_period_end
+        except Exception:
+            # Newer Stripe API versions: period fields live on subscription items.
+            try:
+                items = stripe_sub.items.data if hasattr(stripe_sub, "items") else []
+                for item in items:
+                    if getattr(item, "current_period_end", None):
+                        cpe_ts = item.current_period_end
+                        break
+            except Exception:
+                cpe_ts = None
+        current_period_end_from_stripe = _iso_or_none(cpe_ts)
     except Exception as e:
         logger.error(f"Failed to retrieve subscription for period_end update: {e}")
 

@@ -1180,6 +1180,18 @@ async def _recent_renewal_event(user_id: str, now: datetime):
     }
 
 
+def _resolve_period_end_ts(sub_dict):
+    """Period end from top-level if present; newer Stripe API versions (2025-03-31+)
+    moved current_period_start/end to the subscription ITEM level. Fall back to items."""
+    cpe = sub_dict.get("current_period_end")
+    if cpe:
+        return cpe
+    for item in (sub_dict.get("items", {}) or {}).get("data", []) or []:
+        if item.get("current_period_end"):
+            return item["current_period_end"]
+    return None
+
+
 async def _build_renewal_row(stripe_sub, now: datetime):
     """Project a single Stripe subscription into a renewal row dict."""
     sub_dict = _stripe_sub_to_dict(stripe_sub) or {}
@@ -1191,7 +1203,7 @@ async def _build_renewal_row(stripe_sub, now: datetime):
 
     status = _subscription_status_from_stripe(stripe_sub)
     trial_end_ts = sub_dict.get("trial_end")
-    current_period_end_ts = sub_dict.get("current_period_end")
+    current_period_end_ts = _resolve_period_end_ts(sub_dict)
     cancel_at_period_end = sub_dict.get("cancel_at_period_end", False)
 
     if status == "trialing" and trial_end_ts:
