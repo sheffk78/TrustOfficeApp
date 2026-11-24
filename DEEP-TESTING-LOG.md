@@ -531,3 +531,10 @@ Commit `725bc37` pushed. Build succeeded. Railway auto-deploying.
 - Total issues found: 298
 - Total fixed: 288
 - Total backlogged: 88
+## Feature #2: WingPoint connect email prefill
+**Date:** 2026-11-24  
+**What was found:** The WingPoint admin template now passes the member's known email as `?email=` on the login URL, but LoginPage.js dropped it on two hops: (1) the post-redirect guard for already-logged-in users navigating `login?action=subscribe` to `/pricing`, and (2) the Create Account link builder to `/signup`. SignUpPage.js already read `?email=`, but because the link omitted it the prefill never reached PricingPage. The post-login `completeLogin` path also rebuilt the same pricing params without `email`.
+
+**What was fixed:** Added `email` forwarding at all three points in `frontend/src/pages/LoginPage.js`: post-redirect guard (subscribe→pricing), Create Account link (login→signup), and `completeLogin` post-login subscribe routing. Also added `plan` to the Create Account link so the WingPoint plan survives that hop. Added `frontend/src/pages/LoginPage.connect.test.js` covering all three carriage cases plus absence of the param.
+
+**Evidence:** Full frontend suite passed: 44 test suites, 384 tests passed. Production build passed (lint clean, compiled successfully). Branch `kit/connect-email-forward-20261124` committed and pushed; no merge, no deploy.

@@ -117,6 +117,9 @@ export default function LoginPage() {
         if (coupon) params.set('coupon', coupon);
         if (plan) params.set('plan', plan);
         if (wpRef) params.set('wp_ref', wpRef);
+        // Forward the WingPoint-known email so pricing prefill survives this hop (2026-11-24).
+        const email = searchParams.get('email');
+        if (email) params.set('email', email);
         navigate(`/pricing?${params.toString()}`, { replace: true });
       } else if (action === 'upgrade') {
         const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
@@ -178,6 +181,9 @@ export default function LoginPage() {
         if (coupon) params.set('coupon', coupon);
         if (plan) params.set('plan', plan);
         if (wpRef) params.set('wp_ref', wpRef);
+        // Forward the WingPoint-known email so pricing prefill survives this hop (2026-11-24).
+        const email = searchParams.get('email');
+        if (email) params.set('email', email);
         navigate(`/pricing?${params.toString()}`, { replace: true });
       } else if (action === 'upgrade') {
         const params = new URLSearchParams({ wp: '1', action: 'upgrade' });
@@ -592,6 +598,7 @@ export default function LoginPage() {
                     const trustName = searchParams.get('trust_name');
                     const plan = searchParams.get('plan');
                     const coupon = searchParams.get('coupon');
+                    const email = searchParams.get('email');
                     const isWingPoint = wpRef || plan === 'wingpoint';
                     if (isWingPoint) {
                       const params = new URLSearchParams();
@@ -599,6 +606,9 @@ export default function LoginPage() {
                       if (wpRef) params.set('wp_ref', wpRef);
                       if (trustName) params.set('trust_name', trustName);
                       if (coupon) params.set('coupon', coupon);
+                      if (plan) params.set('plan', plan);
+                      // Forward the WP-known email so the signup/pricing flow can prefill checkout (2026-11-24).
+                      if (email) params.set('email', email);
                       return `/signup?${params.toString()}`;
                     }
                     return '/signup';
