@@ -68,6 +68,11 @@ async def verify_external_api_key(request: Request, authorization: str = Header(
     valid_keys = [k for k in [EXTERNAL_API_KEY, os.environ.get("TRUSTOFFICE_EXTERNAL_API_KEY", "")] if k]
     for valid_key in valid_keys:
         if hmac.compare_digest(key, valid_key):
+            # 2026-11-24: record verified-auth on request.state so downstream
+            # middleware (http_4xx_capture) can trust probe self-identification
+            # headers. Set on every success path (env + DB partner keys).
+            request.state.external_api_key_verified = True
+            request.state.external_partner_id = "wingpoint"
             return {
                 "partner_id": "wingpoint",
                 "partner_name": "WingPoint",
@@ -86,6 +91,8 @@ async def verify_external_api_key(request: Request, authorization: str = Header(
             detail="Invalid or inactive API key"
         )
 
+    request.state.external_api_key_verified = True
+    request.state.external_partner_id = partner.get("partner_id") or partner.get("partner_name") or "unknown"
     return {
         "partner_id": partner["partner_id"],
         "partner_name": partner.get("partner_name", partner["partner_id"]),

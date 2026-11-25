@@ -206,6 +206,19 @@ async def _capture(
             # fresh trust per run. Store for forensics; never queue.
             noise_class = "test_suite"
 
+        # 2026-11-24: sanctioned integration probes (wp-to-connect-test.py and
+        # future partner-probe harnesses) self-identify with a marker header
+        # on their EXPECTED-rejection checks (e.g. deliberate invalid
+        # plan_tier → 422). An expected 422 is a green probe result, not an
+        # error — store for forensics, never page. The header is only trusted
+        # alongside the external API key (verified auth), so third parties
+        # can't cloak their 4xx storms by setting it.
+        if noise_class is None and getattr(request.state, "external_api_key_verified", False):
+            probe_tag = request.headers.get("X-Kit-Probe") or ""
+            if probe_tag.strip().lower() == "expected-422":
+                noise_class = "probe"
+
+
         await report_error(
             source="server",
             error_type=error_type,

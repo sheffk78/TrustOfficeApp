@@ -23,7 +23,7 @@ from http import HTTPStatus
 from types import SimpleNamespace
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
@@ -50,6 +50,15 @@ async def get_item(item_id: str):
     raise HTTPException(status_code=404, detail="Item not found")
 
 
+@app.post("/probe-sim")
+async def probe_sim(request: Request, body: Body):
+    # Simulate the external API-key dependency's success path: a verified
+    # partner request records auth state before any later rejection.
+    request.state.external_api_key_verified = True
+    request.state.external_partner_id = "testpartner"
+    raise HTTPException(status_code=422, detail="plan_tier: Input should be 'trustee'")
+
+
 @app.get("/session")
 async def session_probe():
     raise HTTPException(status_code=401, detail="Not authenticated")
@@ -70,6 +79,8 @@ def _fake_error_logs(monkeypatch):
 
     async def fake_report_error(**kwargs):
         calls.append(kwargs)
+        import http_4xx_capture as mod
+        mod._latest_report_call = kwargs
         return {"alerted": False, "duplicate": False, "fingerprint": "x"}
 
     import http_4xx_capture as mod
@@ -94,6 +105,43 @@ def test_401_and_402_are_noise():
     assert _is_noise(401, "Not authenticated", "/api/x") is True
     assert _is_noise(402, "Payment required", "/api/x") is True
     assert _is_noise(404, "Item not found", "/api/x") is False
+
+
+def test_probe_marker_gets_noise_class_and_untagged_stays_real():
+    """2026-11-24: sanctioned probes self-identify with X-Kit-Probe: expected-422.
+
+    With verified external auth the marker → noise_class "probe" (stored,
+    never alerted). The untagged drift-shaped 422 on a non-probe route stays
+    real — that's WingPoint live traffic hitting the same drift shape.
+    """
+    # Tagged + verified: classified as probe.
+    r = client.post(
+        "/probe-sim",
+        json={"template_type": "spending_authorization"},
+        headers={"X-Kit-Probe": "expected-422"},
+    )
+    assert r.status_code == 422
+    probe_call = _fake_error_logs_latest()
+    assert probe_call is not None
+    assert probe_call["extra_context"]["noise_class"] == "probe"
+
+    # Same route, NO marker header: stays a real error (noise_class None).
+    r2 = client.post("/probe-sim", json={"template_type": "spending_authorization"})
+    assert r2.status_code == 422
+    real_call = _fake_error_logs_latest()
+    assert real_call["extra_context"]["noise_class"] is None
+
+
+def _fake_error_logs_latest():
+    """Read the most recent fake report_error call captured by the fixture."""
+    # The autouse fixture returns a list object; re-derive it from the module
+    # by calling through the TestClient's dependency — simplest robust path
+    # is that the fixture's list is shared via closure, so reach it through
+    # the registered fake: http_4xx_capture.report_error was monkeypatched.
+    import http_4xx_capture as mod
+    # The fixture appended into its own local list; expose last call via the
+    # monkeypatched function's closure using the module attribute set below.
+    return mod._latest_report_call
 
 
 def test_enum_drift_message_flags_alert():
