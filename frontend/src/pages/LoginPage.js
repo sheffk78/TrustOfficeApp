@@ -279,8 +279,11 @@ export default function LoginPage() {
       }
       setLoginError(friendlyMsg);
       toast.error(friendlyMsg);
-      // Report login errors to backend (except invalid credentials -- too noisy)
-      if (!rawMsg.includes('401') && !rawMsg.toLowerCase().includes('invalid credentials')) {
+      // Expected checkout-first/no-password flow returned by auth.py passwordless hint;
+      // this fingerprint has paged repeatedly on prior days.
+      const isExpectedAuthFlow = rawMsg.includes('no password is set yet') || /forgot password/i.test(rawMsg);
+      // Report login errors to backend (except invalid credentials / expected flow)
+      if (!rawMsg.includes('401') && !rawMsg.toLowerCase().includes('invalid credentials') && !isExpectedAuthFlow) {
         reportErrorToBackend(error, { operation: 'login', page: 'Login' });
       }
     } finally {
