@@ -161,6 +161,48 @@ def _is_local_dev_traceback(stack_trace: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Transient Mongo connection-blip suppression (2026-11-26)
+# ---------------------------------------------------------------------------
+# Background/integration call sites report Mongo connection errors directly
+# (empty stack trace, empty URL, no user_id). A transient blip self-heals in
+# seconds, but the alert fires AFTER recovery — pure alert noise. The alert
+# pipeline itself is correct; this gate suppresses the page ONLY when a live
+# ping at report time proves Mongo is actually reachable (blip already healed).
+# If the ping FAILS the alert fires unchanged — dedupe already prevents storms.
+
+_CONN_FAIL_TYPES = (
+    "ConnectionError",
+    "ServerSelectionTimeoutError",
+    "AutoReconnect",
+    "ConnectionFailure",
+)
+
+
+def _is_mongo_connection_alert(error_type: str, error_message: str) -> bool:
+    """True if this is a Mongo connection failure (as opposed to some other
+    ConnectionError, e.g. an upstream HTTP connection)."""
+    if error_type not in _CONN_FAIL_TYPES:
+        return False
+    # "ConnectionError" is generic — require a Mongo provenance marker in the
+    # message. The other three types are pymongo-specific and unambiguous.
+    if error_type == "ConnectionError":
+        return "mongo" in (error_message or "").lower()
+    return True
+
+
+async def _mongo_live_ping() -> bool:
+    """Probe Mongo reachability with a 3s-bounded ping. False on any failure —
+    never raise, never block the report path for long."""
+    try:
+        import asyncio
+
+        await asyncio.wait_for(db.command("ping"), timeout=3.0)
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Knowledge-context redaction (WingPoint isolation, 2026-10-30)
 # ---------------------------------------------------------------------------
 # Error paths (error_logs documents, Discord embeds, Hermes webhook payloads)
@@ -491,7 +533,7 @@ async def report_error(
             "source": source,
             "fingerprint": fp,
             "operation": _ctx.get("operation"),
-            "severity": severity or ("info" if is_info else None),
+            "severity": ("info" if is_info else severity),
             **{k: v for k, v in _ctx.items() if k not in ("location", "user_agent", "operation", "severity")},
         },
         # Auto-resolve the benign BaseHTTPMiddleware client-disconnect class
@@ -594,6 +636,26 @@ async def report_error(
             "duplicate": False,
             "fingerprint": fp,
             "local_dev_traceback": True,
+        }
+
+    # Suppress server-source Mongo connection alerts when a live ping proves
+    # Mongo is actually reachable at report time (transient blip already
+    # self-healed). Stored in error_logs for forensics; never pages Discord.
+    # If the ping FAILS (real outage) the alert fires unchanged below.
+    if (
+        source == "server"
+        and _is_mongo_connection_alert(error_type, error_message)
+        and await _mongo_live_ping()
+    ):
+        logger.info(
+            f"Suppressed transient Mongo connection alert (fingerprint={fp[:8]}) "
+            "— live ping OK at report time; stored in error_logs"
+        )
+        return {
+            "alerted": False,
+            "duplicate": False,
+            "fingerprint": fp,
+            "transient_mongo_blip": True,
         }
 
     # Trigger Hermes autonomous agent for real errors (no Discord ping needed)
