@@ -431,10 +431,20 @@ async def report_error(
         and error_type == "RuntimeError"
         and "No response returned." in error_message
     )
+    # Expected user flow: routers/auth.py deliberately returns a 401 hint
+    # telling a checkout-first passwordless account to use Forgot password
+    # (link in welcome email); it is stored in error_logs but must never page
+    # Discord.
+    _LOGIN_PW_HINT = (
+        source == "frontend"
+        and error_type == "login"
+        and "no password is set yet" in error_message.lower()
+    )
     is_info = (
         (severity or "").lower() == "info"
         or (_BENIGN and source == "frontend")
         or _BASE_MW_DISCONNECT
+        or _LOGIN_PW_HINT
     )
 
     # --- Log with full context (always, even if deduped) ---
