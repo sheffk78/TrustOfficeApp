@@ -72,6 +72,21 @@ export function useOnboardingWizard() {
     return newTrust;
   }, [user, setSelectedTrust, loadTrusts]);
 
+  /**
+   * Remove the placeholder trust created by createMinimalTrust when a downstream
+   * step fails (e.g., document upload or analysis). Prevents orphaned "My Trust"
+   * shells from cluttering the user's account and avoids confusing UI state.
+   */
+  const rollbackMinimalTrust = useCallback(async (trustId) => {
+    if (!trustId) return;
+    try {
+      await xhrRequest('DELETE', `${API_URL}/api/trusts/${trustId}`, null, getToken());
+    } catch (err) {
+      // Best-effort cleanup; don't block error handling if delete fails.
+      console.warn('Failed to rollback placeholder trust:', err);
+    }
+  }, [getToken]);
+
   /** Upload the selected trust document to the newly created trust's vault. */
   const uploadTrustDocument = useCallback(async (trustId, file) => {
     setUploadProgress('Uploading document 0%');
@@ -105,8 +120,9 @@ export function useOnboardingWizard() {
     stopPolling();
     resetPolling();
 
+    let newTrust = null;
     try {
-      const newTrust = await createMinimalTrust();
+      newTrust = await createMinimalTrust();
       await uploadTrustDocument(newTrust.trust_id, trustDoc);
       setDocUploaded(true);
       toast.success('Trust document uploaded! We are analyzing it now.');
@@ -116,25 +132,35 @@ export function useOnboardingWizard() {
       console.error('Doc upload error:', error);
       showError(toast, error, { operation: 'upload_trust_doc', page: 'Onboarding' });
       setUploadProgress('');
+      // Rollback the placeholder trust if we created one but didn't reach analysis.
+      if (newTrust?.trust_id) {
+        await rollbackMinimalTrust(newTrust.trust_id);
+      }
     } finally {
       setUploadingDoc(false);
     }
-  }, [trustDoc, createMinimalTrust, uploadTrustDocument, stopPolling, resetPolling, startPolling]);
+  }, [trustDoc, createMinimalTrust, uploadTrustDocument, stopPolling, resetPolling, startPolling, rollbackMinimalTrust]);
 
   /** Skip the document and go straight to manual entry. */
   const handleSkipDoc = useCallback(async () => {
     setLoading(true);
+    let newTrust = null;
     try {
-      await createMinimalTrust();
+      newTrust = await createMinimalTrust();
       setSkipDocument(true);
       setStep(3);
     } catch (error) {
       console.error('Skip doc trust creation error:', error);
       showError(toast, error, { operation: 'create_trust', page: 'Onboarding' });
+      // Rollback placeholder if creation succeeded but a downstream guard failed
+      // (shouldn't happen here, but keeps the pattern consistent with upload).
+      if (newTrust?.trust_id) {
+        await rollbackMinimalTrust(newTrust.trust_id);
+      }
     } finally {
       setLoading(false);
     }
-  }, [createMinimalTrust]);
+  }, [createMinimalTrust, rollbackMinimalTrust]);
 
   /** Confirm the trust details from step 3 (OnboardingConfirmStep). */
   const handleConfirmDetails = useCallback(async () => {

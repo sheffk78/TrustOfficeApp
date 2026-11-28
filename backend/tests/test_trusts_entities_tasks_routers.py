@@ -122,6 +122,18 @@ class TestTrustsRouter:
         assert data["jurisdiction"] == "Delaware"
         print(f"PASS: PUT /api/trusts/{TEST_TRUST_ID} updates jurisdiction")
 
+    def test_create_trust_rejects_empty_name_with_clear_message(self, auth_headers):
+        """POST /api/trusts with missing/empty name returns 422 with readable message."""
+        response = requests.post(
+            f"{BASE_URL}/api/trusts",
+            headers=auth_headers,
+            json={"name": "", "trust_type": "family", "jurisdiction": "DE"}
+        )
+        assert response.status_code == 422
+        data = response.json()
+        assert "Trust name is required" in data.get("detail", "")
+        print("PASS: POST /api/trusts empty name returns clear 422 message")
+
 
 # ==================== ENTITIES ROUTER TESTS ====================
 

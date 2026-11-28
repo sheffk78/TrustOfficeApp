@@ -273,7 +273,17 @@ async def create_trust(trust: TrustCreate, user: dict = Depends(get_current_user
     - Estate: 8 trusts
     - Advisor: unlimited
     - Legacy monthly/annual: 10 trusts (grandfathered)
+
+    422 UX guard: empty-name requests are almost always manual/API misuse (the
+    frontend guards already block empty strings). Convert them into a readable
+    message instead of Pydantic's generic "name: Field required" so the error is
+    actionable and doesn't look like a server bug in logs.
     """
+    if not trust.name or not trust.name.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Trust name is required."
+        )
     from dependencies import get_subscription_state
     sub_state = await get_subscription_state(user["user_id"])
     trust_limit = get_trust_limit(sub_state.plan_type, sub_state.legacy_trust_limit)

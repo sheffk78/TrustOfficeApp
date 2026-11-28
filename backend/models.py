@@ -1,5 +1,5 @@
 # Shared Pydantic models and enums for TrustOffice API
-from pydantic import BaseModel, Field, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, model_validator
 from typing import List, Optional, Literal, Union
 from enum import Enum
 import calendar
@@ -555,24 +555,26 @@ class EntityCreate(BaseModel):
     article_ref_profit_distribution: str = ""
 
 class EntityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     entity_id: str
     trust_id: str
     name: str
     entity_type: str
-    legal_name: str
+    legal_name: str = ""
     formation_date: Optional[str] = None
-    governing_law: str
+    governing_law: str = ""
     ein: Optional[str] = None
-    trustee_names: str
-    beneficiary_standard: str
-    article_ref_distribution: str
-    article_ref_compensation: str
-    article_ref_amendment: str
-    oversight_required: bool
-    member_names: str
-    manager_names: str
-    article_ref_authority: str
-    article_ref_profit_distribution: str
+    trustee_names: str = ""
+    beneficiary_standard: str = ""
+    article_ref_distribution: str = ""
+    article_ref_compensation: str = ""
+    article_ref_amendment: str = ""
+    oversight_required: bool = False
+    member_names: str = ""
+    manager_names: str = ""
+    article_ref_authority: str = ""
+    article_ref_profit_distribution: str = ""
     created_at: str
 
 class EntityRelationshipCreate(BaseModel):
