@@ -914,7 +914,7 @@ async def update_minutes(minutes_id: str, request: Request, user: dict = Depends
         if not template:
             raise HTTPException(status_code=404, detail="Minutes not found. It may have been deleted. Please refresh the page and try again.")
         if data.get("status") != "finalized":
-            raise HTTPException(status_code=400, detail="Template minutes can only be finalized through this endpoint.")
+            raise HTTPException(status_code=400, detail="Template minutes cannot be edited through this endpoint. Use PUT /minutes-templates/{id} to edit, or send status=finalized to finalize.")
         if template.get("status") == "final":
             raise HTTPException(status_code=409, detail="Minutes are already finalized.")
         result = await db.minutes_templates.update_one(
