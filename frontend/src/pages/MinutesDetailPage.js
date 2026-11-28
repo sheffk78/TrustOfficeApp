@@ -92,13 +92,26 @@ export default function MinutesDetailPage() {
     if (!isDraft) return; // Defense-in-depth: backend also blocks this
     setSaving(true);
     try {
-      const response = await fetchWithAuth(`/minutes/${minutesId}`, {
+      const isTemplate = !!(minutes.template_type || minutes.template_data);
+      const url = isTemplate ? `/minutes-templates/${minutesId}` : `/minutes/${minutesId}`;
+      const body = isTemplate
+        ? JSON.stringify({
+            template_data: {
+              ...(minutes.template_data || {}),
+              decisions_text: editedText,
+              participants_text: editedParticipants,
+              other_attendees_text: editedOtherAttendees
+            }
+          })
+        : JSON.stringify({
+            decisions_text: editedText,
+            participants_text: editedParticipants,
+            other_attendees_text: editedOtherAttendees
+          });
+
+      const response = await fetchWithAuth(url, {
         method: 'PUT',
-        body: JSON.stringify({
-          decisions_text: editedText,
-          participants_text: editedParticipants,
-          other_attendees_text: editedOtherAttendees
-        })
+        body
       });
       
       if (response.ok) {
@@ -169,7 +182,9 @@ export default function MinutesDetailPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const response = await fetchWithAuth(`/minutes/${minutesId}`, {
+      const isTemplate = !!(minutes.template_type || minutes.template_data);
+      const url = isTemplate ? `/minutes-templates/${minutesId}` : `/minutes/${minutesId}`;
+      const response = await fetchWithAuth(url, {
         method: 'DELETE',
       });
       if (response.ok) {
