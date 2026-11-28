@@ -3,13 +3,43 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
-from pydantic import field_validator
+from pydantic import field_validator, ValidationError
 
 from database import db
 from dependencies import get_current_user, require_write_access, auto_update_onboarding
 from models import EntityCreate, EntityResponse, EntityRelationshipCreate, EntityRelationshipResponse
 
 router = APIRouter(tags=["entities"])
+
+_REQUIRED_ENTITY_FIELDS = (
+    "legal_name", "governing_law", "trustee_names", "beneficiary_standard",
+    "article_ref_distribution", "article_ref_compensation", "article_ref_amendment",
+    "member_names", "manager_names", "article_ref_authority",
+    "article_ref_profit_distribution", "oversight_required",
+)
+
+
+def _entity_response(doc: dict) -> EntityResponse:
+    """Build EntityResponse from a stored entity doc.
+
+    Backfills fields that predate later schema additions (legacy docs missing
+    them 500'd GET /api/entities with 'manager_names Field required',
+    fingerprint b2b50917, 2026-11-27), then falls back to model_validate so
+    unknown legacy key sets can never re-break reads.
+    """
+    missing = {
+        f: (False if f == "oversight_required" else "")
+        for f in _REQUIRED_ENTITY_FIELDS
+        if f not in doc or doc[f] is None
+    }
+    if missing:
+        doc = {**doc, **missing}
+    try:
+        return EntityResponse(**doc)
+    except ValidationError:
+        return EntityResponse.model_validate(
+            {k: v for k, v in doc.items() if k in EntityResponse.model_fields}
+        )
 
 
 # ==================== ENTITY CRUD ENDPOINTS ====================
@@ -39,7 +69,7 @@ async def create_entity(entity: EntityCreate, user: dict = Depends(require_write
     await db.entities.insert_one(entity_doc)
     await auto_update_onboarding(user["user_id"], entity.trust_id)
     
-    return EntityResponse(**entity_doc)
+    return _entity_response(entity_doc)
 
 
 @router.get("/entities")
@@ -61,7 +91,7 @@ async def get_entities(
     ).skip(skip).limit(limit).to_list(limit)
     
     return {
-        "items": [EntityResponse(**e) for e in entities],
+        "items": [_entity_response(e) for e in entities],
         "total": total,
         "skip": skip,
         "limit": limit
@@ -78,7 +108,7 @@ async def get_entity(entity_id: str, user: dict = Depends(get_current_user)):
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found. It may have been deleted. Please refresh the page and try again.")
     
-    return EntityResponse(**entity)
+    return _entity_response(entity)
 
 
 @router.patch("/entities/{entity_id}", response_model=EntityResponse)
@@ -104,7 +134,7 @@ async def update_entity(entity_id: str, updates: dict, user: dict = Depends(requ
         await db.entities.update_one({"entity_id": entity_id}, {"$set": update_data})
     
     updated = await db.entities.find_one({"entity_id": entity_id}, {"_id": 0})
-    return EntityResponse(**updated)
+    return _entity_response(updated)
 
 
 @router.delete("/entities/{entity_id}")
